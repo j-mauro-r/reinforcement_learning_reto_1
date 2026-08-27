@@ -197,7 +197,71 @@ Estas propiedades favorecen preliminarmente métodos value-based compatibles con
 
 La selección final del algoritmo debe apoyarse también en las métricas agregadas del baseline aleatorio, especialmente dispersión y densidad de recompensas.
 
-## 13. Estado del EDA
+## 13. Baseline y métricas del proyecto
+
+### 13.1 Métrica principal exigida por el enunciado
+
+Para Assault, el enunciado no define un puntaje absoluto mínimo para considerar el entorno resuelto. El criterio obligatorio consiste en evaluar el agente en **al menos 10 partidas independientes** y reportar el **puntaje o recompensa promedio** obtenido.
+
+Por lo tanto, la métrica principal del proyecto será:
+
+**Recompensa promedio del agente sobre al menos 10 episodios independientes de evaluación.**
+
+Esta será la métrica utilizada para comparar versiones del agente y para reportar el desempeño final del reto.
+
+### 13.2 Baseline oficial del proyecto
+
+El baseline será una **política completamente aleatoria** ejecutada sobre el mismo entorno y bajo un protocolo de evaluación equivalente al utilizado para el agente entrenado.
+
+El baseline debe calcularse sobre al menos 10 episodios independientes y registrar como mínimo:
+
+- recompensa promedio;
+- mediana;
+- desviación estándar;
+- recompensa mínima;
+- recompensa máxima.
+
+El resultado del agente entrenado se comparará contra este baseline para evidenciar que aprendió un comportamiento superior a seleccionar acciones aleatoriamente.
+
+### 13.3 Criterio interno de éxito
+
+Dado que el enunciado no define un umbral numérico absoluto para Assault, el proyecto no establecerá artificialmente uno.
+
+El criterio interno mínimo será:
+
+**La recompensa promedio del agente entrenado debe ser superior a la recompensa promedio del baseline aleatorio, evaluando ambos con el mismo protocolo.**
+
+Además, el comportamiento observado en el video debe ser coherente con una política aprendida y no con acciones predominantemente aleatorias.
+
+### 13.4 Métricas secundarias de evaluación
+
+Estas métricas no reemplazan la métrica principal, pero ayudan a interpretar la calidad y estabilidad del agente:
+
+| Métrica | Propósito |
+|---|---|
+| Mediana de recompensa | reducir el efecto de episodios excepcionalmente altos o bajos |
+| Desviación estándar | medir estabilidad entre episodios |
+| Recompensa mínima y máxima | identificar variabilidad y casos extremos |
+| Steps o frames por episodio | observar supervivencia y duración de las partidas |
+| Pérdidas de vida por episodio | analizar comportamiento defensivo |
+| Porcentaje de steps con recompensa positiva | medir densidad de eventos exitosos |
+| Tiempo total de entrenamiento | cumplir el análisis requerido por el reporte técnico |
+
+### 13.5 Protocolo de comparación
+
+Para que las comparaciones sean válidas, baseline y agente entrenado deberán evaluarse manteniendo constante:
+
+- `ALE/Assault-v5`;
+- configuración del entorno;
+- espacio de acciones;
+- `frameskip`;
+- `repeat_action_probability`;
+- número mínimo de episodios de evaluación;
+- política sin exploración adicional durante la evaluación del agente entrenado, salvo que el algoritmo requiera explícitamente otro comportamiento y se documente.
+
+Los resultados de entrenamiento y evaluación deben mantenerse separados. La recompensa observada durante entrenamiento sirve para analizar aprendizaje; la recompensa promedio de los episodios independientes de evaluación será la métrica utilizada para reportar el desempeño final.
+
+## 14. Estado del EDA
 
 ### Información ya cubierta
 
@@ -213,21 +277,22 @@ La selección final del algoritmo debe apoyarse también en las métricas agrega
 - rango de píxeles observado en el frame inicial;
 - vidas iniciales observadas: `4`;
 - claves disponibles en `info`: `lives`, `episode_frame_number`, `frame_number`, `seeds`;
-- versiones principales utilizadas en la primera ejecución.
+- versiones principales utilizadas en la primera ejecución;
+- métrica principal del proyecto;
+- baseline de comparación;
+- métricas secundarias y protocolo de evaluación.
 
 ### Información pendiente de consolidar con el Experimento 0
 
-1. recompensa media, mediana, desviación y distribución de la política aleatoria;
-2. recompensa mínima y máxima por episodio;
-3. duración media y rango de episodios en steps y frames;
-4. comportamiento de pérdidas de vida durante los episodios;
-5. densidad de recompensas positivas, cero y negativas;
-6. relación entre `terminated`, `truncated` y pérdida de vidas;
-7. baseline cuantitativo completo sobre los 10 episodios ejecutados;
-8. dimensiones después del preprocesamiento definitivo;
-9. consumo real de RAM/VRAM y velocidad de interacción durante el futuro entrenamiento en Colab con GPU.
+1. valor cuantitativo final del baseline aleatorio: media, mediana, desviación, mínimo y máximo;
+2. duración media y rango de episodios en steps y frames;
+3. comportamiento de pérdidas de vida durante los episodios;
+4. densidad de recompensas positivas, cero y negativas;
+5. relación entre `terminated`, `truncated` y pérdida de vidas;
+6. dimensiones después del preprocesamiento definitivo;
+7. consumo real de RAM/VRAM y velocidad de interacción durante el futuro entrenamiento en Colab con GPU.
 
-## 14. Implicaciones MLOps iniciales
+## 15. Implicaciones MLOps iniciales
 
 Desde esta fase deben registrarse como configuración versionada:
 
@@ -240,6 +305,9 @@ Desde esta fase deben registrarse como configuración versionada:
 - frameskip;
 - repeat action probability;
 - hardware de ejecución;
-- variables de observabilidad disponibles en `info`.
+- variables de observabilidad disponibles en `info`;
+- protocolo de evaluación;
+- baseline utilizado;
+- métricas principales y secundarias.
 
 Esto permitirá que los experimentos posteriores en Colab, TensorBoard y MLflow sean comparables y reproducibles.
