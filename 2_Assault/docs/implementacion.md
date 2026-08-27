@@ -34,7 +34,7 @@ Fuentes de verdad relacionadas:
 ```text
 HU001  EDA + baseline aleatorio                      [COMPLETADA]
   ↓
-HU002  Pipeline reproducible del entorno
+HU002  Pipeline reproducible del entorno              [COMPLETADA]
   ↓
 HU003  Núcleo DDQN
   ↓
@@ -80,6 +80,8 @@ La secuencia es deliberada: primero se construye y valida el sistema; después s
 
 ### HU002 — Pipeline reproducible del entorno
 
+**Estado:** completada.
+
 **Propósito:** construir la única fábrica/configuración de `ALE/Assault-v5` que será utilizada por entrenamiento y evaluación.
 
 Debe implementar:
@@ -96,6 +98,25 @@ Debe implementar:
 - detección básica de hardware de Colab.
 
 **Resultado esperado:** para una misma configuración y seed, el pipeline crea observaciones con dimensiones y tipos esperados y puede ejecutar episodios sin errores.
+
+**Entregables principales:**
+
+- `2_Assault/configs/ddqn_config.yaml`
+- `2_Assault/src/environment.py`
+- `2_Assault/src/utils.py`
+- `2_Assault/tests/test_smoke.py`
+- `2_Assault/assault_ddqn.ipynb`
+- `2_Assault/requirements.txt`
+
+**Evidencia de autovalidación HU002:**
+
+- `python -m pytest 2_Assault\tests -q` -> `6 passed`.
+- Observación procesada validada: shape `(4, 84, 84)`, dtype `uint8`.
+- Espacio de acciones validado: `Discrete(7)` con `NOOP`, `FIRE`, `UP`, `RIGHT`, `LEFT`, `RIGHTFIRE`, `LEFTFIRE`.
+- `frameskip` efectivo validado con contadores ALE: delta de `episode_frame_number` igual a `4` por `step()`.
+- Train/eval crean entornos mediante la misma fábrica y comparten contrato de observación/acciones.
+- Detección de hardware ejecutada localmente: Python/Gymnasium/ALE-Py/CPU/RAM/GPU reportados sin requerir GPU.
+- `assault_ddqn.ipynb` creado como orquestador compatible con Colab para instalar dependencias y ejecutar las mismas validaciones de HU002.
 
 **Habilita:** HU003.
 
