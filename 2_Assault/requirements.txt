@@ -1,0 +1,8 @@
+gymnasium[atari,accept-rom-license]==1.1.1
+ale-py==0.10.1
+autorom[accept-rom-license]==0.6.1
+numpy>=1.23
+Pillow>=9.0
+PyYAML>=6.0
+psutil>=5.9
+pytest>=8.0

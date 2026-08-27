@@ -1,0 +1,21 @@
+environment:
+  id: ALE/Assault-v5
+  obs_type: rgb
+  frame_skip: 4
+  repeat_action_probability: 0.25
+  full_action_space: false
+  render_mode: null
+
+preprocessing:
+  grayscale: true
+  resize_height: 84
+  resize_width: 84
+  frame_stack: 4
+  dtype: uint8
+  normalize_pixels_in_env: false
+
+reproducibility:
+  seed: 42
+
+evaluation:
+  episodes: 10
