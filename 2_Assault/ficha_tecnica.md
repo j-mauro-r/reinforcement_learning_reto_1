@@ -4,12 +4,13 @@
 
 Documentar las características del entorno `ALE/Assault-v5` relevantes para diseñar, entrenar y evaluar un agente de aprendizaje por refuerzo profundo dentro del Reto 1.
 
-Esta ficha constituye la fase inicial de exploración del entorno (EDA para Reinforcement Learning). Separa la información conocida por documentación oficial de aquella que debe obtenerse empíricamente ejecutando el entorno.
+Esta ficha constituye la fase inicial de exploración del entorno (EDA para Reinforcement Learning). Separa la información conocida por documentación oficial de aquella obtenida empíricamente mediante la primera ejecución del Experimento 0.
 
 ## 2. Fuentes
 
 - Documentación oficial de Arcade Learning Environment (ALE): https://ale.farama.org/environments/assault/
 - Enunciado del Reto 1 incluido en este repositorio.
+- `2_Assault/experimento_0_assault.ipynb`, primera ejecución del Experimento 0.
 
 ## 3. Descripción del problema
 
@@ -28,11 +29,26 @@ Desde la perspectiva de RL, el agente debe aprender simultáneamente comportamie
 | Observación por defecto | RGB |
 | Forma de observación | `(210, 160, 3)` |
 | Tipo de dato | `uint8` |
-| Rango de píxel | `[0, 255]` |
+| Rango teórico de píxel | `[0, 255]` |
+| Rango observado en el frame inicial del Experimento 0 | `0` a `214` |
 | Frameskip de `ALE/Assault-v5` | `4` |
 | Repeat action probability | `0.25` |
 | Mode disponible / default | `0` / `0` |
 | Difficulty disponible / default | `0` / `0` |
+| Vidas iniciales observadas | `4` |
+
+### Configuración validada en la primera ejecución
+
+La primera ejecución del Experimento 0 confirmó empíricamente:
+
+- Python `3.8.10`;
+- Gymnasium `1.1.1`;
+- ALE-Py `0.10.1`;
+- observación RGB de forma `(210, 160, 3)` y tipo `uint8`;
+- espacio de acciones `Discrete(7)`;
+- `frameskip=4`;
+- `repeat_action_probability=0.25`;
+- seed base `42`.
 
 ## 5. Espacio de acciones
 
@@ -48,6 +64,8 @@ El espacio mínimo de acciones contiene siete acciones discretas:
 | 5 | `RIGHTFIRE` |
 | 6 | `LEFTFIRE` |
 
+La primera ejecución del Experimento 0 confirmó que estos siete significados son los retornados por `env.unwrapped.get_action_meanings()`.
+
 ALE permite habilitar las 18 acciones posibles del Atari 2600 mediante `full_action_space=True`. Para este proyecto se recomienda inicialmente conservar el conjunto mínimo de 7 acciones, ya que contiene las acciones útiles identificadas por ALE y reduce innecesariamente la dimensionalidad del problema.
 
 ## 6. Espacio de observaciones
@@ -61,6 +79,15 @@ ALE ofrece tres representaciones posibles:
 | `ram` | `Box(0, 255, (128,), uint8)` |
 
 `ALE/Assault-v5` utiliza RGB por defecto.
+
+La primera ejecución confirmó que una observación RGB real tiene:
+
+- `shape=(210, 160, 3)`;
+- `dtype=uint8`;
+- valor mínimo observado `0`;
+- valor máximo observado `214` en el frame inicial inspeccionado.
+
+El rango `0-214` corresponde únicamente al frame observado durante la ejecución y no reemplaza el rango teórico `0-255` definido por el espacio de observación.
 
 Para el reto conviene partir de imágenes, coherente con la dificultad descrita en el enunciado. Sin embargo, entregar directamente imágenes RGB de 210x160x3 a una red neuronal sería computacionalmente costoso. En la etapa de diseño deberán evaluarse preprocesamientos estándar de Atari, particularmente reducción de resolución, escala de grises y apilamiento de frames.
 
@@ -77,69 +104,100 @@ Esto convierte el entorno en estocástico y evita asumir una correspondencia com
 
 La configuración debe mantenerse fija y registrada para asegurar comparabilidad y reproducibilidad entre experimentos.
 
-## 8. Recompensas
+## 8. Información expuesta por `info`
+
+La primera ejecución del Experimento 0 permitió descubrir información adicional que no estaba detallada en la ficha original.
+
+En `reset()` se observó:
+
+```python
+{
+    'lives': 4,
+    'episode_frame_number': 0,
+    'frame_number': 0,
+    'seeds': (3444837047, 2669555309)
+}
+```
+
+Esto confirma que ALE expone directamente información útil para observabilidad del entorno:
+
+| Variable | Interpretación práctica |
+|---|---|
+| `lives` | permite registrar y detectar pérdidas de vida sin inferirlas desde la imagen |
+| `episode_frame_number` | permite seguir el avance temporal dentro del episodio |
+| `frame_number` | permite observar el contador global de frames reportado por ALE |
+| `seeds` | expone semillas internas utilizadas por ALE |
+
+Estas variables pueden reutilizarse posteriormente para diagnóstico, evaluación y callbacks de entrenamiento, sin necesidad de reconstruir esta información a partir de observaciones visuales.
+
+## 9. Recompensas
 
 La página oficial de ALE consultada no documenta la tabla exacta de recompensas ni los valores otorgados por cada tipo de enemigo o evento.
 
 El enunciado del reto establece que el objetivo es destruir la mayor cantidad posible de enemigos y maximizar la recompensa acumulada.
 
-Por lo tanto, la distribución real de recompensas debe medirse empíricamente durante la exploración del entorno. No se deben asumir valores específicos sin evidencia de ejecución o documentación adicional.
+El Experimento 0 fue diseñado para medir empíricamente la distribución de recompensas mediante una política aleatoria. La primera ejecución ya permitió validar la instrumentación necesaria para registrar recompensas por step y por episodio, pero las métricas agregadas completas deben mantenerse como evidencia del notebook antes de incorporarlas como valores definitivos en esta ficha.
 
-## 9. Terminación del episodio y vidas
+No se deben asumir valores específicos sin evidencia explícita de la ejecución.
 
-La página específica de Assault de ALE no proporciona suficiente detalle para documentar con precisión:
+## 10. Terminación del episodio y vidas
 
-- número de vidas iniciales;
-- eventos exactos que provocan pérdida de vida;
-- condición exacta de terminación (`terminated`);
-- posibles truncamientos (`truncated`);
-- duración típica de una partida.
+La primera ejecución resolvió parcialmente una de las incógnitas originales:
 
-Estos elementos deben medirse ejecutando el entorno antes del entrenamiento definitivo.
+- `lives` está disponible en `info`;
+- el valor inicial observado fue de **4 vidas**;
+- `episode_frame_number` y `frame_number` están disponibles para estudiar duración y dinámica temporal.
 
-## 10. Dificultades de aprendizaje identificadas
+Todavía deben consolidarse a partir de los resultados completos del Experimento 0:
 
-### 10.1 Observación de alta dimensionalidad
+- comportamiento exacto de las pérdidas de vida durante los episodios;
+- relación entre pérdida de la última vida y `terminated`;
+- presencia o ausencia de `truncated`;
+- duración típica de una partida;
+- cantidad media de pérdidas de vida por episodio.
+
+## 11. Dificultades de aprendizaje identificadas
+
+### 11.1 Observación de alta dimensionalidad
 
 Cada estado RGB contiene 210 x 160 x 3 valores. El agente deberá extraer automáticamente características visuales relevantes.
 
-### 10.2 Dependencia temporal
+### 11.2 Dependencia temporal
 
 Una imagen individual muestra posiciones, pero no describe completamente movimiento. Para decidir si debe esquivar o disparar es necesario recuperar información temporal.
 
-### 10.3 Múltiples objetivos simultáneos
+### 11.3 Múltiples objetivos simultáneos
 
 El agente debe considerar su posición, enemigos, proyectiles y amenazas simultáneamente.
 
-### 10.4 Equilibrio ataque-defensa
+### 11.4 Equilibrio ataque-defensa
 
 Disparar constantemente puede no ser suficiente: el agente debe aprender cuándo atacar y cuándo desplazarse para sobrevivir.
 
-### 10.5 Entorno estocástico
+### 11.5 Entorno estocástico
 
 La probabilidad de repetición de acción de 0.25 introduce variabilidad incluso ante políticas idénticas.
 
-### 10.6 Costo computacional
+### 11.6 Costo computacional
 
 El aprendizaje desde imágenes requiere una red convolucional y un volumen elevado de interacciones. El enunciado recomienda explícitamente GPU y Google Colab.
 
-## 11. Información suficiente para seleccionar algoritmo
+## 12. Información disponible para seleccionar algoritmo
 
-La documentación oficial sí proporciona información suficiente para establecer varias restricciones importantes del diseño:
+La documentación oficial y la primera ejecución permiten establecer varias restricciones importantes del diseño:
 
 1. Las acciones son discretas y pocas (`Discrete(7)`).
 2. El estado es visual y de alta dimensionalidad.
 3. Existe dependencia temporal entre frames.
 4. El entorno es estocástico.
-5. El entrenamiento será costoso y requerirá reutilización eficiente de experiencias.
+5. ALE expone vidas y contadores de frames, mejorando la observabilidad durante entrenamiento y evaluación.
+6. El entrenamiento será costoso y requerirá reutilización eficiente de experiencias.
 
 Estas propiedades favorecen preliminarmente métodos value-based compatibles con acciones discretas, como DQN, DQN + Prioritized Experience Replay o DDQN, todos permitidos por el enunciado.
 
-La selección final del algoritmo debe realizarse después de completar el EDA empírico y construir el baseline aleatorio.
+La selección final del algoritmo debe apoyarse también en las métricas agregadas del baseline aleatorio, especialmente dispersión y densidad de recompensas.
 
-## 12. ¿Es suficiente la documentación oficial para completar el EDA?
-
-**No completamente.** La documentación de ALE es suficiente para caracterizar la interfaz formal del entorno y diseñar la exploración, pero no sustituye una ejecución empírica.
+## 13. Estado del EDA
 
 ### Información ya cubierta
 
@@ -150,38 +208,24 @@ La selección final del algoritmo debe realizarse después de completar el EDA e
 - `frameskip`;
 - probabilidad de repetición de acción;
 - modos y dificultades disponibles;
-- descripción general de la dinámica del juego.
+- descripción general de la dinámica del juego;
+- forma y tipo real de una observación RGB;
+- rango de píxeles observado en el frame inicial;
+- vidas iniciales observadas: `4`;
+- claves disponibles en `info`: `lives`, `episode_frame_number`, `frame_number`, `seeds`;
+- versiones principales utilizadas en la primera ejecución.
 
-### Información pendiente de EDA empírico
+### Información pendiente de consolidar con el Experimento 0
 
-Antes del entrenamiento deben medirse como mínimo:
-
-1. recompensa media, desviación y distribución de una política aleatoria;
-2. recompensa mínima y máxima observada;
-3. duración de episodios en steps y frames;
-4. número y comportamiento de las vidas;
-5. frecuencia de recompensas positivas y presencia de recompensas nulas/negativas;
-6. causas observadas de `terminated` y `truncated`;
-7. comportamiento real del espacio de acciones mediante episodios de prueba;
-8. dimensiones luego del preprocesamiento seleccionado;
-9. consumo aproximado de RAM/VRAM y velocidad de interacción en Colab;
-10. baseline sobre al menos 10 episodios, alineado con el criterio de evaluación del reto.
-
-## 13. Próximo paso recomendado
-
-Crear un notebook o módulo de exploración reproducible que ejecute una política completamente aleatoria sobre un número controlado de episodios y registre:
-
-- seed;
-- recompensa por episodio;
-- longitud del episodio;
-- acciones ejecutadas;
-- recompensas por step;
-- vidas reportadas por el entorno;
-- `terminated` y `truncated`;
-- estadísticos descriptivos;
-- algunos frames de referencia.
-
-El resultado constituirá el **baseline experimental** contra el cual comparar posteriormente el agente entrenado y permitirá cerrar formalmente la etapa de EDA antes de seleccionar el algoritmo definitivo.
+1. recompensa media, mediana, desviación y distribución de la política aleatoria;
+2. recompensa mínima y máxima por episodio;
+3. duración media y rango de episodios en steps y frames;
+4. comportamiento de pérdidas de vida durante los episodios;
+5. densidad de recompensas positivas, cero y negativas;
+6. relación entre `terminated`, `truncated` y pérdida de vidas;
+7. baseline cuantitativo completo sobre los 10 episodios ejecutados;
+8. dimensiones después del preprocesamiento definitivo;
+9. consumo real de RAM/VRAM y velocidad de interacción durante el futuro entrenamiento en Colab con GPU.
 
 ## 14. Implicaciones MLOps iniciales
 
@@ -195,6 +239,7 @@ Desde esta fase deben registrarse como configuración versionada:
 - wrappers/preprocesamiento;
 - frameskip;
 - repeat action probability;
-- hardware de ejecución.
+- hardware de ejecución;
+- variables de observabilidad disponibles en `info`.
 
 Esto permitirá que los experimentos posteriores en Colab, TensorBoard y MLflow sean comparables y reproducibles.
