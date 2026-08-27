@@ -1,0 +1,112 @@
+Enunciado Reto I
+
+Descripción
+Para el Reto 1 vamos a trabajar en los ambientes de videojuegos clásicos de Box2D y Atari sobre los cuales nos enfocaremos en tres juegos para los cuales se debe crear un agente.
+
+Para resolver las tareas deben escoger al menos dos de los siguientes métodos de aprendizaje por refuerzo profundo.  Los estudiantes pueden reutilizar un algoritmo en más de un problema, siempre que se cumpla el requisito mínimo de utilizar al menos dos métodos distintos a lo largo del reto. NO ES POSIBLE USAR UN ALGORITMO DIFERENTE A ESTOS PARA RESOLVER LOS PROBLEMAS.
+
+•DQN 
+
+•DQN + Prioritized Experience Replay 
+
+•DDQN 
+
+•REINFORCE
+
+Problema de dificultad básica
+https://gymnasium.farama.org/environments/box2d/lunar_lander/
+
+El primer problema a resolver corresponde al entorno LunarLander de Gymnasium   En este ambiente, el objetivo es controlar una nave espacial mediante un conjunto discreto de acciones que activan los motores de propulsión, con el fin de lograr un aterrizaje seguro en la zona designada entre dos banderas ubicadas en la posición (0,0) del entorno.
+
+La nave inicia siempre desde la misma posición inicial, mientras que el terreno varía entre episodios. No obstante, la zona de aterrizaje se mantiene como una superficie horizontal. El entorno permite además la configuración de parámetros físicos como gravedad, viento y turbulencia, por lo que el agente debe ser capaz de generalizar su comportamiento ante estas variaciones.
+
+Su tarea consiste en seleccionar un algoritmo de aprendizaje por refuerzo y diseñar un agente capaz de aterrizar correctamente la nave de forma consistente, independientemente de los cambios en el entorno.
+
+Se considerará que el problema ha sido resuelto si el agente alcanza una recompensa promedio de al menos 200 evaluada sobre múltiples episodios consecutivos. Dado que el espacio de observaciones de este entorno es reducido, el entrenamiento puede realizarse utilizando únicamente CPU.
+
+Problema de dificultad media
+https://ale.farama.org/environments/assault/
+ 
+
+Assault es un juego de Atari en el que el agente controla una nave espacial que puede desplazarse horizontalmente (izquierda y derecha) en la parte inferior de la pantalla. Desde la parte superior del escenario, una nave maestra enemiga despliega continuamente drones hostiles que se mueven hacia el agente siguiendo distintos patrones. El agente puede disparar proyectiles para destruir estos drones antes de que alcancen la parte inferior de la pantalla o colisionen con la nave.
+
+El objetivo del juego es destruir la mayor cantidad posible de drones enemigos, maximizando así la recompensa acumulada. La recompensa se obtiene al eliminar enemigos, mientras que permitir que los drones avancen sin ser destruidos o perder la nave reduce el desempeño del agente. El ambiente presenta una dinámica rápida, múltiples enemigos simultáneos y un espacio de observaciones visuales basado en imágenes RGB, lo que incrementa la complejidad del problema.
+
+Para resolver este problema, su tarea es desarrollar un agente de aprendizaje por refuerzo profundo, utilizando uno de los métodos descritos previamente. El agente debe ser capaz de maximizar la recompensa promedio al ser evaluado en al menos 10 partidas independientes del juego.
+
+Dadas las características del ambiente, en particular el uso de observaciones basadas en imágenes, es necesario utilizar aceleración por GPU, por lo que se recomienda ejecutar el entrenamiento en Google Colab con GPU habilitada. Adicionalmente, el entrenamiento de este ambiente es considerablemente más costoso en tiempo de cómputo que los ejemplos vistos en los tutoriales del curso o el problema de LunarLander.
+
+Debido a las limitaciones de tiempo de ejecución en Colab, es posible que el entrenamiento deba realizarse en múltiples sesiones. En este contexto, se recomienda implementar mecanismos de guardado de modelos (checkpoints) que permitan reanudar el entrenamiento sin perder el progreso alcanzado. Tras realizar varias evaluaciones utilizando la GPU de Colab, puede ser necesario desconectar la sesión y esperar antes de continuar con nuevas ejecuciones.
+
+ Problema dificultad alta
+https://ale.farama.org/environments/battle_zone/
+
+BattleZone es un videojuego clásico de Atari en el que el agente controla un tanque armado desde una perspectiva en primera persona dentro de un entorno tridimensional minimalista. El objetivo principal del agente es destruir la mayor cantidad posible de vehículos enemigos, que pueden incluir tanques hostiles, misiles y otras unidades, mientras evita ser alcanzado por el fuego enemigo. El jugador dispone de un radar integrado en la parte superior de la pantalla que muestra la posición de los objetivos y amenazas alrededor del tanque, permitiendo localizar enemigos incluso fuera del campo de visión directo. 
+
+El tanque puede moverse libremente por el plano, navega en distintas direcciones (avanzar, retroceder, girar) y tiene la capacidad de disparar proyectiles para eliminar a sus adversarios. Destruir cada tipo de enemigo concede diferentes cantidades de puntos, y el entorno incluye obstáculos geométricos que también pueden influir en la dinámica de movimiento y combate del agente. 
+
+Al igual que otros entornos de Atari dentro del Arcade Learning Environment (ALE), BattleZone entrega observaciones en formato de imágenes RGB similares a las que vería un jugador humano, lo que hace que el espacio de estados sea visual y de alta dimensión. 
+
+Su tarea es desarrollar un agente de aprendizaje por refuerzo profundo, utilizando los métodos descritos previamente, de modo que el agente aprenda una política que maximice la recompensa promedio obtenida durante la ejecución de al menos 10 partidas del juego.
+
+Este problema en particular es más difícil que los anteriores en parte porque su espacio de acciones es mucho más grande. En este caso, no se espera que su agente logre un comportamiento o estrategia óptima de juego, o que alcance puntajes similares a los de un jugador humano, pero sí se espera que demuestre que aprendió algún comportamiento lógico en lugar de tomar acciones muy aleatorias.
+
+Dadas las características visuales y tridimensionales del ambiente, es necesario utilizar aceleración por GPU, por lo que se recomienda entrenar los agentes en Google Colab con GPU habilitada. El entrenamiento en entornos basados en píxeles de juegos complejos como BattleZone puede requerir mucho más tiempo de cómputo que en los ejemplos de los tutoriales del curso o entornos más simples como LunarLander.
+
+Además, debido a las limitaciones de tiempo de ejecución en Colab, es posible que el entrenamiento deba realizarse en varias sesiones independientes. Para mitigar la pérdida de progreso por desconexiones, se recomienda implementar puntos de control (checkpoints) que permitan reiniciar el entrenamiento desde estados guardados sin perder aprendizaje previo.
+
+Entrega
+ La entrega del reto para cada problema debe incluir los siguientes elementos obligatorios:
+
+1. Archivos a entregar
+
+Un notebook en Google Colab con el desarrollo completo del agente. El reto debe ser desarrollado y ejecutable en Google Colab, incluyendo todas las dependencias necesarias para su correcta ejecución. Los notebooks que no ejecuten correctamente tendrán una calificación de 0.
+
+El modelo entrenado del agente, el cual será utilizado para verificar la correcta ejecución y el comportamiento aprendido.
+
+Un video corto en el que se demuestre el funcionamiento de los agentes desarrollados (es decir el render el juego, no necesitan grabarse o colocar audio). En el video debe evidenciarse:
+
+El proceso de entrenamiento del agente.
+
+El comportamiento aprendido por el agente una vez entrenado.
+
+2. Reporte técnico (incluido dentro del notebook)
+
+El notebook debe contener un reporte técnico con presentación profesional, en el cual se explique y justifique el proceso de desarrollo de los agentes. Este reporte debe incluir, como mínimo, los siguientes puntos:
+
+La selección de los algoritmos de aprendizaje por refuerzo utilizados, junto con una breve justificación de su elección para cada problema.
+
+Las condiciones de ejecución del agente, incluyendo:
+
+Hiperparámetros de aprendizaje utilizados.
+
+Librerías y versiones empleadas.
+
+Características del hardware utilizado durante el entrenamiento.
+
+Un análisis de los resultados obtenidos para cada uno de los problemas resueltos. Este análisis debe estar acompañado de evidencias cuantitativas del entrenamiento y desempeño del agente, tales como:
+
+Tiempo de entrenamiento.
+
+Puntaje promedio obtenido por el agente en al menos 10 episodios de evaluación. Para juzgar el desempeño de su agente, especialmente en los juegos de Atari, puede compararlo con el comportamiento de una política completamente aleatoria.  
+
+ Gráficas de la evolución de la recompensa durante entrenamiento y explotación (se recomienda el uso de TensorBoard para la generación de estas gráficas).  
+
+Una descripción del comportamiento aprendido por el agente, relacionando dicho comportamiento con el algoritmo utilizado y los hiperparámetros seleccionados.
+
+Finalmente, una conclusión general, basada en los resultados obtenidos, sobre las capacidades de los agentes implementados (es decir, de los métodos de aprendizaje por refuerzo utilizados) para resolver el problema propuesto.
+
+Evaluación
+La evaluación del reto tendrá en cuenta:
+
+La completitud de la entrega. La entrega debe estar completa para cada problema.
+
+La implementación del agente. El notebook de su implementación de su agente debe seguir buenos estándares de programación, estar organizada, debe ser funcional, y debe dar evidencia de un desarrollo dentro del contexto de los métodos utilizados en el curso.
+
+El modelo del agente entrenado debe corresponder al entrenamiento del agente en el notebook.
+
+Para cada uno de los problemas el agente debe ser capaz de resolver el juego efectivamente.
+
+El video debe dar evidencia del proceso de entrenamiento del agente y su ejecución
+
+El reporte debe presentar formalmente el trabajo realizado debidamente justificado.
