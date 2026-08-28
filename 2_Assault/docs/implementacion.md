@@ -409,6 +409,8 @@ Debe implementar:
 
 **Evidencia de implementación HU004 (2026-08-27, rama `feature/hu004-ciclo-entrenamiento`):**
 
+- Commit de implementación registrado:
+  - `910d7ea2df9f88b45dbe386e5bff54856ff1ae73` (`Implement HU004 training preflight and loop`).
 - Archivos creados/modificados:
   - `2_Assault/src/preflight.py`
   - `2_Assault/src/trainer.py`
