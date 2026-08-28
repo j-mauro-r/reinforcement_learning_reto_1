@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import json
 import sys
 from pathlib import Path
 
@@ -35,6 +36,7 @@ def _config(tmp_path: Path, enabled: bool = True) -> dict:
         "local_directory": "logs/mlflow",
         "tracking_mode": "new",
         "mlflow_run_id": None,
+        "tracking_session_id": "session_001",
         "artifact_location": None,
         "log_checkpoint_binary": False,
     }
@@ -90,10 +92,18 @@ def _evaluation_summary() -> EvaluationSummary:
     )
 
 
-def _start_logged_run(tmp_path: Path, project_run_id: str = "assault_ddqn_exp_tracking"):
+def _start_logged_run(
+    tmp_path: Path,
+    project_run_id: str = "assault_ddqn_exp_tracking",
+    tracking_session_id: str = "session_001",
+):
     config = _config(tmp_path)
     tracker = MLflowTracker.from_config(config)
-    metadata = tracker.start_run(project_run_id=project_run_id, tracking_mode="new")
+    metadata = tracker.start_run(
+        project_run_id=project_run_id,
+        tracking_mode="new",
+        tracking_session_id=tracking_session_id,
+    )
     tracker.log_run_context(
         config=config,
         runtime_info=get_runtime_info(),
@@ -106,6 +116,19 @@ def _start_logged_run(tmp_path: Path, project_run_id: str = "assault_ddqn_exp_tr
         device="cpu",
     )
     return config, tracker, metadata
+
+
+def _artifact_paths(tracker: MLflowTracker, mlflow_run_id: str, directories: tuple[str, ...]) -> set[str]:
+    client = tracker._mlflow.tracking.MlflowClient()
+    return {item.path for directory in directories for item in client.list_artifacts(mlflow_run_id, directory)}
+
+
+def _download_json(tracker: MLflowTracker, mlflow_run_id: str, artifact_path: str, tmp_path: Path) -> dict:
+    client = tracker._mlflow.tracking.MlflowClient()
+    download_dir = tmp_path / "downloaded_artifacts"
+    download_dir.mkdir(parents=True, exist_ok=True)
+    local_path = client.download_artifacts(mlflow_run_id, artifact_path, str(download_dir))
+    return json.loads(Path(local_path).read_text(encoding="utf-8"))
 
 
 def test_disabled_tracking_is_noop_without_importing_mlflow(monkeypatch, tmp_path):
@@ -126,6 +149,7 @@ def test_disabled_tracking_is_noop_without_importing_mlflow(monkeypatch, tmp_pat
 
     assert metadata.enabled is False
     assert metadata.mlflow_run_id is None
+    assert metadata.tracking_session_id == "session_001"
     assert not (tmp_path / "mlruns").exists()
 
 
@@ -137,20 +161,39 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
     tracker.log_runtime_metadata(get_runtime_info(), git_commit="abc123", runtime="local")
     tracker.log_training_summary(_training_summary())
     tracker.log_evaluation_summary(_evaluation_summary())
-    tracker.log_checkpoint_reference(checkpoint, resume_mode="resume_full")
+    tracker.log_checkpoint_reference(
+        checkpoint,
+        resume_mode="resume_full",
+        checkpoint_output_reference=str(checkpoint.path),
+    )
+    tracker.log_session_metadata(
+        tracking_mode="new",
+        runtime_info=get_runtime_info(),
+        git_commit="abc123",
+        git_ref="feature/hu008-mlflow-tracking",
+        runtime="local",
+        device="cpu",
+        initial_global_step=0,
+        final_global_step=8,
+        checkpoint_input_reference=None,
+        checkpoint_output_reference=str(checkpoint.path),
+    )
     run = tracker.get_run(metadata.mlflow_run_id)
-    client = tracker._mlflow.tracking.MlflowClient()
-    artifacts = {
-        item.path
-        for directory in ("config", "metadata", "summaries", "artifacts")
-        for item in client.list_artifacts(metadata.mlflow_run_id, directory)
-    }
+    artifacts = _artifact_paths(tracker, metadata.mlflow_run_id, ("config", "sessions/session_001"))
+    session_metadata = _download_json(
+        tracker,
+        metadata.mlflow_run_id,
+        "sessions/session_001/session_metadata.json",
+        tmp_path,
+    )
     tracker.end_run()
 
     assert metadata.enabled is True
     assert metadata.mlflow_run_id
+    assert metadata.tracking_session_id == "session_001"
     assert run.info.run_id == metadata.mlflow_run_id
     assert run.data.tags["project_run_id"] == metadata.project_run_id
+    assert run.data.tags["latest_tracking_session_id"] == "session_001"
     assert run.data.params["identity.algorithm"] == "DDQN"
     assert run.data.params["identity.project_run_id"] == metadata.project_run_id
     assert run.data.params["git.commit"]
@@ -173,43 +216,122 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
     assert run.data.metrics["checkpoint/step"] == pytest.approx(8.0)
     assert run.data.tags["checkpoint_resume_mode"] == "resume_full"
     assert "config/ddqn_config.json" in artifacts
-    assert "metadata/runtime.json" in artifacts
-    assert "summaries/train_summary.json" in artifacts
-    assert "summaries/eval_summary.json" in artifacts
-    assert "artifacts/checkpoint_reference.json" in artifacts
+    assert "sessions/session_001/runtime.json" in artifacts
+    assert "sessions/session_001/training_summary.json" in artifacts
+    assert "sessions/session_001/evaluation_summary.json" in artifacts
+    assert "sessions/session_001/checkpoint_reference.json" in artifacts
+    assert "sessions/session_001/session_metadata.json" in artifacts
+    assert session_metadata["tracking_session_id"] == "session_001"
+    assert session_metadata["project_run_id"] == metadata.project_run_id
+    assert session_metadata["mlflow_run_id"] == metadata.mlflow_run_id
+    assert session_metadata["initial_global_step"] == 0
+    assert session_metadata["final_global_step"] == 8
+    assert session_metadata["checkpoint_input_reference"] is None
+    assert session_metadata["checkpoint_output_reference"] == str(checkpoint.path)
 
 
-def test_resume_existing_run_reuses_same_mlflow_run_and_preserves_metrics(tmp_path):
+def test_resume_existing_run_reuses_same_mlflow_run_and_separates_tracking_sessions(tmp_path):
     project_run_id = "assault_ddqn_exp_resume"
     _, tracker_a, metadata_a = _start_logged_run(tmp_path, project_run_id=project_run_id)
+    checkpoint_a = CheckpointMetadata(tmp_path / "checkpoint_step_000008.pt", project_run_id, 8, 2048, True)
     tracker_a.log_training_summary(_training_summary(initial_step=0, final_step=8))
+    tracker_a.log_checkpoint_reference(checkpoint_a, resume_mode="new", checkpoint_output_reference=str(checkpoint_a.path))
+    tracker_a.log_session_metadata(
+        tracking_mode="new",
+        runtime_info={"python_version": "3.11", "torch_version": "2.0", "cuda_version": None, "gpu_available": False},
+        runtime="local",
+        device="cpu",
+        initial_global_step=0,
+        final_global_step=8,
+        checkpoint_output_reference=str(checkpoint_a.path),
+    )
     tracker_a._mlflow.log_metric("custom/session_a_marker", 1.0)
     tracker_a.end_run()
 
     tracker_b = MLflowTracker.from_config(_config(tmp_path))
+    checkpoint_b = CheckpointMetadata(tmp_path / "checkpoint_step_000012.pt", project_run_id, 12, 3072, True)
     metadata_b = tracker_b.start_run(
         project_run_id=project_run_id,
         tracking_mode="resume",
         mlflow_run_id=metadata_a.mlflow_run_id,
+        tracking_session_id="session_002",
     )
     tracker_b.log_training_summary(_training_summary(initial_step=8, final_step=12))
+    tracker_b.log_checkpoint_reference(
+        checkpoint_b,
+        resume_mode="resume_full",
+        checkpoint_input_reference=str(checkpoint_a.path),
+        checkpoint_output_reference=str(checkpoint_b.path),
+    )
+    tracker_b.log_session_metadata(
+        tracking_mode="resume",
+        runtime_info={"python_version": "3.11", "torch_version": "2.0", "cuda_version": "12.1", "gpu_available": True, "gpu_name": "T4"},
+        runtime="Google Colab",
+        device="cuda",
+        initial_global_step=8,
+        final_global_step=12,
+        checkpoint_input_reference=str(checkpoint_a.path),
+        checkpoint_output_reference=str(checkpoint_b.path),
+    )
     tracker_b._mlflow.log_metric("custom/session_b_marker", 2.0)
     run = tracker_b.get_run(metadata_b.mlflow_run_id)
+    artifacts = _artifact_paths(tracker_b, metadata_b.mlflow_run_id, ("sessions/session_001", "sessions/session_002"))
+    session_a = _download_json(tracker_b, metadata_b.mlflow_run_id, "sessions/session_001/session_metadata.json", tmp_path)
+    session_b = _download_json(tracker_b, metadata_b.mlflow_run_id, "sessions/session_002/session_metadata.json", tmp_path)
     tracker_b.end_run()
 
     assert metadata_b.mlflow_run_id == metadata_a.mlflow_run_id
+    assert metadata_b.project_run_id == metadata_a.project_run_id
+    assert metadata_b.tracking_session_id == "session_002"
     assert run.data.params["identity.project_run_id"] == project_run_id
+    assert run.data.tags["latest_tracking_session_id"] == "session_002"
     assert run.data.metrics["custom/session_a_marker"] == pytest.approx(1.0)
     assert run.data.metrics["custom/session_b_marker"] == pytest.approx(2.0)
     assert run.data.metrics["train/initial_global_step"] == pytest.approx(8.0)
     assert run.data.metrics["train/final_global_step"] == pytest.approx(12.0)
+    assert "sessions/session_001/session_metadata.json" in artifacts
+    assert "sessions/session_002/session_metadata.json" in artifacts
+    assert "sessions/session_001/training_summary.json" in artifacts
+    assert "sessions/session_002/training_summary.json" in artifacts
+    assert session_a["checkpoint_output_reference"] == str(checkpoint_a.path)
+    assert session_b["checkpoint_input_reference"] == str(checkpoint_a.path)
+    assert session_b["checkpoint_output_reference"] == str(checkpoint_b.path)
+    assert session_b["initial_global_step"] == 8
+    assert session_b["final_global_step"] == 12
+    assert session_b["gpu_name"] == "T4"
+
+
+def test_duplicate_tracking_session_id_fails_fast_on_resume(tmp_path):
+    project_run_id = "assault_ddqn_exp_duplicate_session"
+    _, tracker_a, metadata_a = _start_logged_run(tmp_path, project_run_id=project_run_id)
+    tracker_a.log_session_metadata(tracking_mode="new", initial_global_step=0, final_global_step=8)
+    tracker_a.end_run()
+
+    tracker_b = MLflowTracker.from_config(_config(tmp_path))
+
+    with pytest.raises(RuntimeError, match="already exists"):
+        tracker_b.start_run(
+            project_run_id=project_run_id,
+            tracking_mode="resume",
+            mlflow_run_id=metadata_a.mlflow_run_id,
+            tracking_session_id="session_001",
+        )
 
 
 def test_resume_requires_explicit_mlflow_run_id(tmp_path):
     tracker = MLflowTracker.from_config(_config(tmp_path))
 
     with pytest.raises(ValueError, match="requires explicit mlflow_run_id"):
-        tracker.start_run(project_run_id="ambiguous", tracking_mode="resume")
+        tracker.start_run(project_run_id="ambiguous", tracking_mode="resume", tracking_session_id="session_001")
+
+
+def test_enabled_tracking_requires_explicit_tracking_session_id(tmp_path):
+    config = _config(tmp_path)
+    config["mlflow"]["tracking_session_id"] = None
+    tracker = MLflowTracker.from_config(config)
+
+    with pytest.raises(ValueError, match="tracking_session_id"):
+        tracker.start_run(project_run_id="missing_session", tracking_mode="new")
 
 
 def test_different_project_run_ids_create_isolated_mlflow_runs(tmp_path):
@@ -242,7 +364,7 @@ def test_tensorboard_and_mlflow_coexist_with_same_project_run_id(tmp_path):
         logger.close()
 
     tracker = MLflowTracker.from_config(config)
-    metadata = tracker.start_run(project_run_id=project_run_id)
+    metadata = tracker.start_run(project_run_id=project_run_id, tracking_session_id="session_001")
     tracker.log_training_summary(summary)
     run = tracker.get_run(metadata.mlflow_run_id)
     tracker.end_run()

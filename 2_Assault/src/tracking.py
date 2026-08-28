@@ -7,6 +7,7 @@ import json
 import math
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 from urllib.parse import urlparse
@@ -19,6 +20,7 @@ class MLflowRunMetadata:
     enabled: bool
     project_run_id: str
     mlflow_run_id: Optional[str]
+    tracking_session_id: Optional[str]
     experiment_name: Optional[str]
     experiment_id: Optional[str]
     tracking_uri: Optional[str]
@@ -29,6 +31,7 @@ class MLflowRunMetadata:
             "enabled": self.enabled,
             "project_run_id": self.project_run_id,
             "mlflow_run_id": self.mlflow_run_id,
+            "tracking_session_id": self.tracking_session_id,
             "experiment_name": self.experiment_name,
             "experiment_id": self.experiment_id,
             "tracking_uri": self.tracking_uri,
@@ -50,6 +53,7 @@ class MLflowTracker:
         experiment_name: str,
         artifact_location: Optional[str] = None,
         log_checkpoint_binary: bool = False,
+        tracking_session_id: Optional[str] = None,
     ) -> None:
         """Initializes the tracker.
 
@@ -61,15 +65,20 @@ class MLflowTracker:
                 experiment.
             log_checkpoint_binary: Whether checkpoint binaries may be uploaded.
                 The default is false to avoid duplicating large Replay Buffers.
+            tracking_session_id: Optional default session id. When MLflow is
+                enabled, ``start_run`` still requires an explicit id either via
+                this value or its ``tracking_session_id`` argument.
         """
         self.enabled = bool(enabled)
         self.tracking_uri = _normalize_tracking_uri(tracking_uri)
         self.experiment_name = str(experiment_name)
         self.artifact_location = artifact_location
         self.log_checkpoint_binary = bool(log_checkpoint_binary)
+        self.tracking_session_id = _normalize_session_id(tracking_session_id) if tracking_session_id else None
         self._mlflow = None
         self._run = None
         self._run_metadata: Optional[MLflowRunMetadata] = None
+        self._session_started_at: Optional[str] = None
 
     @classmethod
     def from_config(
@@ -104,12 +113,14 @@ class MLflowTracker:
             or "assault_ddqn"
         )
         artifact_location = os.environ.get("ASSAULT_MLFLOW_ARTIFACT_LOCATION") or mlflow_config.get("artifact_location")
+        tracking_session_id = os.environ.get("ASSAULT_MLFLOW_SESSION_ID") or mlflow_config.get("tracking_session_id")
         return cls(
             enabled=enabled,
             tracking_uri=str(resolved_tracking_uri) if resolved_tracking_uri else None,
             experiment_name=str(resolved_experiment),
             artifact_location=str(artifact_location) if artifact_location else None,
             log_checkpoint_binary=bool(mlflow_config.get("log_checkpoint_binary", False)),
+            tracking_session_id=str(tracking_session_id) if tracking_session_id else None,
         )
 
     @property
@@ -132,6 +143,7 @@ class MLflowTracker:
         mlflow_run_id: Optional[str] = None,
         run_name: Optional[str] = None,
         tags: Optional[Mapping[str, Any]] = None,
+        tracking_session_id: Optional[str] = None,
     ) -> MLflowRunMetadata:
         """Starts a new MLflow run or resumes an explicit existing run.
 
@@ -141,6 +153,8 @@ class MLflowTracker:
             mlflow_run_id: Required when ``tracking_mode="resume"``.
             run_name: Optional display name for a new MLflow run.
             tags: Optional extra run tags.
+            tracking_session_id: Unique notebook/computation session id within
+                the selected MLflow run. Required when tracking is enabled.
 
         Returns:
             Metadata linking the logical project run and MLflow run.
@@ -160,9 +174,14 @@ class MLflowTracker:
         if tracking_mode == "new" and mlflow_run_id is not None:
             raise ValueError("tracking_mode='new' must not receive mlflow_run_id.")
 
+        resolved_session_id = _normalize_session_id(tracking_session_id or self.tracking_session_id)
+
         if not self.enabled:
-            self._run_metadata = MLflowRunMetadata(False, project_run_id, None, None, None, self.tracking_uri)
+            self._run_metadata = MLflowRunMetadata(False, project_run_id, None, resolved_session_id, None, None, self.tracking_uri)
             return self._run_metadata
+
+        if not resolved_session_id:
+            raise ValueError("tracking_session_id must be explicit and non-empty when MLflow is enabled.")
 
         mlflow = self._require_mlflow()
         self._validate_tracking_uri()
@@ -174,6 +193,7 @@ class MLflowTracker:
             "algorithm": "DDQN",
             "project_run_id": project_run_id,
             "tracking_mode": tracking_mode,
+            "latest_tracking_session_id": resolved_session_id,
         }
         if tags:
             base_tags.update({str(key): _to_mlflow_value(value) for key, value in tags.items()})
@@ -182,6 +202,7 @@ class MLflowTracker:
             client = mlflow.tracking.MlflowClient()
             existing = client.get_run(str(mlflow_run_id))
             _validate_existing_project_run(existing.data, project_run_id)
+            self._ensure_session_is_new(client, str(mlflow_run_id), resolved_session_id)
             self._run = mlflow.start_run(run_id=str(mlflow_run_id))
             mlflow.set_tags(base_tags)
         else:
@@ -194,10 +215,13 @@ class MLflowTracker:
             enabled=True,
             project_run_id=project_run_id,
             mlflow_run_id=active.info.run_id,
+            tracking_session_id=resolved_session_id,
             experiment_name=self.experiment_name,
             experiment_id=active.info.experiment_id,
             tracking_uri=mlflow.get_tracking_uri(),
         )
+        self.tracking_session_id = resolved_session_id
+        self._session_started_at = _utc_now()
         self._log_param_once("identity.algorithm", "DDQN")
         self._log_param_once("identity.project_run_id", project_run_id)
         self._log_param_once("identity.experiment_name", self.experiment_name)
@@ -296,11 +320,12 @@ class MLflowTracker:
             }
         )
 
-    def log_training_summary(self, summary: Any, prefix: str = "train") -> None:
+    def log_training_summary(self, summary: Any, prefix: str = "train", tracking_session_id: Optional[str] = None) -> None:
         """Logs aggregate training metrics and a JSON summary artifact."""
         if not self.enabled:
             return
         data = _as_mapping(summary)
+        metric_step = _to_int(data.get("global_step"))
         metrics = {
             f"{prefix}/initial_global_step": data.get("initial_global_step"),
             f"{prefix}/final_global_step": data.get("global_step"),
@@ -316,10 +341,10 @@ class MLflowTracker:
         }
         if data.get("episode_rewards"):
             metrics[f"{prefix}/best_episode_reward"] = max(float(value) for value in data["episode_rewards"])
-        self._log_metrics(metrics)
-        self.log_dict_artifact(data, f"summaries/{prefix}_summary.json")
+        self._log_metrics(metrics, step=metric_step)
+        self.log_dict_artifact(data, "training_summary.json", tracking_session_id=tracking_session_id)
 
-    def log_evaluation_summary(self, summary: Any, prefix: str = "eval") -> None:
+    def log_evaluation_summary(self, summary: Any, prefix: str = "eval", tracking_session_id: Optional[str] = None) -> None:
         """Logs aggregate evaluation metrics and a JSON summary artifact."""
         if not self.enabled or summary is None:
             return
@@ -337,25 +362,37 @@ class MLflowTracker:
         if lengths:
             metrics[f"{prefix}/mean_episode_length"] = sum(float(value) for value in lengths) / len(lengths)
         self._log_metrics(metrics)
-        self.log_dict_artifact(data, f"summaries/{prefix}_summary.json")
+        self.log_dict_artifact(data, "evaluation_summary.json", tracking_session_id=tracking_session_id)
 
-    def log_checkpoint_reference(self, checkpoint: Any, resume_mode: str, project_run_id: Optional[str] = None) -> None:
+    def log_checkpoint_reference(
+        self,
+        checkpoint: Any,
+        resume_mode: str,
+        project_run_id: Optional[str] = None,
+        checkpoint_input_reference: Optional[str] = None,
+        checkpoint_output_reference: Optional[str] = None,
+        tracking_session_id: Optional[str] = None,
+    ) -> None:
         """Logs lightweight checkpoint metadata without duplicating binaries."""
         if not self.enabled or checkpoint is None:
             return
         data = _as_mapping(checkpoint)
+        checkpoint_path = data.get("path")
+        output_reference = checkpoint_output_reference or checkpoint_path
         reference = {
-            "checkpoint_path": data.get("path"),
+            "checkpoint_path": checkpoint_path,
             "project_run_id": project_run_id or data.get("run_id") or (self._run_metadata.project_run_id if self._run_metadata else None),
             "checkpoint_step": data.get("checkpoint_step"),
             "checkpoint_size_bytes": data.get("size_bytes"),
             "resume_mode": resume_mode,
             "save_replay_buffer": data.get("save_replay_buffer"),
             "checkpoint_binary_logged": False,
+            "checkpoint_input_reference": checkpoint_input_reference,
+            "checkpoint_output_reference": output_reference,
         }
         self._mlflow.set_tags(
             {
-                "checkpoint_path": _to_mlflow_value(reference["checkpoint_path"]),
+                "checkpoint_path": _to_mlflow_value(reference["checkpoint_output_reference"]),
                 "checkpoint_step": _to_mlflow_value(reference["checkpoint_step"]),
                 "checkpoint_resume_mode": _to_mlflow_value(resume_mode),
             }
@@ -366,34 +403,115 @@ class MLflowTracker:
                 "checkpoint/size_bytes": reference["checkpoint_size_bytes"],
             }
         )
-        self.log_dict_artifact(reference, "artifacts/checkpoint_reference.json")
+        self.log_dict_artifact(reference, "checkpoint_reference.json", tracking_session_id=tracking_session_id)
 
     def log_config_snapshot(self, config: Mapping[str, Any], artifact_file: str = "config/ddqn_config.json") -> None:
         """Logs the effective configuration as a JSON artifact."""
         if self.enabled:
-            self.log_dict_artifact(dict(config), artifact_file)
+            self.log_dict_artifact(dict(config), artifact_file, session_scoped=False)
 
     def log_runtime_metadata(
         self,
         runtime_info: Mapping[str, Any],
         git_commit: Optional[str] = None,
         runtime: Optional[str] = None,
-        artifact_file: str = "metadata/runtime.json",
+        artifact_file: str = "runtime.json",
+        tracking_session_id: Optional[str] = None,
     ) -> None:
         """Logs runtime metadata as a JSON artifact."""
         if not self.enabled:
             return
         data = dict(runtime_info)
         data.update({"git_commit": git_commit, "runtime": runtime, "mlflow_version": _package_version("mlflow")})
-        self.log_dict_artifact(data, artifact_file)
+        self.log_dict_artifact(data, artifact_file, tracking_session_id=tracking_session_id)
 
-    def log_dict_artifact(self, data: Mapping[str, Any], artifact_file: str) -> None:
+    def log_session_metadata(
+        self,
+        tracking_mode: str,
+        runtime_info: Optional[Mapping[str, Any]] = None,
+        git_commit: Optional[str] = None,
+        git_ref: Optional[str] = None,
+        runtime: Optional[str] = None,
+        device: Optional[str] = None,
+        initial_global_step: Optional[int] = None,
+        final_global_step: Optional[int] = None,
+        checkpoint_input_reference: Optional[str] = None,
+        checkpoint_output_reference: Optional[str] = None,
+        started_at: Optional[str] = None,
+        ended_at: Optional[str] = None,
+        duration_seconds: Optional[float] = None,
+        tracking_session_id: Optional[str] = None,
+        extra: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        """Logs immutable per-session metadata under ``sessions/<id>/``."""
+        if not self.enabled:
+            return
+        metadata = self._require_run_metadata()
+        runtime_info = dict(runtime_info or {})
+        session_id = self._resolve_session_id(tracking_session_id)
+        session_metadata: Dict[str, Any] = {
+            "tracking_session_id": session_id,
+            "project_run_id": metadata.project_run_id,
+            "mlflow_run_id": metadata.mlflow_run_id,
+            "tracking_mode": str(tracking_mode).strip().lower(),
+            "started_at": started_at or self._session_started_at,
+            "ended_at": ended_at or _utc_now(),
+            "duration_seconds": duration_seconds,
+            "runtime": runtime,
+            "git_commit": git_commit,
+            "git_ref": git_ref,
+            "device": device,
+            "gpu_available": runtime_info.get("gpu_available"),
+            "gpu_name": runtime_info.get("gpu_name"),
+            "cpu": runtime_info.get("cpu"),
+            "initial_global_step": initial_global_step,
+            "final_global_step": final_global_step,
+            "checkpoint_input_reference": checkpoint_input_reference,
+            "checkpoint_output_reference": checkpoint_output_reference,
+            "versions": {
+                "python": runtime_info.get("python_version"),
+                "torch": runtime_info.get("torch_version"),
+                "cuda": runtime_info.get("cuda_version"),
+                "mlflow": _package_version("mlflow"),
+            },
+        }
+        if extra:
+            session_metadata.update(dict(extra))
+        self._mlflow.set_tags(
+            {
+                "latest_tracking_session_id": _to_mlflow_value(session_id),
+                "tracking_mode": _to_mlflow_value(session_metadata["tracking_mode"]),
+            }
+        )
+        self.log_dict_artifact(session_metadata, "session_metadata.json", tracking_session_id=session_id)
+
+    def log_dict_artifact(
+        self,
+        data: Mapping[str, Any],
+        artifact_file: str,
+        session_scoped: bool = True,
+        tracking_session_id: Optional[str] = None,
+    ) -> None:
         """Logs a small dictionary artifact to MLflow as JSON."""
         if not self.enabled:
             return
         self._require_active_run()
         serializable = _json_safe(data)
-        self._mlflow.log_dict(serializable, artifact_file)
+        artifact_path = str(artifact_file).replace("\\", "/").lstrip("/")
+        if session_scoped and not artifact_path.startswith("sessions/"):
+            artifact_path = f"{self._session_root(tracking_session_id)}/{artifact_path}"
+        self._mlflow.log_dict(serializable, artifact_path)
+
+    def list_session_artifacts(self, tracking_session_id: Optional[str] = None) -> Any:
+        """Lists artifacts recorded under the active run's session namespace."""
+        if not self.enabled:
+            return []
+        metadata = self._require_run_metadata()
+        self._require_mlflow()
+        return self._mlflow.tracking.MlflowClient().list_artifacts(
+            metadata.mlflow_run_id,
+            self._session_root(tracking_session_id),
+        )
 
     def get_run(self, mlflow_run_id: Optional[str] = None) -> Any:
         """Fetches an MLflow run with ``MlflowClient`` for validation."""
@@ -421,6 +539,32 @@ class MLflowTracker:
         self._require_mlflow()
         if self._mlflow.active_run() is None:
             raise RuntimeError("No active MLflow run. Call start_run() first.")
+
+    def _require_run_metadata(self) -> MLflowRunMetadata:
+        if self._run_metadata is None:
+            raise RuntimeError("No MLflow run metadata. Call start_run() first.")
+        return self._run_metadata
+
+    def _resolve_session_id(self, tracking_session_id: Optional[str] = None) -> str:
+        session_id = _normalize_session_id(tracking_session_id or self.tracking_session_id)
+        if not session_id:
+            raise ValueError("tracking_session_id must be explicit and non-empty when MLflow is enabled.")
+        return session_id
+
+    def _session_root(self, tracking_session_id: Optional[str] = None) -> str:
+        return f"sessions/{self._resolve_session_id(tracking_session_id)}"
+
+    def _ensure_session_is_new(self, client: Any, mlflow_run_id: str, tracking_session_id: str) -> None:
+        session_root = f"sessions/{tracking_session_id}"
+        try:
+            existing_artifacts = client.list_artifacts(mlflow_run_id, session_root)
+        except Exception:
+            existing_artifacts = []
+        for artifact in existing_artifacts:
+            if artifact.path == f"{session_root}/session_metadata.json":
+                raise RuntimeError(
+                    f"tracking_session_id='{tracking_session_id}' already exists for MLflow run {mlflow_run_id}."
+                )
 
     def _ensure_experiment(self) -> str:
         mlflow = self._require_mlflow()
@@ -467,7 +611,7 @@ class MLflowTracker:
             return
         self._mlflow.log_param(key, serialized)
 
-    def _log_metrics(self, metrics: Mapping[str, Any]) -> None:
+    def _log_metrics(self, metrics: Mapping[str, Any], step: Optional[int] = None) -> None:
         self._require_active_run()
         for key, value in metrics.items():
             if value is None:
@@ -477,7 +621,7 @@ class MLflowTracker:
                 continue
             if not math.isfinite(scalar):
                 raise ValueError(f"Non-finite MLflow metric for {key}: {scalar}")
-            self._mlflow.log_metric(key, scalar)
+            self._mlflow.log_metric(key, scalar, step=step)
 
 
 def _validate_existing_project_run(run_data: Any, project_run_id: str) -> None:
@@ -497,6 +641,21 @@ def _normalize_tracking_uri(tracking_uri: Optional[str]) -> Optional[str]:
     if len(parsed.scheme) == 1 and len(uri) >= 3 and uri[1] == ":":
         return Path(uri).as_uri()
     return uri
+
+
+def _normalize_session_id(tracking_session_id: Optional[str]) -> Optional[str]:
+    if tracking_session_id is None:
+        return None
+    session_id = str(tracking_session_id).strip()
+    if not session_id:
+        return None
+    if session_id in {".", ".."} or "/" in session_id or "\\" in session_id:
+        raise ValueError("tracking_session_id must be a single path-safe name.")
+    return session_id
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _get_nested(config: Mapping[str, Any], section: str, key: str) -> Any:
@@ -543,6 +702,15 @@ def _to_float(value: Any) -> Optional[float]:
         return float(value)
     try:
         return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return int(value)
     except (TypeError, ValueError):
         return None
 

@@ -64,6 +64,7 @@ mlflow:
   local_directory: logs/mlflow
   tracking_mode: new
   mlflow_run_id: null
+  tracking_session_id: session_001
   artifact_location: null
   log_checkpoint_binary: false
 
