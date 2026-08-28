@@ -40,3 +40,12 @@ training:
   train_frequency: 4
   target_update_frequency: 16
   epsilon_decay_steps: 48
+
+checkpointing:
+  enabled: true
+  interval_steps: 24
+  directory: checkpoints
+  mode: new
+  run_id: assault_ddqn_exp_001
+  resume_checkpoint: null
+  save_replay_buffer: true

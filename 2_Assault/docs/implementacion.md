@@ -44,7 +44,7 @@ HU003  Núcleo DDQN                                      [COMPLETADA]
   ↓
 HU004  Ciclo de entrenamiento                              [COMPLETADA]
   ↓
-HU005  Checkpoints + reanudación + idempotencia
+HU005  Checkpoints + reanudación + idempotencia        [COMPLETADA]
   ↓
 HU006  Observabilidad con TensorBoard
   ↓
@@ -498,6 +498,8 @@ Debe implementar:
 
 ### HU005 — Checkpoints, reanudación e idempotencia
 
+**Estado:** completada.
+
 **Propósito:** asegurar continuidad entre sesiones de Google Colab y evitar pérdida de progreso.
 
 El checkpoint debe guardar como mínimo:
@@ -518,6 +520,117 @@ Debe soportar explícitamente:
 3. resume liviano cuando el Replay Buffer no pueda persistirse.
 
 **Resultado esperado:** entrenar → guardar → reiniciar proceso → cargar → continuar desde el timestep correcto sin reiniciar silenciosamente el entrenamiento.
+
+**Evidencia de implementación HU005 (2026-08-27, rama `feature/hu005-checkpoints-resume`):**
+
+- Commit de implementación registrado:
+  - `be461f1a0f68880ae5a6335ae36414cb85f93050` (`Implement HU005 checkpoint resume support`).
+- Archivos creados/modificados:
+  - `2_Assault/src/checkpointing.py`
+  - `2_Assault/src/replay_buffer.py`
+  - `2_Assault/src/trainer.py`
+  - `2_Assault/tests/test_checkpointing.py`
+  - `2_Assault/configs/ddqn_config.yaml`
+  - `2_Assault/assault_ddqn.ipynb`
+  - `2_Assault/docs/implementacion.md`
+- Configuración checkpointing agregada:
+  - `checkpointing.enabled=true`
+  - `checkpointing.interval_steps=24`
+  - `checkpointing.directory=checkpoints`
+  - `checkpointing.mode=new`
+  - `checkpointing.run_id=assault_ddqn_exp_001`
+  - `checkpointing.resume_checkpoint=null`
+  - `checkpointing.save_replay_buffer=true`
+- Arquitectura `checkpointing.py`:
+  - `CheckpointManager(directory, run_id, repo_path=".")`;
+  - rutas por `run_id`: `checkpoints/<run_id>/checkpoint_step_000048.pt`;
+  - `save(...)` con guardado atómico mediante archivo temporal y `os.replace`;
+  - `load(..., mode="resume_full" | "resume_light")` con checkpoint explícito;
+  - `ensure_new_run()` bloquea `new` si ya existen checkpoints para el `run_id`;
+  - `CheckpointMetadata` y `CheckpointState` como resultados estructurados;
+  - `reconstruct_epsilon(global_step, config)` reconstruye epsilon desde `global_step + config`.
+- Contenido de checkpoint validado:
+  - `schema_version=1`;
+  - `run_id`;
+  - `created_at`;
+  - `checkpoint_step`;
+  - `git_commit`;
+  - `config`;
+  - `online_network`;
+  - `target_network`;
+  - `optimizer`;
+  - `global_step`;
+  - `epsilon_state`;
+  - `training_metrics`;
+  - `resume_mode_capabilities`;
+  - `replay_buffer_state` cuando `save_replay_buffer=True`.
+- Replay Buffer serializable:
+  - `ReplayBuffer.state_dict()`;
+  - `ReplayBuffer.load_state_dict(...)`;
+  - conserva `capacity`, `state_shape`, `size`, `position`, arrays válidos y estado RNG;
+  - serializa solo posiciones válidas, no slots vacíos.
+- Trainer extendido:
+  - soporta `initial_global_step`;
+  - soporta `initial_metrics`;
+  - `training.total_timesteps` sigue siendo objetivo global;
+  - checkpoint periódico opcional por `checkpoint_interval_steps`;
+  - resume desde `N` hasta `T` termina en `T`, no en `N+T`.
+- Modos soportados:
+  - `new`: agente nuevo, optimizer nuevo, Replay Buffer vacío, `global_step=0`, `run_id` explícito y no-overwrite por defecto;
+  - `resume_full`: restaura Online, Target, optimizer, `global_step`, config, métricas y Replay Buffer;
+  - `resume_light`: restaura Online, Target, optimizer, `global_step`, config y métricas; Replay Buffer inicia vacío.
+- Validaciones ejecutadas:
+  - `python -m pytest 2_Assault/tests -q` -> `48 passed, 2 skipped in 17.14s`;
+  - `python -m compileall -q 2_Assault/src` -> PASS;
+  - imports HU005 -> `HU005 imports OK`;
+  - notebook local con `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu005-checkpoints-resume`, `ASSAULT_CHECKPOINT_DIR=<temp>` -> `NOTEBOOK_CODE_CELLS_OK`.
+- Notebook:
+  - `2_Assault/assault_ddqn.ipynb` queda como orquestador;
+  - expone `RUN_MODE = new | resume_full | resume_light`;
+  - exige `CHECKPOINT_PATH` explícito para `resume_full` y `resume_light`;
+  - imprime modo, `run_id`, checkpoint elegido, `global_step` inicial, epsilon reconstruido y si Replay Buffer fue restaurado;
+  - guarda checkpoints periódicos y reutiliza explícitamente el checkpoint final si ya fue creado por el intervalo.
+- Smoke real Assault HU005:
+  - flujo validado: `Preflight PASS -> train N -> save full/light -> recrear objetos -> load -> resume`;
+  - PyTorch `2.4.1+cpu`;
+  - CUDA local: `False`;
+  - dispositivo usado: `cpu`;
+  - `READY_FOR_TRAINING=True`;
+  - `new_global_step=8`;
+  - `new_updates=3`;
+  - `new_epsilon=0.01`;
+  - `buffer_size_at_save=8`;
+  - checkpoint full size: `27476290` bytes;
+  - checkpoint light size: `27022210` bytes;
+  - `resume_full_loaded_step=8`;
+  - `resume_full_epsilon=0.01`;
+  - `resume_full_buffer_size_after_load=8`;
+  - `resume_full_final_global_step=12`;
+  - `resume_full_updates=5`;
+  - `resume_full_last_loss=0.0002125417668139562`;
+  - `resume_light_loaded_step=8`;
+  - `resume_light_epsilon=0.01`;
+  - `resume_light_buffer_size_after_load=0`;
+  - `resume_light_final_global_step=11`;
+  - `resume_light_new_updates=0`;
+  - `resume_light_buffer_size_after_refill=3`.
+- Idempotencia validada:
+  - guardar dos veces el mismo step con `overwrite=False` falla con `FileExistsError`;
+  - `overwrite=True` permite sobrescritura explícita;
+  - `new` con `run_id` existente y checkpoint previo falla con `FileExistsError`;
+  - `resume_full/resume_light` requieren checkpoint explícito;
+  - no se implementa selección automática de `latest`.
+- Compatibilidad validada:
+  - carga en CPU con `map_location`;
+  - error explícito ante `schema_version` incompatible;
+  - error explícito ante config crítica incompatible (`environment.id`, preprocessing, `network.input_channels`, `network.num_actions`);
+  - `resume_full` falla si el checkpoint no fue guardado con Replay Buffer.
+- Desviaciones respecto del DWP:
+  - No se ejecutó Colab/GPU desde Codex porque HU002B sigue sin canal remoto autenticado disponible; queda como validación futura/manual.
+  - No se automatizó montaje OAuth/Google Drive; el notebook permite configurar `ASSAULT_CHECKPOINT_DIR` para una ruta persistente.
+  - No se serializa estado interno de ALE; al reanudar se inicia un episodio nuevo conservando agente, optimizer, `global_step`, epsilon, métricas y buffer según modo.
+- Scope excluido confirmado:
+  - No se implementó TensorBoard, MLflow, entrenamiento largo, evaluación formal, video, best-model selection, hyperparameter optimization, PER, Dueling, Rainbow, Noisy Nets, n-step, GitHub Actions ni automatización Codex -> Colab.
 
 **Habilita:** HU006.
 
