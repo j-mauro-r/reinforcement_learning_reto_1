@@ -239,6 +239,51 @@ Debe implementar:
 6. Confirmar que aparece `HU002 validations passed.`.
 7. Registrar stdout/stderr, versión Python, GPU disponible y SHA ejecutado para completar AV09 de HU002 y la validación Colab de HU002B.
 
+**Reintento Gate T00 con CLI oficial de Colab (2026-08-27, PR #4):**
+
+- Cambio aplicado antes del reintento:
+  - `2_Assault/assault_ddqn.ipynb` ahora deja como default `BOOTSTRAP_REF = os.environ.get("ASSAULT_BOOTSTRAP_REF", "main")`.
+  - Para validar el PR sin usar `main` como código objetivo, se usó explícitamente `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab`.
+- CLI/mecanismo inspeccionado:
+  - En Windows no existe `colab` ni `google-colab`.
+  - La CLI oficial `google-colab-cli` documenta `colab exec` para ejecución remota y su README indica soporte actual para Linux y macOS; Windows no está soportado.
+  - Se inspeccionó WSL2 Ubuntu disponible en la máquina y se instaló la CLI oficial allí con `uv tool install google-colab-cli`.
+- Sintaxis real confirmada:
+  - `/root/.local/bin/colab --help` -> PASS, muestra comandos `new`, `sessions`, `status`, `exec`, `run`, `log`, etc.
+  - `/root/.local/bin/colab exec --help` -> PASS, muestra `colab exec [OPTIONS]`, `--session`, `--file`, `--output-image`, `--timeout`.
+  - `/root/.local/bin/colab version` -> `Version: 0.6.0`.
+- Comando de conectividad remoto intentado:
+  - `printf 'import sys\nprint(sys.version)\n' | /root/.local/bin/colab exec --timeout 30`
+- Resultado real:
+  - stdout/stderr: `[colab] Error: No active sessions found. Create one with 'colab new'.`
+  - No se obtuvo versión Python remota porque no existía sesión Colab activa accesible para la CLI.
+- Comandos adicionales:
+  - `/root/.local/bin/colab sessions`
+  - `/root/.local/bin/colab status`
+  - `/root/.local/bin/colab new -s hu002b-pr4 --gpu T4`
+- Bloqueo real:
+  - Los comandos `sessions`, `status` y `new` solicitan autorización OAuth interactiva con un código de Google.
+  - Codex no tiene un código de autorización ya disponible en la sesión y no debe escribir tokens, passwords ni secretos en archivos o Git.
+  - `colab new -s hu002b-pr4 --gpu T4` imprimió la URL OAuth y terminó en `Aborted.`
+- Conclusión:
+  - La CLI oficial sí está identificada y disponible vía WSL, pero la ejecución remota real no fue posible desde Codex porque no hay sesión activa autenticada ni credenciales interactivas disponibles.
+  - No se ejecutaron en Colab el bootstrap remoto, Python remoto, GPU remota, validaciones HU002 remotas ni notebook remoto.
+  - No se declara HU002 ni HU002B como completada.
+- Validaciones locales posteriores al ajuste:
+  - `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab python -m pytest 2_Assault/tests -q` -> `10 passed in 11.54s`.
+  - Celdas de código de `2_Assault/assault_ddqn.ipynb` ejecutadas localmente con `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab` y `ASSAULT_INSTALL_DEPENDENCIES=0` -> `NOTEBOOK_CODE_CELLS_OK`.
+  - SHA local resuelto para la rama del PR durante esa validación: `d265329a4f1f30f00dbc9a1fe224b799dae9e03c`.
+- Estado tras el reintento:
+  - `HU002 — IMPLEMENTADA — VALIDACIÓN LOCAL COMPLETADA — AV09 COLAB PENDIENTE`.
+  - `HU002B — IMPLEMENTADA — VALIDACIONES AUTOMATIZABLES COMPLETADAS — VALIDACIÓN COLAB PENDIENTE`.
+- Pasos manuales exactos para desbloquear:
+  1. En una terminal WSL con la CLI instalada, ejecutar `/root/.local/bin/colab new -s hu002b-pr4 --gpu T4`.
+  2. Abrir la URL OAuth que imprime la CLI, autorizar con la cuenta de Google/Colab y pegar el código en la terminal.
+  3. Ejecutar `printf 'import sys\nprint(sys.version)\n' | /root/.local/bin/colab exec -s hu002b-pr4 --timeout 30`.
+  4. Ejecutar `printf 'import os\nprint(os.getcwd())\n' | /root/.local/bin/colab exec -s hu002b-pr4 --timeout 30`.
+  5. Ejecutar `printf 'import torch\nprint("CUDA available:", torch.cuda.is_available())\nif torch.cuda.is_available():\n    print(torch.cuda.get_device_name(0))\n' | /root/.local/bin/colab exec -s hu002b-pr4 --timeout 30`.
+  6. Ejecutar el notebook o script equivalente con `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab` y capturar SHA, ruta `/content/reinforcement_learning_reto_1`, origen de `src.environment`, resultado `HU002 validations passed.` y logs stdout/stderr.
+
 ---
 
 ### HU003 — Núcleo DDQN
