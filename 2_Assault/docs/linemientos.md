@@ -325,43 +325,424 @@ No se deben registrar métricas sin utilidad analítica clara.
 
 ---
 
-## 13. MLflow
+## 13. MLflow — reglas de implementación y uso
 
-MLflow será utilizado para trazabilidad de experimentos, no como plataforma de despliegue.
+MLflow será utilizado como **sistema de tracking, trazabilidad y comparación de experimentos**, no como plataforma de despliegue ni como reemplazo de TensorBoard, GitHub o checkpoints.
 
-Cada run relevante debe registrar:
+Documentación oficial de referencia:
 
-### Parámetros
+- **MLflow Documentation:** https://mlflow.org/docs/latest/
+- **MLflow para Machine Learning / Tracking:** https://mlflow.org/docs/latest/ml/
 
-- algoritmo = DDQN;
-- configuración del entorno;
-- preprocessing;
-- hiperparámetros;
+Toda implementación que utilice MLflow deberá respetar las reglas de esta sección además de la HU correspondiente.
+
+### 13.1 Separación de responsabilidades
+
+La integración con MLflow deberá quedar encapsulada en `src/tracking.py` o en una abstracción equivalente claramente definida.
+
+No se deben dispersar llamadas `mlflow.log_*` dentro de:
+
+- `agent.py`;
+- `network.py`;
+- `replay_buffer.py`;
+- `environment.py`;
+- `trainer.py`;
+- `evaluator.py`;
+- `checkpointing.py`.
+
+Flujo preferido:
+
+```text
+Trainer / Evaluator / CheckpointManager
+            ↓
+resúmenes y metadata
+            ↓
+tracking.py
+            ↓
+MLflow
+```
+
+TensorBoard conserva la responsabilidad de observabilidad temporal detallada; MLflow conserva la responsabilidad de identidad, contexto, comparación y trazabilidad agregada.
+
+### 13.2 Modelo obligatorio de identidad
+
+Para ejecuciones que pueden dividirse en varias sesiones físicas se deben distinguir tres niveles:
+
+```text
+project_run_id
+    ↓
+mlflow_run_id
+    ↓
+tracking_session_id
+```
+
+- `project_run_id`: identidad lógica del experimento dentro del proyecto; también relaciona checkpoints y TensorBoard.
+- `mlflow_run_id`: identificador técnico generado por MLflow para ese experimento lógico.
+- `tracking_session_id`: identifica una sesión física concreta de ejecución, por ejemplo una sesión de Colab.
+
+Una continuación real del mismo entrenamiento debe conservar:
+
+```text
+same project_run_id
+same mlflow_run_id
+different tracking_session_id
+```
+
+No usar únicamente nombres visibles de runs como identificadores técnicos.
+
+### 13.3 New vs resume
+
+El modo de tracking debe ser explícito:
+
+#### `new`
+
+- crea un nuevo MLflow run;
+- no recibe ni reutiliza automáticamente otro `mlflow_run_id`;
+- debe producir un `tracking_session_id` nuevo;
+- inicia un nuevo entrenamiento lógico cuando corresponda.
+
+#### `resume`
+
+- requiere `mlflow_run_id` explícito;
+- requiere un `tracking_session_id` nuevo;
+- no puede seleccionar automáticamente “el último run”;
+- debe validar que el `project_run_id` coincide;
+- si representa continuidad de entrenamiento, debe cargar realmente el checkpoint de entrada.
+
+Reabrir un MLflow run **no equivale** a reanudar el entrenamiento. Para declarar continuidad deben cumplirse ambas condiciones:
+
+```text
+MLflow resume
++
+checkpoint resume real
+```
+
+### 13.4 Resume real y lineage
+
+Cuando una sesión reanuda entrenamiento debe existir trazabilidad verificable:
+
+```text
+session_001
+0 → N
+checkpoint_A
+        ↓
+session_002
+load checkpoint_A
+N → T
+checkpoint_B
+```
+
+La sesión reanudada debe registrar al menos:
+
+- `checkpoint_input_reference`;
+- `checkpoint_input_loaded`;
+- `restored_checkpoint_path`;
+- `restored_global_step`;
+- `replay_buffer_restored` cuando aplique;
+- `resume_mode`;
+- `initial_global_step`;
+- `final_global_step`;
+- `checkpoint_output_reference`.
+
+Para `resume_full`, la continuidad esperada incluye agente, Target Network, optimizer, progreso y Replay Buffer.
+
+No registrar una ruta de checkpoint como lineage si el archivo no fue efectivamente cargado.
+
+### 13.5 Parámetros globales e inmutables del MLflow run
+
+Los **params de MLflow son inmutables** dentro de un mismo `mlflow_run_id`. Por tanto, solo se registrarán como params globales valores que conceptualmente no deben cambiar entre sesiones del mismo experimento.
+
+Ejemplos de contexto global/inmutable:
+
+- algoritmo;
+- `project_run_id`;
+- experiment name;
 - seed;
-- versiones;
-- hardware;
-- commit Git.
+- environment ID;
+- observation type;
+- action space;
+- effective frameskip;
+- repeat action probability;
+- full action space;
+- preprocessing;
+- gamma;
+- learning rate;
+- epsilon inicial/final;
+- batch size;
+- Replay Buffer capacity;
+- learning starts;
+- train frequency;
+- Target Network update frequency.
 
-### Métricas
+Si uno de estos valores cambia y representa una incompatibilidad real del experimento, la ejecución debe fallar explícitamente o crear un nuevo experimento lógico según corresponda.
 
-- timestep inicial y final;
-- tiempo de entrenamiento;
-- recompensa de evaluación;
+No deshabilitar validaciones de incompatibilidad únicamente para evitar errores de MLflow.
+
+### 13.6 Metadata variable por sesión
+
+Los valores que pueden cambiar entre sesiones **no deben registrarse como params inmutables del mismo MLflow run**.
+
+Deben persistirse como metadata y/o artefactos de cada `tracking_session_id`.
+
+Ejemplos:
+
+- runtime local / Google Colab;
+- device;
+- GPU disponible;
+- modelo de GPU;
+- VRAM;
+- CPU;
+- RAM total/disponible;
+- versiones efectivamente ejecutadas cuando puedan variar entre sesiones;
+- Git SHA/ref ejecutado;
+- `session_target_timesteps`;
+- timestep inicial/final;
+- timestamps;
+- duración;
+- checkpoint de entrada/salida;
+- datos del restore;
+- evaluación de la sesión.
+
+Un cambio de hardware entre sesiones válidas no debe provocar `MLflow param mismatch`.
+
+### 13.7 Total timesteps y objetivos de sesión
+
+`training.total_timesteps` deberá respetar la semántica establecida por Trainer/Checkpointing como target global de entrenamiento.
+
+Cuando una ejecución multisesión use distintos objetivos parciales, por ejemplo:
+
+```text
+session_001 target = 48
+session_002 target = 64
+```
+
+el valor variable se registrará como `session_target_timesteps` dentro de la metadata/configuración efectiva de la sesión, no como param inmutable del MLflow run.
+
+No convertir accidentalmente el target global en “timesteps adicionales”.
+
+### 13.8 Estructura de artefactos por sesión
+
+Los artefactos variables deberán quedar aislados para evitar sobrescritura:
+
+```text
+sessions/
+├── session_001/
+│   ├── session_metadata.json
+│   ├── effective_config.json
+│   ├── runtime.json
+│   ├── training_summary.json
+│   ├── evaluation_summary.json
+│   └── checkpoint_reference.json
+└── session_002/
+    ├── session_metadata.json
+    ├── effective_config.json
+    ├── runtime.json
+    ├── training_summary.json
+    ├── evaluation_summary.json
+    └── checkpoint_reference.json
+```
+
+Los artefactos de una sesión posterior no deben sobrescribir evidencia de sesiones anteriores.
+
+Una configuración global solo podrá quedar fuera de `sessions/` si representa información realmente estable para todo el run.
+
+### 13.9 Idempotencia de sesiones
+
+Un `tracking_session_id` no debe reutilizarse silenciosamente dentro del mismo `mlflow_run_id`.
+
+Si existe evidencia de esa sesión, el sistema debe fallar y exigir una nueva identidad de sesión.
+
+No deducir automáticamente `session_002`, `session_003`, etc. mediante heurísticas ambiguas salvo que una HU futura defina explícitamente ese mecanismo y lo valide.
+
+### 13.10 Tracking URI y persistencia
+
+El backend/tracking URI de MLflow debe ser configurable y nunca depender obligatoriamente de una ruta personal hardcodeada.
+
+Debe soportar:
+
+- filesystem temporal para tests;
+- filesystem local para desarrollo;
+- almacenamiento persistente montado en Colab para corridas que deban sobrevivir a una sesión.
+
+Una ruta como `/content` es efímera y no debe considerarse almacenamiento persistente para entrenamientos multisesión.
+
+El montaje/autenticación de Google Drive no debe estar acoplado dentro de `tracking.py`.
+
+Variables de entorno pueden utilizarse para resolver información dependiente del runtime, por ejemplo:
+
+```text
+ASSAULT_MLFLOW_TRACKING_URI
+ASSAULT_MLFLOW_EXPERIMENT
+ASSAULT_MLFLOW_RUN_ID
+ASSAULT_MLFLOW_SESSION_ID
+ASSAULT_MLFLOW_TRACKING_MODE
+```
+
+### 13.11 Fail-fast
+
+Cuando MLflow esté habilitado para una corrida relevante, los errores materiales de tracking deben propagarse de forma visible.
+
+No usar patrones como:
+
+```python
+try:
+    ...
+except Exception:
+    pass
+```
+
+ni convertir un error de backend, permisos, I/O o consulta en “no existe información”.
+
+Ejemplos:
+
+```text
+backend inaccesible → FAIL
+tracking URI no escribible → FAIL
+resume sin mlflow_run_id → FAIL
+session ID duplicado → FAIL
+checkpoint de resume inexistente → FAIL
+param global incompatible → FAIL
+```
+
+Una corrida no puede considerarse trazable si el tracking requerido falló.
+
+### 13.12 Métricas
+
+MLflow registrará principalmente métricas agregadas y comparables, por ejemplo:
+
+#### Entrenamiento
+
+- timestep inicial/final;
+- duración;
+- updates count;
+- loss final/media;
+- Q-value final/medio;
+- epsilon final;
+- episodios completados;
+- mejor recompensa disponible cuando exista evidencia real.
+
+#### Evaluación
+
+- episodios;
+- recompensa media;
+- mediana;
 - desviación estándar;
-- mínimo y máximo;
-- mejor recompensa relevante observada.
+- mínimo;
+- máximo;
+- longitud media;
+- epsilon de evaluación.
 
-### Artefactos
+No registrar `0` para representar una métrica ausente.
 
-- configuración;
-- modelo/checkpoint o referencia;
-- resumen de evaluación;
-- gráficas finales relevantes.
+No duplicar automáticamente en MLflow cada scalar paso a paso que ya pertenece a TensorBoard.
 
-TensorBoard y MLflow no se reemplazan entre sí:
+### 13.13 Evaluación asociada al tracking
 
-- TensorBoard analiza la evolución interna del entrenamiento.
-- MLflow permite comparar y reproducir experimentos.
+Cada experimento candidato que deba compararse debe disponer de una evaluación registrada mediante la lógica de `evaluator.py`.
+
+Para smoke tests o HUs técnicas puede utilizarse una evaluación corta claramente marcada como no formal.
+
+La evaluación formal del reto sigue las reglas de la sección 18 y de la HU correspondiente.
+
+MLflow no debe contener lógica propia para ejecutar la evaluación; debe recibir un `EvaluationSummary` o estructura equivalente producida por el componente responsable.
+
+### 13.14 Checkpoints y MLflow
+
+MLflow no reemplaza `CheckpointManager`.
+
+Por defecto, registrar referencia y metadata del checkpoint es suficiente:
+
+- path/reference;
+- checkpoint step;
+- tamaño;
+- run lógico;
+- resume mode;
+- capacidad de Replay Buffer cuando aplique.
+
+No subir automáticamente a MLflow cada checkpoint completo si contiene Replay Buffer o produce duplicación costosa.
+
+Los binarios importantes deberán persistirse mediante la estrategia de checkpoints definida por el proyecto.
+
+### 13.15 TensorBoard y MLflow
+
+La separación obligatoria es:
+
+```text
+TensorBoard
+→ curvas y evolución interna
+→ diagnóstico temporal
+→ scalars por step/episodio
+
+MLflow
+→ identidad del experimento
+→ params globales
+→ metadata por sesión
+→ métricas agregadas
+→ evaluación
+→ artefactos y lineage
+→ comparación entre runs
+```
+
+Ninguno debe depender internamente del otro.
+
+### 13.16 MLflow disabled
+
+Cuando `mlflow.enabled=false`, los módulos de entrenamiento y evaluación deben continuar funcionando para pruebas o ejecuciones donde tracking no sea requisito.
+
+No obstante, una HU o entrenamiento que declare MLflow obligatorio no puede marcarse como completado ejecutándolo con tracking deshabilitado.
+
+### 13.17 Validaciones mínimas para una implementación MLflow
+
+Toda HU que modifique tracking deberá probar, según aplique:
+
+- creación de nuevo run;
+- resume explícito del mismo `mlflow_run_id`;
+- asociación correcta con `project_run_id`;
+- sesiones diferentes dentro del mismo run;
+- preservación de artefactos de sesiones previas;
+- rechazo de `tracking_session_id` duplicado;
+- params globales estables;
+- hardware/runtime diferente entre sesiones sin conflicto;
+- incompatibilidad real de params globales con fail-fast;
+- checkpoint resume funcional si se declara continuidad;
+- lineage entrada/salida;
+- backend failure propagado;
+- métricas de entrenamiento;
+- métricas de evaluación;
+- consulta programática mediante `MlflowClient`;
+- coexistencia con TensorBoard;
+- modo disabled cuando corresponda.
+
+Un test que únicamente registre una string `checkpoint_input_reference` sin cargar el checkpoint **no prueba resume**.
+
+### 13.18 Regla para Colab multisesión
+
+Antes de declarar una integración multisesión como terminada se debe demostrar en el runtime objetivo, cuando la HU lo requiera:
+
+```text
+Colab session A
+new MLflow run
+training 0 → N
+checkpoint persistente
+        ↓
+nuevo runtime Colab
+        ↓
+Colab session B
+resume mismo mlflow_run_id
+load real checkpoint
+training N → T
+```
+
+Debe verificarse:
+
+- mismo `project_run_id`;
+- mismo `mlflow_run_id`;
+- distinto `tracking_session_id`;
+- checkpoint efectivamente cargado;
+- continuidad de `global_step`;
+- Replay Buffer restaurado cuando sea `resume_full`;
+- artefactos de ambas sesiones preservados;
+- tracking persistente fuera del filesystem efímero cuando sea necesario.
 
 ---
 
