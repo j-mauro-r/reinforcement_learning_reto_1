@@ -437,6 +437,11 @@ class MLflowTracker:
         final_global_step: Optional[int] = None,
         checkpoint_input_reference: Optional[str] = None,
         checkpoint_output_reference: Optional[str] = None,
+        checkpoint_input_loaded: Optional[bool] = None,
+        restored_checkpoint_path: Optional[str] = None,
+        restored_global_step: Optional[int] = None,
+        replay_buffer_restored: Optional[bool] = None,
+        resume_mode: Optional[str] = None,
         started_at: Optional[str] = None,
         ended_at: Optional[str] = None,
         duration_seconds: Optional[float] = None,
@@ -468,6 +473,11 @@ class MLflowTracker:
             "final_global_step": final_global_step,
             "checkpoint_input_reference": checkpoint_input_reference,
             "checkpoint_output_reference": checkpoint_output_reference,
+            "checkpoint_input_loaded": checkpoint_input_loaded,
+            "restored_checkpoint_path": restored_checkpoint_path,
+            "restored_global_step": restored_global_step,
+            "replay_buffer_restored": replay_buffer_restored,
+            "resume_mode": resume_mode,
             "versions": {
                 "python": runtime_info.get("python_version"),
                 "torch": runtime_info.get("torch_version"),
@@ -556,10 +566,7 @@ class MLflowTracker:
 
     def _ensure_session_is_new(self, client: Any, mlflow_run_id: str, tracking_session_id: str) -> None:
         session_root = f"sessions/{tracking_session_id}"
-        try:
-            existing_artifacts = client.list_artifacts(mlflow_run_id, session_root)
-        except Exception:
-            existing_artifacts = []
+        existing_artifacts = client.list_artifacts(mlflow_run_id, session_root)
         for artifact in existing_artifacts:
             if artifact.path == f"{session_root}/session_metadata.json":
                 raise RuntimeError(

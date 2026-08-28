@@ -4,7 +4,7 @@
 
 - **ID:** HU008
 - **Nombre:** MLflow y trazabilidad de experimentos
-- **Estado:** Lista para implementación
+- **Estado:** Implementada con validaciones locales; validacion Colab multisesion pendiente.
 - **Dependencia previa:** HU007 — Smoke test end-to-end `[COMPLETADA]`
 - **Dependencias funcionales:** HU002/HU002B, HU003, HU004, HU005, HU006 y HU007.
 - **Habilita:** HU009 — Entrenamiento DDQN completo.
@@ -1713,3 +1713,19 @@ HU008 [IMPLEMENTADA — VALIDACIONES LOCALES COMPLETADAS — VALIDACIÓN COLAB M
 ```
 
 hasta ejecutar y verificar las dos sesiones reales en Colab.
+
+### 15.18 Correccion tecnica local de resume real
+
+La correccion tecnica del 2026-08-28 agrega evidencia local para cerrar los hallazgos pendientes de HU008 sin cambiar el alcance de HU009:
+
+- `tracking.py` deja de ocultar errores de `MlflowClient.list_artifacts(...)` al validar colisiones de `tracking_session_id`; fallos reales de backend se propagan fail-fast.
+- `tracking.py` registra evidencia explicita de restauracion en `session_metadata.json`: `checkpoint_input_loaded`, `restored_checkpoint_path`, `restored_global_step`, `replay_buffer_restored` y `resume_mode`.
+- `training_session.py` orquesta una unica sesion HU008 reanudable usando `CheckpointManager.load(..., mode="resume_full")`; no implementa una segunda ruta de restauracion.
+- En modo `resume`, la sesion valida que el checkpoint externo fue cargado, que `restored_global_step` coincide con `initial_global_step`, que el Replay Buffer fue restaurado en `resume_full` y que el entrenamiento continua de `N` a `T`.
+- El notebook soporta explicitamente:
+  - `tracking_mode=new`, `tracking_session_id=session_001`, sin checkpoint de entrada, `initial_global_step=0`;
+  - `tracking_mode=resume`, `tracking_session_id=session_002`, mismo `mlflow_run_id`, `ASSAULT_MLFLOW_CHECKPOINT_INPUT` explicito, restore real del checkpoint y continuacion con `final_global_step > initial_global_step`.
+- Las salidas visibles del notebook incluyen `checkpoint_input_loaded`, `restored_global_step`, `replay_buffer_restored`, `checkpoint_output_reference`, `MULTISESSION_CHECKPOINT_RESUME_PASS`, `E2E_SMOKE_PASS` y `MLFLOW_TRACKING_PASS`.
+- Tests locales agregados cubren resume externo real A=0->N y B=N->T, lineage checkpoint output/input, duplicado de sesion y propagacion de fallo real del backend MLflow.
+
+Esta correccion no ejecuta Colab desde Codex ni inventa resultados remotos; la evidencia final de dos runtimes Colab separados sigue pendiente.
