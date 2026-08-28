@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import gc
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,6 +77,8 @@ class E2ESmokeSummary:
     replay_buffer_unchanged_during_evaluation: bool
     training_global_step_unchanged_during_evaluation: bool
     memory_before: MemorySnapshot
+    memory_after_segment_a: MemorySnapshot
+    memory_after_release: MemorySnapshot
     memory_after: MemorySnapshot
     runtime_info: Dict[str, Any]
     duration_seconds: float
@@ -111,6 +114,8 @@ class E2ESmokeSummary:
             "replay_buffer_unchanged_during_evaluation": self.replay_buffer_unchanged_during_evaluation,
             "training_global_step_unchanged_during_evaluation": self.training_global_step_unchanged_during_evaluation,
             "memory_before": self.memory_before.as_dict(),
+            "memory_after_segment_a": self.memory_after_segment_a.as_dict(),
+            "memory_after_release": self.memory_after_release.as_dict(),
             "memory_after": self.memory_after.as_dict(),
             "runtime_info": self.runtime_info,
             "duration_seconds": self.duration_seconds,
@@ -190,6 +195,14 @@ def run_e2e_smoke(
     run_log_dir = Path(tensorboard_root) / run_id
     event_files_before = logger_a.event_files()
     scalars_before = load_tensorboard_scalars(run_log_dir)
+    memory_after_segment_a = _memory_snapshot("after_segment_a")
+
+    del agent_a
+    del buffer_a
+    del logger_a
+    del env_a
+    _release_unused_memory()
+    memory_after_release = _memory_snapshot("after_release")
 
     segment_b_config = copy.deepcopy(smoke_config)
     segment_b_config["training"]["total_timesteps"] = final_timesteps
@@ -278,6 +291,8 @@ def run_e2e_smoke(
         replay_buffer_unchanged_during_evaluation=replay_unchanged,
         training_global_step_unchanged_during_evaluation=step_unchanged,
         memory_before=memory_before,
+        memory_after_segment_a=memory_after_segment_a,
+        memory_after_release=memory_after_release,
         memory_after=memory_after,
         runtime_info=runtime_info,
         duration_seconds=time.perf_counter() - start_time,
@@ -317,6 +332,13 @@ def _memory_snapshot(label: str) -> MemorySnapshot:
         cuda_allocated_mb=cuda_allocated,
         cuda_reserved_mb=cuda_reserved,
     )
+
+
+def _release_unused_memory() -> None:
+    """Runs explicit GC and conditional CUDA cache cleanup between smoke segments."""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _validate_segment_a(segment: TrainingSummary, checkpoint: CheckpointMetadata, expected_step: int) -> None:
