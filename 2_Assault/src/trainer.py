@@ -33,6 +33,8 @@ class TrainingSummary:
     online_weights_changed: bool
     duration_seconds: float
     final_replay_buffer_size: int
+    initial_global_step: int = 0
+    checkpoints_saved: List[str] = field(default_factory=list)
     truncated_episodes: int = 0
     terminated_episodes: int = 0
     episode_end_reasons: List[str] = field(default_factory=list)
@@ -56,6 +58,8 @@ class TrainingSummary:
             "online_weights_changed": self.online_weights_changed,
             "duration_seconds": self.duration_seconds,
             "final_replay_buffer_size": self.final_replay_buffer_size,
+            "initial_global_step": self.initial_global_step,
+            "checkpoints_saved": self.checkpoints_saved,
             "truncated_episodes": self.truncated_episodes,
             "terminated_episodes": self.terminated_episodes,
             "episode_end_reasons": self.episode_end_reasons,
@@ -100,6 +104,11 @@ class Trainer:
         agent: DDQNAgent,
         replay_buffer: ReplayBuffer,
         config: Mapping[str, Any],
+        initial_global_step: int = 0,
+        initial_metrics: Optional[Mapping[str, Any]] = None,
+        checkpoint_manager: Any = None,
+        checkpoint_interval_steps: Optional[int] = None,
+        checkpoint_save_replay_buffer: bool = True,
     ) -> None:
         """Initializes the trainer.
 
@@ -109,11 +118,23 @@ class Trainer:
             replay_buffer: Replay buffer used to store transitions.
             config: Parsed project configuration containing ``training``,
                 ``agent`` and ``replay_buffer`` sections.
+            initial_global_step: Restored global timestep for resume.
+            initial_metrics: Optional accumulated metrics restored from a
+                checkpoint.
+            checkpoint_manager: Optional object exposing ``save(...)``.
+            checkpoint_interval_steps: Optional periodic checkpoint interval.
+            checkpoint_save_replay_buffer: Whether automatic checkpoints include
+                Replay Buffer state.
         """
         self.env = env
         self.agent = agent
         self.replay_buffer = replay_buffer
         self.config = config
+        self.initial_global_step = int(initial_global_step)
+        self.initial_metrics = dict(initial_metrics or {})
+        self.checkpoint_manager = checkpoint_manager
+        self.checkpoint_interval_steps = checkpoint_interval_steps
+        self.checkpoint_save_replay_buffer = bool(checkpoint_save_replay_buffer)
 
     def train(self, total_timesteps: Optional[int] = None) -> TrainingSummary:
         """Executes a short DDQN training run.
@@ -142,6 +163,7 @@ class Trainer:
 
         _validate_training_config(
             total_timesteps=target_timesteps,
+            initial_global_step=self.initial_global_step,
             learning_starts=learning_starts,
             train_frequency=train_frequency,
             target_update_frequency=target_update_frequency,
@@ -151,23 +173,28 @@ class Trainer:
         online_before = _clone_parameters(self.agent.online_network)
         start_time = time.perf_counter()
         observation, _ = self.env.reset()
-        global_step = 0
+        global_step = self.initial_global_step
         episode_reward = 0.0
         episode_length = 0
-        episode_rewards: List[float] = []
-        episode_lengths: List[int] = []
+        episode_rewards: List[float] = list(self.initial_metrics.get("episode_rewards", []))
+        episode_lengths: List[int] = list(self.initial_metrics.get("episode_lengths", []))
         episode_end_reasons: List[str] = []
         losses: List[float] = []
         update_steps: List[int] = []
         target_sync_steps: List[int] = []
-        terminated_episodes = 0
-        truncated_episodes = 0
+        checkpoints_saved: List[str] = []
+        initial_updates_count = int(self.initial_metrics.get("updates_count", 0) or 0)
+        initial_target_sync_count = int(self.initial_metrics.get("target_sync_count", 0) or 0)
+        terminated_episodes = int(self.initial_metrics.get("terminated_episodes", 0) or 0)
+        truncated_episodes = int(self.initial_metrics.get("truncated_episodes", 0) or 0)
+        transitions_this_run = 0
 
         while global_step < target_timesteps:
             epsilon = compute_epsilon(global_step, epsilon_start, epsilon_final_value, epsilon_decay_steps)
             action = self.agent.select_action(observation, epsilon=epsilon)
             next_observation, reward, terminated, truncated, _ = self.env.step(action)
             global_step += 1
+            transitions_this_run += 1
             episode_reward += float(reward)
             episode_length += 1
 
@@ -206,6 +233,28 @@ class Trainer:
             else:
                 observation = next_observation
 
+            if self._should_save_checkpoint(global_step):
+                metrics = _build_metrics_snapshot(
+                    global_step=global_step,
+                    episode_rewards=episode_rewards,
+                    episode_lengths=episode_lengths,
+                    updates_count=initial_updates_count + len(losses),
+                    losses=losses,
+                    target_sync_count=initial_target_sync_count + len(target_sync_steps),
+                    duration_seconds=time.perf_counter() - start_time + float(self.initial_metrics.get("duration_seconds", 0.0) or 0.0),
+                    terminated_episodes=terminated_episodes,
+                    truncated_episodes=truncated_episodes,
+                )
+                saved = self.checkpoint_manager.save(
+                    agent=self.agent,
+                    replay_buffer=self.replay_buffer,
+                    config=self.config,
+                    global_step=global_step,
+                    training_metrics=metrics,
+                    save_replay_buffer=self.checkpoint_save_replay_buffer,
+                )
+                checkpoints_saved.append(str(saved.path))
+
         epsilon_final_observed = compute_epsilon(
             global_step,
             epsilon_start,
@@ -214,17 +263,17 @@ class Trainer:
         )
         online_after = _clone_parameters(self.agent.online_network)
         weights_changed = any(not torch.equal(before, after) for before, after in zip(online_before, online_after))
-        duration = time.perf_counter() - start_time
+        duration = time.perf_counter() - start_time + float(self.initial_metrics.get("duration_seconds", 0.0) or 0.0)
 
         return TrainingSummary(
             global_step=global_step,
             episodes_completed=len(episode_rewards),
             episode_rewards=episode_rewards,
             episode_lengths=episode_lengths,
-            epsilon_initial=compute_epsilon(0, epsilon_start, epsilon_final_value, epsilon_decay_steps),
+            epsilon_initial=compute_epsilon(self.initial_global_step, epsilon_start, epsilon_final_value, epsilon_decay_steps),
             epsilon_final=epsilon_final_observed,
-            transitions_stored=global_step,
-            updates_count=len(losses),
+            transitions_stored=transitions_this_run,
+            updates_count=initial_updates_count + len(losses),
             update_steps=update_steps,
             first_update_step=update_steps[0] if update_steps else None,
             last_loss=losses[-1] if losses else None,
@@ -233,10 +282,18 @@ class Trainer:
             online_weights_changed=weights_changed,
             duration_seconds=duration,
             final_replay_buffer_size=len(self.replay_buffer),
+            initial_global_step=self.initial_global_step,
+            checkpoints_saved=checkpoints_saved,
             truncated_episodes=truncated_episodes,
             terminated_episodes=terminated_episodes,
             episode_end_reasons=episode_end_reasons,
         )
+
+    def _should_save_checkpoint(self, global_step: int) -> bool:
+        if self.checkpoint_manager is None:
+            return False
+        interval = int(self.checkpoint_interval_steps or 0)
+        return interval > 0 and global_step > self.initial_global_step and global_step % interval == 0
 
 
 def _should_update(
@@ -253,6 +310,32 @@ def _clone_parameters(module: torch.nn.Module) -> List[torch.Tensor]:
     return [parameter.detach().clone() for parameter in module.parameters()]
 
 
+def _build_metrics_snapshot(
+    global_step: int,
+    episode_rewards: List[float],
+    episode_lengths: List[int],
+    updates_count: int,
+    losses: List[float],
+    target_sync_count: int,
+    duration_seconds: float,
+    terminated_episodes: int,
+    truncated_episodes: int,
+) -> Dict[str, Any]:
+    return {
+        "global_step": int(global_step),
+        "episodes_completed": len(episode_rewards),
+        "episode_rewards": list(episode_rewards),
+        "episode_lengths": list(episode_lengths),
+        "updates_count": int(updates_count),
+        "last_loss": losses[-1] if losses else None,
+        "mean_loss": float(np.mean(losses)) if losses else None,
+        "target_sync_count": int(target_sync_count),
+        "duration_seconds": float(duration_seconds),
+        "terminated_episodes": int(terminated_episodes),
+        "truncated_episodes": int(truncated_episodes),
+    }
+
+
 def _episode_end_reason(terminated: bool, truncated: bool) -> str:
     if terminated and truncated:
         return "terminated+truncated"
@@ -263,6 +346,7 @@ def _episode_end_reason(terminated: bool, truncated: bool) -> str:
 
 def _validate_training_config(
     total_timesteps: int,
+    initial_global_step: int,
     learning_starts: int,
     train_frequency: int,
     target_update_frequency: int,
@@ -270,6 +354,10 @@ def _validate_training_config(
 ) -> None:
     if total_timesteps <= 0:
         raise ValueError("training.total_timesteps must be positive.")
+    if initial_global_step < 0:
+        raise ValueError("initial_global_step must be non-negative.")
+    if initial_global_step > total_timesteps:
+        raise ValueError("initial_global_step cannot exceed training.total_timesteps.")
     if learning_starts < 0:
         raise ValueError("training.learning_starts must be non-negative.")
     if train_frequency <= 0:
