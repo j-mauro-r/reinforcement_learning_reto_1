@@ -29,6 +29,9 @@ class TrainingSummary:
     first_update_step: Optional[int]
     last_loss: Optional[float]
     mean_loss: Optional[float]
+    last_q_mean: Optional[float]
+    mean_q_mean: Optional[float]
+    last_learning_rate: Optional[float]
     target_sync_steps: List[int]
     online_weights_changed: bool
     duration_seconds: float
@@ -54,6 +57,9 @@ class TrainingSummary:
             "first_update_step": self.first_update_step,
             "last_loss": self.last_loss,
             "mean_loss": self.mean_loss,
+            "last_q_mean": self.last_q_mean,
+            "mean_q_mean": self.mean_q_mean,
+            "last_learning_rate": self.last_learning_rate,
             "target_sync_steps": self.target_sync_steps,
             "online_weights_changed": self.online_weights_changed,
             "duration_seconds": self.duration_seconds,
@@ -109,6 +115,7 @@ class Trainer:
         checkpoint_manager: Any = None,
         checkpoint_interval_steps: Optional[int] = None,
         checkpoint_save_replay_buffer: bool = True,
+        metrics_logger: Any = None,
     ) -> None:
         """Initializes the trainer.
 
@@ -125,6 +132,8 @@ class Trainer:
             checkpoint_interval_steps: Optional periodic checkpoint interval.
             checkpoint_save_replay_buffer: Whether automatic checkpoints include
                 Replay Buffer state.
+            metrics_logger: Optional observability callback exposing
+                ``log_step``, ``log_update``, ``log_episode`` and flush hooks.
         """
         self.env = env
         self.agent = agent
@@ -135,6 +144,7 @@ class Trainer:
         self.checkpoint_manager = checkpoint_manager
         self.checkpoint_interval_steps = checkpoint_interval_steps
         self.checkpoint_save_replay_buffer = bool(checkpoint_save_replay_buffer)
+        self.metrics_logger = metrics_logger
 
     def train(self, total_timesteps: Optional[int] = None) -> TrainingSummary:
         """Executes a short DDQN training run.
@@ -178,8 +188,12 @@ class Trainer:
         episode_length = 0
         episode_rewards: List[float] = list(self.initial_metrics.get("episode_rewards", []))
         episode_lengths: List[int] = list(self.initial_metrics.get("episode_lengths", []))
+        if self.metrics_logger is not None and hasattr(self.metrics_logger, "set_episode_history"):
+            self.metrics_logger.set_episode_history(episode_rewards)
         episode_end_reasons: List[str] = []
         losses: List[float] = []
+        q_means: List[float] = []
+        learning_rates: List[float] = []
         update_steps: List[int] = []
         target_sync_steps: List[int] = []
         checkpoints_saved: List[str] = []
@@ -197,6 +211,8 @@ class Trainer:
             transitions_this_run += 1
             episode_reward += float(reward)
             episode_length += 1
+            if self.metrics_logger is not None:
+                self.metrics_logger.log_step(global_step=global_step, epsilon=epsilon)
 
             done_for_bootstrap = bool(terminated)
             self.replay_buffer.add(
@@ -214,6 +230,23 @@ class Trainer:
                     raise RuntimeError(f"Non-finite DDQN loss at step {global_step}: {loss}")
                 losses.append(loss)
                 update_steps.append(global_step)
+                q_mean = float(metrics["q_mean"]) if "q_mean" in metrics else None
+                learning_rate = float(metrics["learning_rate"]) if "learning_rate" in metrics else None
+                if q_mean is not None and not np.isfinite(q_mean):
+                    raise RuntimeError(f"Non-finite DDQN q_mean at step {global_step}: {q_mean}")
+                if learning_rate is not None and not np.isfinite(learning_rate):
+                    raise RuntimeError(f"Non-finite learning rate at step {global_step}: {learning_rate}")
+                if q_mean is not None:
+                    q_means.append(q_mean)
+                if learning_rate is not None:
+                    learning_rates.append(learning_rate)
+                if self.metrics_logger is not None:
+                    self.metrics_logger.log_update(
+                        global_step=global_step,
+                        loss=loss,
+                        q_mean=q_mean,
+                        learning_rate=learning_rate,
+                    )
 
             if global_step % target_update_frequency == 0:
                 self.agent.sync_target_network()
@@ -227,11 +260,20 @@ class Trainer:
                 if truncated:
                     truncated_episodes += 1
                 episode_end_reasons.append(_episode_end_reason(terminated, truncated))
+                if self.metrics_logger is not None:
+                    self.metrics_logger.log_episode(
+                        global_step=global_step,
+                        reward=episode_reward,
+                        length=episode_length,
+                    )
                 observation, _ = self.env.reset()
                 episode_reward = 0.0
                 episode_length = 0
             else:
                 observation = next_observation
+
+            if self.metrics_logger is not None:
+                self.metrics_logger.flush_if_needed(global_step)
 
             if self._should_save_checkpoint(global_step):
                 metrics = _build_metrics_snapshot(
@@ -278,6 +320,9 @@ class Trainer:
             first_update_step=update_steps[0] if update_steps else None,
             last_loss=losses[-1] if losses else None,
             mean_loss=float(np.mean(losses)) if losses else None,
+            last_q_mean=q_means[-1] if q_means else None,
+            mean_q_mean=float(np.mean(q_means)) if q_means else None,
+            last_learning_rate=learning_rates[-1] if learning_rates else None,
             target_sync_steps=target_sync_steps,
             online_weights_changed=weights_changed,
             duration_seconds=duration,

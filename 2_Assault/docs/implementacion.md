@@ -46,7 +46,7 @@ HU004  Ciclo de entrenamiento                              [COMPLETADA]
   ↓
 HU005  Checkpoints + reanudación + idempotencia        [COMPLETADA]
   ↓
-HU006  Observabilidad con TensorBoard
+HU006  Observabilidad con TensorBoard                  [COMPLETADA]
   ↓
 HU007  Smoke test end-to-end
   ↓
@@ -652,6 +652,82 @@ Registrar como mínimo:
 - learning rate si cambia.
 
 **Resultado esperado:** una corrida corta genera logs válidos que TensorBoard puede visualizar y que permiten detectar si el agente está aprendiendo, divergiendo o dejó de explorar.
+
+**Evidencia de implementación HU006 (2026-08-28, rama `feature/hu006-tensorboard`):**
+
+- Archivos modificados:
+  - `2_Assault/requirements.txt`: agrega `tensorboard>=2.14`.
+  - `2_Assault/configs/ddqn_config.yaml`: agrega `tensorboard.enabled`, `directory`, `log_frequency_steps`, `reward_window_episodes` y `flush_frequency_steps`.
+  - `2_Assault/src/callbacks.py`: crea `TensorBoardLogger` y `load_tensorboard_scalars`.
+  - `2_Assault/src/agent.py`: `DDQNAgent.update()` conserva `loss` y añade `q_mean` y `learning_rate` reales.
+  - `2_Assault/src/trainer.py`: integra `metrics_logger` opcional sin cambiar el flujo DDQN cuando es `None`.
+  - `2_Assault/tests/test_tensorboard.py`: valida event files, tags, pasos, valores finitos, episodios, resume, runs separados, modo deshabilitado y smoke Assault.
+  - `2_Assault/assault_ddqn.ipynb`: orquesta HU006 y muestra comandos TensorBoard local/Colab.
+- Arquitectura:
+  - `Trainer` decide cuándo existen eventos reales;
+  - `TensorBoardLogger` encapsula `SummaryWriter`;
+  - `callbacks.py` no selecciona acciones, no calcula targets, no toca optimizer, no crea entornos y no implementa MLflow.
+- Configuración centralizada aplicada:
+  - `enabled: true`;
+  - `directory: logs/tensorboard`;
+  - `log_frequency_steps: 4`;
+  - `reward_window_episodes: 10`;
+  - `flush_frequency_steps: 24`.
+- Estructura de logs:
+  - `2_Assault/logs/tensorboard/<run_id>/events.out.tfevents.*`;
+  - el smoke local usó `run_id=hu006_validation_local`;
+  - los logs quedan fuera de Git por `2_Assault/logs/`.
+- Tags implementados y validados:
+  - `train/epsilon`;
+  - `train/loss`;
+  - `train/q_mean`;
+  - `train/learning_rate`;
+  - `episode/reward`;
+  - `episode/reward_mean`;
+  - `episode/length`.
+- Smoke real Assault:
+  - `Preflight PASS`;
+  - dispositivo: `cpu`;
+  - Python `3.8.10`;
+  - Torch `2.4.1`;
+  - ALE `0.10.1`;
+  - `global_step=48`;
+  - `updates_count=5`;
+  - `update_steps=[32, 36, 40, 44, 48]`;
+  - `last_loss=0.0008681566687300801`;
+  - `last_q_mean=0.02830067276954651`;
+  - `last_learning_rate=0.0001`;
+  - event files: `1`;
+  - tags reales leídos: `train/epsilon`, `train/loss`, `train/q_mean`, `train/learning_rate`;
+  - conteos: `train/epsilon=12`, `train/loss=5`, `train/q_mean=5`, `train/learning_rate=5`.
+- Evidencia de episodios:
+  - entorno controlado valida `episode/reward` en pasos `3` y `6`;
+  - `episode/reward_mean` usa ventana móvil configurable;
+  - `episode/length` registra decisiones del agente;
+  - la corrida real corta de Assault no terminó episodio, por eso no inventa métricas `episode/*`.
+- Evidencia de epsilon:
+  - con frecuencia `4`, se registran pasos `4` y `8` en test controlado;
+  - el valor corresponde al epsilon usado para la acción antes de incrementar el timestep, registrado sobre el `global_step` posterior de esa transición.
+- Evidencia de updates:
+  - `train/loss`, `train/q_mean` y `train/learning_rate` solo aparecen en pasos con update real;
+  - no se registran ceros falsos en timesteps sin actualización.
+- Evidencia de resume:
+  - al reusar `run_id=resume_run`, los eventos continúan con pasos `[4, 8, 12]`;
+  - el segundo tramo arranca con `initial_global_step=8` y no reinicia silenciosamente a cero;
+  - el mismo directorio de run puede contener múltiples event files sin truncarse.
+- Evidencia de aislamiento:
+  - `run_a` y `run_b` escriben en directorios separados;
+  - los scalars no se mezclan entre `run_id`.
+- Evidencia de modo deshabilitado:
+  - con `tensorboard.enabled=false`, `Trainer` completa la corrida;
+  - no se crea directorio de run ni event files.
+- Autovalidaciones ejecutadas:
+  - `python -m pytest 2_Assault/tests/test_tensorboard.py 2_Assault/tests/test_trainer.py -q` -> `19 passed`;
+  - `python -m pytest 2_Assault/tests -q` -> `58 passed, 2 skipped`.
+- Limitaciones y pendientes:
+  - no se ejecutó runtime remoto de Colab desde Codex por la restricción ya diagnosticada en HU002B/HU005;
+  - no se implementó MLflow, evaluación formal, video, entrenamiento largo ni selección de mejor modelo;
+  - los tags `episode/*` dependen de que finalice un episodio real; en corridas muy cortas de Assault pueden no aparecer.
 
 **Habilita:** HU007.
 
