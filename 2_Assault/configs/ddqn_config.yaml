@@ -19,3 +19,17 @@ reproducibility:
 
 evaluation:
   episodes: 10
+
+network:
+  input_channels: 4
+  num_actions: 7
+
+agent:
+  gamma: 0.99
+  learning_rate: 0.0001
+  epsilon_start: 1.0
+  epsilon_final: 0.01
+
+replay_buffer:
+  capacity: 100000
+  batch_size: 32
