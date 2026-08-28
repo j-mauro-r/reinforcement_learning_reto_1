@@ -48,7 +48,7 @@ HU005  Checkpoints + reanudación + idempotencia        [COMPLETADA]
   ↓
 HU006  Observabilidad con TensorBoard                  [COMPLETADA]
   ↓
-HU007  Smoke test end-to-end
+HU007  Smoke test end-to-end                         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - COLAB/GPU PENDIENTE]
   ↓
 HU008  MLflow y trazabilidad de experimentos
   ↓
@@ -763,6 +763,8 @@ Registrar como mínimo:
 
 ### HU007 — Smoke test end-to-end
 
+**Estado:** implementada - validaciones locales completadas - Colab/GPU pendiente.
+
 **Propósito:** validar todo el pipeline antes de gastar recursos en un entrenamiento largo.
 
 Debe ejecutar una corrida corta con GPU y verificar conjuntamente:
@@ -782,6 +784,58 @@ Debe ejecutar una corrida corta con GPU y verificar conjuntamente:
 **Resultado esperado:** el pipeline completo funciona sin errores funcionales ni problemas evidentes de dimensiones, dispositivo, memoria o persistencia.
 
 **Gate:** no iniciar HU009 si HU007 no está aprobada.
+
+**Evidencia de implementación HU007 (2026-08-28, rama `feature/hu007-e2e-smoke`):**
+
+- Commit final del PR: último commit de la rama `feature/hu007-e2e-smoke`.
+- Archivos implementados/modificados:
+  - `2_Assault/configs/ddqn_config.yaml`: agrega bloque `e2e_smoke` con `enabled`, timesteps cortos, evaluación corta, replay buffer reducido y `require_cuda=true` por defecto para el cierre real en Colab/GPU.
+  - `2_Assault/src/evaluator.py`: agrega evaluación separada del entrenamiento, con epsilon configurable, recompensas crudas, longitudes y restauración de modos `train/eval`.
+  - `2_Assault/src/e2e_smoke.py`: orquesta el smoke end-to-end con preflight, entorno real, DDQN, Replay Buffer, entrenamiento A, checkpoint, restauración, entrenamiento B, TensorBoard y evaluación.
+  - `2_Assault/src/callbacks.py`: estabiliza la lectura de scalars de TensorBoard ordenando eventos por `global_step`.
+  - `2_Assault/tests/test_e2e_smoke.py`: cubre evaluador, contrato de no-mutación, fail-fast CUDA y smoke real Assault en CPU local.
+  - `2_Assault/assault_ddqn.ipynb`: integra la ejecución HU007 y muestra gates/resultados.
+  - `2_Assault/docs/implementacion.md`: registra esta evidencia.
+- Contrato de ejecución implementado:
+  - por configuración, HU007 exige CUDA (`require_cuda=true`) para poder declarar `E2E_SMOKE_PASS=True`;
+  - en ejecución local sin CUDA se permite validación reducida con `ASSAULT_E2E_REQUIRE_CUDA=0`, pero el gate formal permanece pendiente;
+  - `E2E_SMOKE_PASS` solo puede ser `True` en Google Colab con dispositivo CUDA;
+  - `LOCAL_E2E_SMOKE_PASS=True` solo certifica que el pipeline corre localmente de extremo a extremo sin GPU.
+- Ejecución local automatizada del notebook:
+  - variables usadas: `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu007-e2e-smoke`, `ASSAULT_CHECKPOINT_DIR=<temp>`, `ASSAULT_TENSORBOARD_DIR=<temp>`, `ASSAULT_RUN_ID=<run temporal>`, `ASSAULT_E2E_REQUIRE_CUDA=0`;
+  - celdas de código ejecutadas: `10`;
+  - celdas omitidas: `[]`;
+  - resultado: `NOTEBOOK_CODE_CELLS_OK`.
+- Evidencia local del smoke end-to-end:
+  - runtime detectado: `local`;
+  - dispositivo usado: `cpu`;
+  - preflight: `READY_FOR_TRAINING=True`;
+  - observación procesada: `(4, 84, 84)`, dtype `uint8`;
+  - action space: `Discrete(7)`;
+  - segmento A: `segment_a_steps=48`, `segment_a_updates=5`;
+  - checkpoint: `checkpoint_step_000048.pt`, tamaño aproximado `29,741,058` bytes;
+  - restauración: `restored_global_step=48`, `replay_buffer_restored=True`;
+  - segmento B: `segment_b_final_step=64`, `segment_b_updates_total=9`;
+  - TensorBoard: `tensorboard_event_files=2`;
+  - TensorBoard tags preservados: `train/epsilon`, `train/loss`, `train/q_mean`, `train/learning_rate`;
+  - pasos post-resume validados para tags principales: `[52, 56, 60, 64]`;
+  - evaluación corta separada: `evaluation_rewards=[0.0, 0.0]`, `evaluation_mean_reward=0.0`, `evaluation_lengths=[256, 256]`;
+  - memoria local: RSS aproximado `324.56 MB -> 375.28 MB`, RAM disponible aproximada `0.98 GB -> 0.93 GB`;
+  - verificación de evaluación: no muta pesos online, pesos target, estado del optimizador, replay buffer ni `global_step`;
+  - resultado local: `LOCAL_E2E_SMOKE_PASS=True`;
+  - resultado formal HU007: `E2E_SMOKE_PASS=False` por no haberse ejecutado en Colab/GPU.
+- Autovalidaciones ejecutadas:
+  - `python -c "import sys; sys.path.insert(0, '2_Assault'); from src.evaluator import evaluate_agent; from src.e2e_smoke import run_e2e_smoke; print('HU007 imports OK')"` -> `HU007 imports OK`;
+  - `python -m compileall -q 2_Assault/src` -> PASS sin salida ni errores;
+  - `python -m pytest 2_Assault/tests/test_e2e_smoke.py -q` -> `5 passed`;
+  - `python -m pytest 2_Assault/tests/test_tensorboard.py::test_resume_reuses_run_id_and_continues_global_steps 2_Assault/tests/test_e2e_smoke.py -q` -> `6 passed`;
+  - `python -m pytest 2_Assault/tests -q` -> `64 passed, 2 skipped`.
+- Limitaciones y pendientes:
+  - no se ejecutó runtime remoto de Google Colab desde Codex;
+  - no se inventan resultados GPU ni Colab;
+  - queda pendiente ejecutar el notebook en Google Colab con GPU y `ASSAULT_E2E_REQUIRE_CUDA=1` para obtener `E2E_SMOKE_PASS=True`;
+  - HU007 bloquea HU009 hasta completar esa evidencia remota;
+  - no se implementó MLflow, entrenamiento largo, optimización de hiperparámetros, videos ni evaluación formal contra baseline, porque pertenecen a HU008-HU012.
 
 **Habilita:** HU008.
 
