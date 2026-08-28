@@ -523,6 +523,8 @@ Debe soportar explícitamente:
 
 **Evidencia de implementación HU005 (2026-08-27, rama `feature/hu005-checkpoints-resume`):**
 
+- Commit de implementación registrado:
+  - `be461f1a0f68880ae5a6335ae36414cb85f93050` (`Implement HU005 checkpoint resume support`).
 - Archivos creados/modificados:
   - `2_Assault/src/checkpointing.py`
   - `2_Assault/src/replay_buffer.py`
