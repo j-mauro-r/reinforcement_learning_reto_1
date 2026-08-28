@@ -48,7 +48,7 @@ HU005  Checkpoints + reanudación + idempotencia        [COMPLETADA]
   ↓
 HU006  Observabilidad con TensorBoard                  [COMPLETADA]
   ↓
-HU007  Smoke test end-to-end                         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - COLAB/GPU PENDIENTE]
+HU007  Smoke test end-to-end                         [COMPLETADA]
   ↓
 HU008  MLflow y trazabilidad de experimentos
   ↓
