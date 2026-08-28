@@ -42,7 +42,7 @@ HU002B Pipeline de ejecución Local → GitHub → Colab
   ↓
 HU003  Núcleo DDQN                                      [COMPLETADA]
   ↓
-HU004  Ciclo de entrenamiento
+HU004  Ciclo de entrenamiento                              [COMPLETADA]
   ↓
 HU005  Checkpoints + reanudación + idempotencia
   ↓
@@ -388,6 +388,8 @@ Debe implementar:
 
 ### HU004 — Ciclo de entrenamiento
 
+**Estado:** completada.
+
 **Propósito:** integrar entorno, agente y Replay Buffer en un ciclo de entrenamiento controlado por timesteps.
 
 Debe implementar:
@@ -404,6 +406,89 @@ Debe implementar:
 - control por `global_step`.
 
 **Resultado esperado:** el sistema puede entrenar durante un número pequeño de timesteps y modificar los pesos de la Online Network de forma verificable.
+
+**Evidencia de implementación HU004 (2026-08-27, rama `feature/hu004-ciclo-entrenamiento`):**
+
+- Archivos creados/modificados:
+  - `2_Assault/src/preflight.py`
+  - `2_Assault/src/trainer.py`
+  - `2_Assault/tests/test_preflight.py`
+  - `2_Assault/tests/test_trainer.py`
+  - `2_Assault/configs/ddqn_config.yaml`
+  - `2_Assault/assault_ddqn.ipynb`
+  - `2_Assault/docs/implementacion.md`
+- Configuración HU004 agregada:
+  - `training.total_timesteps=48`
+  - `training.learning_starts=32`
+  - `training.train_frequency=4`
+  - `training.target_update_frequency=16`
+  - `training.epsilon_decay_steps=48`
+  - `replay_buffer.capacity=1024`
+  - `replay_buffer.batch_size=32`
+- Decisión de memoria:
+  - `replay_buffer.capacity` se ajustó de `100000` a `1024` para HU004 porque el buffer visual preasignado con `uint8` reserva memoria al inicializarse y esta HU valida una corrida corta, no el entrenamiento largo de HU009.
+  - El dimensionamiento final de Replay Buffer para entrenamiento largo queda pendiente de HU009/validación de RAM en Colab.
+- Preflight:
+  - archivo: `2_Assault/src/preflight.py`;
+  - interfaz: `run_preflight_checks(config, device=...)`;
+  - resultado estructurado: `PreflightReport(passed, runtime, device, checks, errors, details)`;
+  - checks obligatorios implementados: `Device`, `Environment`, `Observation`, `QNetwork`, `ReplayBuffer`, `DDQN update`, `Loss finite`, `Target stable`, `Target sync`, `Save/load`;
+  - `READY_FOR_TRAINING=True` en validación local CPU;
+  - save/load usa archivo temporal y confirma `temporary_file_cleaned=True`.
+- Trainer:
+  - archivo: `2_Assault/src/trainer.py`;
+  - interfaz principal: `Trainer(env, agent, replay_buffer, config).train()`;
+  - resumen estructurado: `TrainingSummary`;
+  - control por `global_step`;
+  - una transición almacenada por cada `env.step(action)`;
+  - `learning_starts` respetado antes de updates;
+  - updates solo si `global_step >= learning_starts`, `len(replay_buffer) >= batch_size` y `global_step % train_frequency == 0`;
+  - epsilon decay lineal determinista con `compute_epsilon`;
+  - Target sync solo en múltiplos de `target_update_frequency`;
+  - `terminated or truncated` reinicia episodio;
+  - solo `terminated` se guarda como `done` para bootstrap DDQN.
+- Notebook:
+  - `2_Assault/assault_ddqn.ipynb` queda como orquestador;
+  - secuencia: bootstrap HU002B, config/runtime, validación HU002, Preflight HU004, gate `READY_FOR_TRAINING`, short training HU004, resumen de métricas;
+  - no duplica CNN, Replay Buffer, lógica DDQN ni trainer.
+- Validaciones ejecutadas:
+  - `python -m pytest 2_Assault/tests -q` -> `33 passed, 2 skipped in 11.50s`;
+  - `python -m compileall -q 2_Assault/src` -> PASS;
+  - imports HU004 -> `HU004 imports OK`;
+  - ejecución local de celdas de código del notebook con `ASSAULT_INSTALL_DEPENDENCIES=0` y `ASSAULT_BOOTSTRAP_REF=feature/hu004-ciclo-entrenamiento` -> `NOTEBOOK_CODE_CELLS_OK`.
+- Ambiente local:
+  - PyTorch `2.4.1+cpu`;
+  - CUDA local: `False`;
+  - dispositivo usado: `cpu`;
+  - tests GPU omitidos correctamente por ausencia de CUDA.
+- Smoke integrado HU004 con Assault real:
+  - flujo: `create_assault_env -> Preflight -> DDQNAgent -> ReplayBuffer -> Trainer -> short run`;
+  - observación real: `(4, 84, 84)`;
+  - dtype real: `uint8`;
+  - `preflight_passed=True`;
+  - `READY_FOR_TRAINING=True`;
+  - checks Preflight: todos `True`;
+  - `global_step=48`;
+  - `transitions_stored=48`;
+  - `updates_count=5`;
+  - `first_update_step=32`;
+  - `last_loss=0.0008681566687300801`;
+  - `mean_loss=0.512887254380621`;
+  - `loss_finite=True`;
+  - `epsilon_initial=1.0`;
+  - `epsilon_final=0.01`;
+  - `target_sync_steps=[16, 32, 48]`;
+  - `online_weights_changed=True`;
+  - `episodes_completed=0` durante la corrida corta real de 48 timesteps.
+- Evidencia `terminated/truncated`:
+  - tests con entorno controlado validan que `terminated=True` reinicia y guarda `done=True`;
+  - `truncated=True` reinicia episodio pero guarda `done=False` para el target DDQN;
+  - `global_step` continúa tras `reset()` y se detiene exactamente en `total_timesteps`.
+- Desviaciones respecto del DWP:
+  - No se ejecutó Colab/GPU desde Codex porque HU002B sigue sin canal remoto autenticado disponible; queda como validación futura/manual.
+  - No se registró evidencia remota ni se declara GPU como aprobada.
+- Scope excluido confirmado:
+  - No se implementó entrenamiento largo, checkpoints persistentes, resume, Replay Buffer persistente, Google Drive, TensorBoard, MLflow, callbacks avanzados, mejor modelo, evaluación formal, video, optimización de hiperparámetros, PER, Dueling, Rainbow, Noisy Nets, n-step, reward clipping, GitHub Actions ni automatización Codex -> Colab.
 
 **Habilita:** HU005.
 

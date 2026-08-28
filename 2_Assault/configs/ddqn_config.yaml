@@ -31,5 +31,12 @@ agent:
   epsilon_final: 0.01
 
 replay_buffer:
-  capacity: 100000
+  capacity: 1024
   batch_size: 32
+
+training:
+  total_timesteps: 48
+  learning_starts: 32
+  train_frequency: 4
+  target_update_frequency: 16
+  epsilon_decay_steps: 48
