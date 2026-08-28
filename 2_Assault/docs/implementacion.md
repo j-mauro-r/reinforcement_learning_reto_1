@@ -34,7 +34,7 @@ Fuentes de verdad relacionadas:
 ```text
 HU001  EDA + baseline aleatorio                      [COMPLETADA]
   ↓
-HU002  Pipeline reproducible del entorno
+HU002  Pipeline reproducible del entorno              [IMPLEMENTADA — VALIDACIÓN LOCAL COMPLETADA — AV09 COLAB PENDIENTE]
   ↓
 HU003  Núcleo DDQN
   ↓
@@ -80,6 +80,8 @@ La secuencia es deliberada: primero se construye y valida el sistema; después s
 
 ### HU002 — Pipeline reproducible del entorno
 
+**Estado:** implementada — validación local completada — AV09 Colab pendiente.
+
 **Propósito:** construir la única fábrica/configuración de `ALE/Assault-v5` que será utilizada por entrenamiento y evaluación.
 
 Debe implementar:
@@ -96,6 +98,40 @@ Debe implementar:
 - detección básica de hardware de Colab.
 
 **Resultado esperado:** para una misma configuración y seed, el pipeline crea observaciones con dimensiones y tipos esperados y puede ejecutar episodios sin errores.
+
+**Entregables principales:**
+
+- `2_Assault/configs/ddqn_config.yaml`
+- `2_Assault/src/environment.py`
+- `2_Assault/src/utils.py`
+- `2_Assault/tests/test_smoke.py`
+- `2_Assault/assault_ddqn.ipynb`
+- `2_Assault/requirements.txt`
+
+**Evidencia de autovalidación HU002:**
+
+- Rama validada localmente: `feature/hu002-pipeline-reproducible-entorno`, PR #3.
+- Entorno virtual limpio en Windows: `.venv` creado con `python -m venv .venv`.
+- Instalación desde cero validada con `.venv\Scripts\python -m pip install -r 2_Assault\requirements.txt`.
+- `python -m pytest 2_Assault\tests -q` -> `6 passed`.
+- Comando real ejecutado en el venv limpio: `.venv\Scripts\python -m pytest 2_Assault\tests -q` -> `6 passed`.
+- Observación procesada validada: shape `(4, 84, 84)`, dtype `uint8`.
+- Espacio de acciones validado: `Discrete(7)` con `NOOP`, `FIRE`, `UP`, `RIGHT`, `LEFT`, `RIGHTFIRE`, `LEFTFIRE`.
+- `frameskip` efectivo validado con contadores ALE: tras 100 `step()`, `episode_frame_number=400`, consistente con 4 frames por decisión y sin duplicación.
+- Train/eval crean entornos mediante la misma fábrica y comparten contrato de observación/acciones.
+- Reproducibilidad local validada: dos entornos independientes con seed `42` producen la misma observación inicial procesada y los mismos `info["seeds"]`.
+- Detección de hardware ejecutada localmente sin requerir GPU:
+  - Python `3.8.10`;
+  - Windows `10.0.19044`;
+  - Gymnasium `1.1.1`;
+  - ALE-Py `0.10.1`;
+  - CPU `AMD64 Family 23 Model 17 Stepping 0, AuthenticAMD`;
+  - 8 CPUs lógicas, 4 físicas;
+  - RAM total `6.9 GB`, disponible observada `0.95 GB`;
+  - GPU no disponible en esta Lenovo (`gpu_available=false`).
+- `2_Assault/assault_ddqn.ipynb` ejecutado localmente de principio a fin mediante ejecución automatizada equivalente en el mismo venv. Celdas de código ejecutadas: `[2, 4, 6, 8, 10, 11]`. Resultado: `HU002 validations passed`.
+- AV09 queda solo como **prevalidada localmente**. La ejecución real en Google Colab sigue pendiente y es gate final antes de declarar HU002 como completamente cerrada.
+- Correcciones realizadas en esta iteración: documentación de estado/evidencia; no se requirieron cambios de código ni notebook para que las validaciones locales pasaran.
 
 **Habilita:** HU003.
 
