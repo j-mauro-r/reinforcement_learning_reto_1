@@ -125,6 +125,6 @@ def load_tensorboard_scalars(log_dir: str | Path) -> Dict[str, list[tuple[int, f
     accumulator = EventAccumulator(str(log_dir))
     accumulator.Reload()
     return {
-        tag: [(int(event.step), float(event.value)) for event in accumulator.Scalars(tag)]
+        tag: sorted((int(event.step), float(event.value)) for event in accumulator.Scalars(tag))
         for tag in accumulator.Tags().get("scalars", [])
     }
