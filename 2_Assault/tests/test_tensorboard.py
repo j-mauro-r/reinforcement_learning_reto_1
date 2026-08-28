@@ -15,7 +15,9 @@ ASSAULT_DIR = Path(__file__).resolve().parents[1]
 if str(ASSAULT_DIR) not in sys.path:
     sys.path.insert(0, str(ASSAULT_DIR))
 
+from src.agent import DDQNAgent
 from src.callbacks import TensorBoardLogger, load_tensorboard_scalars
+from src.checkpointing import CheckpointManager
 from src.environment import create_assault_env
 from src.replay_buffer import ReplayBuffer
 from src.trainer import Trainer, compute_epsilon
@@ -183,6 +185,78 @@ def test_resume_reuses_run_id_and_continues_global_steps(tmp_path):
     assert all(step > 0 for step, _ in scalars["train/loss"])
 
 
+def test_tensorboard_resume_from_checkpoint_load_preserves_logs_and_continues_after_restored_step(tmp_path):
+    run_id = "checkpoint_resume_run"
+    checkpoint_step = 8
+    final_step = 12
+    log_root = tmp_path / "tensorboard"
+    checkpoint_root = tmp_path / "checkpoints"
+    config = _config(total_timesteps=checkpoint_step)
+    manager = CheckpointManager(checkpoint_root, run_id, repo_path=ASSAULT_DIR.parents[0])
+
+    env_a = FakeEnv(total_steps=checkpoint_step, episode_length=3)
+    agent_a = DDQNAgent(config, device="cpu", seed=42)
+    buffer_a = ReplayBuffer(capacity=64, seed=42)
+    logger_a = TensorBoardLogger.from_config(config, run_id=run_id, log_root=log_root)
+    try:
+        summary_a = Trainer(env_a, agent_a, buffer_a, config, metrics_logger=logger_a).train()
+        metadata = manager.save(agent_a, buffer_a, config, summary_a.global_step, summary_a, save_replay_buffer=True)
+        logger_a.flush()
+    finally:
+        logger_a.close()
+        env_a.close()
+
+    run_log_dir = log_root / run_id
+    event_files_before = logger_a.event_files()
+    scalars_before = load_tensorboard_scalars(run_log_dir)
+
+    assert metadata.checkpoint_step == checkpoint_step
+    assert summary_a.global_step == checkpoint_step
+    assert event_files_before
+    assert [step for step, _ in scalars_before["train/epsilon"]] == [4, 8]
+    assert [step for step, _ in scalars_before["train/loss"]] == [4, 6, 8]
+
+    resumed_config = _config(total_timesteps=final_step)
+    env_b = FakeEnv(total_steps=final_step, episode_length=3)
+    agent_b = DDQNAgent(resumed_config, device="cpu", seed=999)
+    buffer_b = ReplayBuffer(capacity=64, seed=999)
+    logger_b = TensorBoardLogger.from_config(resumed_config, run_id=run_id, log_root=log_root)
+    try:
+        restored_state = manager.load(metadata.path, agent_b, buffer_b, resumed_config, mode="resume_full")
+        summary_b = Trainer(
+            env_b,
+            agent_b,
+            buffer_b,
+            resumed_config,
+            initial_global_step=restored_state.global_step,
+            initial_metrics=restored_state.training_metrics,
+            metrics_logger=logger_b,
+        ).train()
+        logger_b.flush()
+    finally:
+        logger_b.close()
+        env_b.close()
+
+    event_files_after = logger_b.event_files()
+    scalars_after = load_tensorboard_scalars(run_log_dir)
+    previous_event_paths = {path.name for path in event_files_before}
+    resumed_epsilon_steps = [step for step, _ in scalars_after["train/epsilon"] if step > checkpoint_step]
+    resumed_loss_steps = [step for step, _ in scalars_after["train/loss"] if step > checkpoint_step]
+
+    assert restored_state.global_step == checkpoint_step
+    assert summary_b.initial_global_step == checkpoint_step
+    assert summary_b.global_step == final_step
+    assert logger_b.run_log_dir == run_log_dir
+    assert previous_event_paths.issubset({path.name for path in event_files_after})
+    assert len(event_files_after) >= len(event_files_before)
+    assert [step for step, _ in scalars_after["train/epsilon"]] == [4, 8, 12]
+    assert resumed_epsilon_steps == [12]
+    assert resumed_loss_steps == [10, 12]
+    assert len(scalars_after["train/loss"]) > len(scalars_before["train/loss"])
+    assert len(scalars_after["train/q_mean"]) > len(scalars_before["train/q_mean"])
+    assert len(scalars_after["train/learning_rate"]) > len(scalars_before["train/learning_rate"])
+
+
 def test_different_run_ids_do_not_mix_events(tmp_path):
     _run_with_logger(tmp_path, run_id="run_a")
     _run_with_logger(tmp_path, run_id="run_b", total_timesteps=4)
@@ -221,8 +295,6 @@ def test_short_real_assault_smoke_writes_training_scalars(tmp_path):
     env = create_assault_env(config, mode="train", seed=42)
     logger = TensorBoardLogger.from_config(config, run_id="assault_smoke", log_root=tmp_path)
     try:
-        from src.agent import DDQNAgent
-
         agent = DDQNAgent(config, device="cpu", seed=42)
         buffer = ReplayBuffer(capacity=64, seed=42)
         summary = Trainer(env, agent, buffer, config, metrics_logger=logger).train()

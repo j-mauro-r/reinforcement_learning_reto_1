@@ -715,6 +715,31 @@ Registrar como mínimo:
   - al reusar `run_id=resume_run`, los eventos continúan con pasos `[4, 8, 12]`;
   - el segundo tramo arranca con `initial_global_step=8` y no reinicia silenciosamente a cero;
   - el mismo directorio de run puede contener múltiples event files sin truncarse.
+- AV13 - Resume real mediante checkpoint:
+  - test agregado: `test_tensorboard_resume_from_checkpoint_load_preserves_logs_and_continues_after_restored_step`;
+  - `run_id=checkpoint_resume_run`;
+  - segmento A entrena hasta `checkpoint @ N=8`;
+  - checkpoint guardado con `CheckpointManager.save(..., save_replay_buffer=True)`;
+  - se cierran logger, entorno y objetos del segmento A;
+  - segmento B crea nuevos `environment`, `DDQNAgent`, `ReplayBuffer`, `TensorBoardLogger` y `Trainer`;
+  - resume ejecutado con `CheckpointManager.load(..., mode="resume_full")`;
+  - `restored global_step=8`;
+  - `Trainer(..., initial_global_step=restored_state.global_step, initial_metrics=restored_state.training_metrics)`;
+  - `final global_step=12`;
+  - `train/epsilon` antes del resume: `[4, 8]`;
+  - `train/epsilon` despues del resume en la serie completa: `[4, 8, 12]`;
+  - nuevos `train/epsilon` steps `> N`: `[12]`;
+  - `train/loss` antes del resume: `[4, 6, 8]`;
+  - `train/loss` despues del resume en la serie completa: `[4, 6, 8, 10, 12]`;
+  - nuevos `train/loss` steps `> N`: `[10, 12]`;
+  - no se valida pasando manualmente `initial_global_step=N`; el valor proviene del checkpoint cargado.
+- AV14 - Preservacion de logs:
+  - mismo directorio usado: `<tensorboard_root>/checkpoint_resume_run/`;
+  - event files antes del resume: `1`;
+  - event files despues del resume: `2`;
+  - archivos previos preservados: `True`;
+  - eventos `train/loss` antes/despues: `3 -> 5`;
+  - EventAccumulator lee una serie temporal completa sin eliminar ni truncar logs previos.
 - Evidencia de aislamiento:
   - `run_a` y `run_b` escriben en directorios separados;
   - los scalars no se mezclan entre `run_id`.
@@ -722,8 +747,11 @@ Registrar como mínimo:
   - con `tensorboard.enabled=false`, `Trainer` completa la corrida;
   - no se crea directorio de run ni event files.
 - Autovalidaciones ejecutadas:
-  - `python -m pytest 2_Assault/tests/test_tensorboard.py 2_Assault/tests/test_trainer.py -q` -> `19 passed`;
-  - `python -m pytest 2_Assault/tests -q` -> `58 passed, 2 skipped`.
+  - AV03: `python -m compileall -q 2_Assault/src` -> PASS sin salida ni errores;
+  - `python -m pytest 2_Assault/tests/test_tensorboard.py -q` -> `11 passed`;
+  - `python -m pytest 2_Assault/tests/test_tensorboard.py 2_Assault/tests/test_checkpointing.py -q` -> `26 passed`;
+  - AV16 notebook local: celdas automatizables de `2_Assault/assault_ddqn.ipynb` ejecutadas con `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu006-tensorboard`, `ASSAULT_CHECKPOINT_DIR=<temp>`, `ASSAULT_TENSORBOARD_DIR=<temp>`, `ASSAULT_RUN_ID=<run temporal>` -> `NOTEBOOK_CODE_CELLS_OK`; celdas ejecutadas: `11`; celdas omitidas: `[]`;
+  - `python -m pytest 2_Assault/tests -q` -> `59 passed, 2 skipped`.
 - Limitaciones y pendientes:
   - no se ejecutó runtime remoto de Colab desde Codex por la restricción ya diagnosticada en HU002B/HU005;
   - no se implementó MLflow, evaluación formal, video, entrenamiento largo ni selección de mejor modelo;
