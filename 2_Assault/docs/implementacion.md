@@ -133,7 +133,7 @@ Debe implementar:
 
 ### HU002B — Pipeline de ejecución Local → GitHub → Colab
 
-**Estado:** lista para implementación.
+**Estado:** implementada — validaciones automatizables locales completadas — validación Colab pendiente.
 
 **Propósito:** establecer un flujo reproducible de ejecución que separe desarrollo/validación local, versionamiento en GitHub y ejecución remota en Google Colab, garantizando que Colab ejecute una rama o commit conocido del repositorio.
 
@@ -160,6 +160,84 @@ Debe implementar:
 **Entregable de definición:** `2_Assault/docs/hu002b_pipeline_ejecucion_local_github_colab.md`.
 
 **Habilita:** HU003.
+
+**Evidencia de implementación HU002B (2026-08-27, rama `feature/hu002b-pipeline-local-github-colab`):**
+
+- Archivos implementados/modificados:
+  - `2_Assault/assault_ddqn.ipynb`
+  - `2_Assault/src/execution_bootstrap.py`
+  - `2_Assault/tests/test_execution_bootstrap.py`
+  - `2_Assault/docs/implementacion.md`
+- Bootstrap agregado al inicio del notebook:
+  - detecta ejecución local vs Google Colab;
+  - en local usa el checkout Git existente;
+  - en Colab usa `/content/reinforcement_learning_reto_1`;
+  - si la copia Colab no existe, ejecuta `git clone`;
+  - si existe, ejecuta `git fetch --prune origin`;
+  - resuelve rama/ref o commit explícito;
+  - usa checkout detached al SHA resuelto;
+  - no ejecuta `git pull`, merge, commit ni push desde Colab;
+  - instala dependencias desde `2_Assault/requirements.txt` de la copia seleccionada;
+  - configura `PROJECT_ROOT`, `ASSAULT_DIR` e imports después del bootstrap;
+  - verifica el origen de `src.environment`;
+  - bloquea cambios de commit cuando ya existen imports `src.*` cargados.
+- Resultado del bootstrap local:
+  - runtime detectado: `local`;
+  - repo usado: `D:\Users\Usuario\Documents\ENTROPY_LAB\maestria_ia\reinforcement_learning_reto_1`;
+  - `ASSAULT_DIR`: `D:\Users\Usuario\Documents\ENTROPY_LAB\maestria_ia\reinforcement_learning_reto_1\2_Assault`;
+  - ref solicitada: `feature/hu002b-pipeline-local-github-colab`;
+  - commit pin validado localmente: `8a17b7f9b5e5ae12dc6bfacfc36e9d2bdef926d2`;
+  - idempotencia local: dos ejecuciones resolvieron el mismo SHA;
+  - origen real de import: `D:\Users\Usuario\Documents\ENTROPY_LAB\maestria_ia\reinforcement_learning_reto_1\2_Assault\src\environment.py`.
+- Validaciones locales ejecutadas:
+  - `python -m pytest 2_Assault/tests -q` -> `10 passed in 11.46s`;
+  - ejecución local de celdas de código de `2_Assault/assault_ddqn.ipynb` con `ASSAULT_INSTALL_DEPENDENCIES=0` -> `NOTEBOOK_CODE_CELLS_OK`;
+  - observación procesada: `(4, 84, 84)`;
+  - dtype: `uint8`;
+  - action space: `Discrete(7)`;
+  - acciones: `NOOP`, `FIRE`, `UP`, `RIGHT`, `LEFT`, `RIGHTFIRE`, `LEFTFIRE`;
+  - `frameskip` efectivo validado: `4`;
+  - interacción corta HU002: 100 `step()` sin errores.
+- Resultado Gate T00 Codex -> Colab:
+  - mecanismo intentado: CLI local oficial/equivalente para Colab y puentes Jupyter disponibles;
+  - comandos/procedimientos:
+    - `Get-Command colab -ErrorAction SilentlyContinue`;
+    - `Get-Command google-colab -ErrorAction SilentlyContinue`;
+    - `python -m pip show google-colab colab-cli colabcode jupyter_http_over_ws`;
+    - `jupyter server list`;
+    - `jupyter notebook list`;
+    - `jupyter kernelspec list`;
+  - resultado real:
+    - no existe comando local `colab`;
+    - no existe comando local `google-colab`;
+    - no hay paquetes Python de CLI Colab instalados;
+    - Jupyter local solo expone subcomandos `kernel`, `kernelspec`, `migrate`, `run`, `troubleshoot`;
+    - `jupyter-server` y `jupyter-notebook` no están disponibles;
+    - kernels locales detectados: `myenv`, `venv`, `python3`;
+  - conclusión: Codex no tiene desde este entorno un canal remoto automatizable para ejecutar comandos contra un runtime activo de Google Colab, por lo que no se ejecutaron Python remoto, GPU remota, smoke remoto ni AV09 en Colab. No se inventan resultados remotos.
+- Estado AV09 HU002:
+  - `HU002 — IMPLEMENTADA — VALIDACIÓN LOCAL COMPLETADA — AV09 COLAB PENDIENTE`.
+- Estado HU002B:
+  - `HU002B — IMPLEMENTADA — VALIDACIONES AUTOMATIZABLES COMPLETADAS — VALIDACIÓN COLAB PENDIENTE`.
+- Desviación respecto del DWP:
+  - El notebook incluye un pre-bootstrap mínimo antes de importar `src.execution_bootstrap`, porque en un runtime Colab limpio el repositorio y sus helpers todavía no existen bajo `/content`.
+  - Justificación: ese pre-bootstrap solo trae la copia versionada desde GitHub; la validación del contrato, el SHA, la instalación, imports e idempotencia se delegan al helper versionado del repositorio.
+
+**Instrucciones manuales para cerrar AV09 Colab:**
+
+1. Hacer merge del PR o, para validar la rama antes del merge, mantener `BOOTSTRAP_REF = "feature/hu002b-pipeline-local-github-colab"` en el notebook.
+2. Abrir `2_Assault/assault_ddqn.ipynb` en Google Colab con runtime limpio.
+3. Activar GPU en Colab si se desea registrar disponibilidad CUDA: `Runtime > Change runtime type > GPU`.
+4. Ejecutar todas las celdas en orden.
+5. Verificar que el bootstrap imprima:
+   - runtime `Google Colab`;
+   - repo `/content/reinforcement_learning_reto_1`;
+   - ref solicitada;
+   - SHA resuelto;
+   - requirements bajo `/content/reinforcement_learning_reto_1/2_Assault/requirements.txt`;
+   - `src.environment` bajo `/content/reinforcement_learning_reto_1/2_Assault/src/environment.py`.
+6. Confirmar que aparece `HU002 validations passed.`.
+7. Registrar stdout/stderr, versión Python, GPU disponible y SHA ejecutado para completar AV09 de HU002 y la validación Colab de HU002B.
 
 ---
 
