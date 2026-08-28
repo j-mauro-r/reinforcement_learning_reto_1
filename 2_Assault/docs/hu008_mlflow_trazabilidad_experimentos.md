@@ -1386,3 +1386,330 @@ HU009 no debe iniciar el primer entrenamiento DDQN largo hasta que HU008 demuest
 - asociarse inequívocamente con código, configuración, checkpoint y métricas.
 
 **Habilita:** HU009 — Entrenamiento DDQN completo.
+
+---
+
+## 15. Enmienda de trazabilidad por sesión de ejecución
+
+> **Prioridad normativa:** esta sección complementa y, cuando exista conflicto, tiene prioridad sobre las secciones anteriores de HU008 respecto a `new`, `resume`, artefactos y evidencia entre sesiones.
+
+### 15.1 Problema que debe resolver la implementación
+
+Un `project_run_id` representa un experimento lógico y un `mlflow_run_id` representa su run técnico en MLflow, pero una misma corrida puede ejecutarse en varias sesiones de cómputo independientes, por ejemplo dos runtimes distintos de Google Colab.
+
+La implementación debe poder responder inequívocamente:
+
+- qué ocurrió en cada sesión;
+- qué Git SHA y hardware usó cada sesión;
+- desde qué `global_step` inició y en cuál terminó;
+- qué checkpoint cargó o produjo;
+- qué métricas pertenecen a cada sesión;
+- qué evaluación se ejecutó en cada sesión;
+- en qué orden ocurrieron las sesiones;
+- y confirmar que todas pertenecen al mismo `project_run_id` y `mlflow_run_id` cuando se trata de un `resume` real.
+
+No es suficiente conservar únicamente el último `training_summary.json`, `evaluation_summary.json` o `runtime.json` con nombres fijos.
+
+### 15.2 Nueva identidad: `tracking_session_id`
+
+Además de:
+
+```text
+project_run_id
+mlflow_run_id
+```
+
+debe existir un identificador explícito por sesión:
+
+```text
+tracking_session_id
+```
+
+Ejemplo:
+
+```text
+project_run_id = assault_ddqn_exp_001
+mlflow_run_id = ABC123
+
+tracking_session_id = session_001
+tracking_session_id = session_002
+```
+
+El nombre concreto puede adaptarse (`session_id`, `execution_session_id`, etc.), pero el concepto debe ser explícito y persistente.
+
+Cada ejecución del notebook que represente una sesión de cómputo debe utilizar un `tracking_session_id` único dentro del mismo `project_run_id`.
+
+Debe poder suministrarse explícitamente mediante configuración o variable de entorno, por ejemplo:
+
+```text
+ASSAULT_MLFLOW_SESSION_ID=session_001
+```
+
+No inferir silenciosamente una sesión existente como “la última”. Si se implementa generación automática para `new`, el identificador generado debe imprimirse y quedar persistido antes de iniciar el trabajo relevante.
+
+### 15.3 Un MLflow run lógico, múltiples sesiones trazables
+
+Para una reanudación del mismo experimento:
+
+```text
+MLflow experiment: assault_ddqn
+└── mlflow_run_id = ABC123
+    ├── project_run_id = assault_ddqn_exp_001
+    ├── session_001
+    │   └── step 0 → N
+    └── session_002
+        └── step N → T
+```
+
+No crear un segundo `mlflow_run_id` para representar únicamente una nueva sesión del mismo entrenamiento reanudado.
+
+Un nuevo `mlflow_run_id` corresponde a un experimento/run lógico distinto, no a una sesión adicional del mismo experimento.
+
+### 15.4 Artefactos inmutables por sesión
+
+Los artefactos variables entre sesiones deben almacenarse en un namespace específico de sesión.
+
+Estructura objetivo equivalente:
+
+```text
+sessions/
+  session_001/
+    session_metadata.json
+    runtime.json
+    training_summary.json
+    evaluation_summary.json
+    checkpoint_reference.json
+  session_002/
+    session_metadata.json
+    runtime.json
+    training_summary.json
+    evaluation_summary.json
+    checkpoint_reference.json
+```
+
+Los nombres pueden adaptarse, pero una sesión posterior **no debe sobrescribir** los artefactos históricos de otra sesión.
+
+Artefactos realmente invariantes del experimento, como una configuración base que MLflow no permite cambiar como param, pueden conservarse en una ubicación común si existe evidencia de igualdad/compatibilidad.
+
+### 15.5 `session_metadata.json`
+
+Cada sesión debe registrar como mínimo:
+
+```text
+tracking_session_id
+project_run_id
+mlflow_run_id
+tracking_mode
+started_at
+ended_at o duration
+runtime
+Git SHA
+Git ref
+device
+GPU/CPU
+initial_global_step
+final_global_step
+checkpoint_input_reference
+checkpoint_output_reference
+```
+
+Cuando una propiedad no aplique, usar `null`/ausencia explícita y no inventar valores.
+
+### 15.6 Métricas globales vs métricas de sesión
+
+MLflow puede conservar historial de métricas repetidas, pero HU008 debe evitar depender únicamente del “último valor” de una misma key para reconstruir sesiones.
+
+Debe existir una estrategia explícita equivalente a una de estas opciones:
+
+1. registrar métricas con `step=global_step` cuando la semántica sea temporal y útil; y/o
+2. registrar métricas namespaced por sesión; y siempre
+3. conservar summaries de sesión como artefactos inmutables.
+
+Para comparación de runs pueden mantenerse métricas agregadas canónicas como:
+
+```text
+train/final_global_step
+eval/mean_reward
+```
+
+pero la evidencia histórica completa debe seguir disponible en `sessions/<tracking_session_id>/...`.
+
+### 15.7 Reglas de `new`
+
+Una sesión `new` debe:
+
+- crear un nuevo `mlflow_run_id`;
+- usar un `project_run_id` explícito;
+- crear/registrar un `tracking_session_id` único;
+- registrar `tracking_mode=new`;
+- registrar `initial_global_step=0` cuando efectivamente aplique;
+- persistir artefactos bajo `sessions/<tracking_session_id>/`;
+- devolver e imprimir `mlflow_run_id` y `tracking_session_id`.
+
+### 15.8 Reglas de `resume`
+
+Una sesión `resume` debe:
+
+- recibir explícitamente el mismo `project_run_id`;
+- recibir explícitamente el `mlflow_run_id` a reabrir;
+- usar un `tracking_session_id` nuevo y distinto al anterior;
+- verificar que el `project_run_id` del run existente coincide;
+- registrar `tracking_mode=resume`;
+- registrar el checkpoint de entrada;
+- registrar `initial_global_step` restaurado;
+- registrar el `final_global_step` alcanzado;
+- guardar nuevos artefactos bajo el namespace de la nueva sesión;
+- preservar sin modificación los artefactos de sesiones anteriores.
+
+### 15.9 Detección de colisiones
+
+Si se intenta registrar una nueva sesión con un `tracking_session_id` que ya existe para ese MLflow run, el comportamiento por defecto debe ser **fail-fast**.
+
+No sobrescribir silenciosamente:
+
+```text
+sessions/session_001/*
+```
+
+El usuario debe escoger explícitamente otro `tracking_session_id` o un modo de corrección documentado fuera del flujo normal.
+
+### 15.10 Trazabilidad de checkpoint entre sesiones
+
+Para demostrar continuidad real, la sesión reanudada debe poder asociar:
+
+```text
+session_001.checkpoint_output_reference
+        ↓
+session_002.checkpoint_input_reference
+```
+
+Cuando HU005 produzca el checkpoint usado para resume, la metadata de sesión debe registrar esta relación sin acoplar `CheckpointManager` a MLflow.
+
+### 15.11 API esperada en `tracking.py`
+
+Codex puede adaptar la API existente, pero debe soportar un contrato equivalente a:
+
+```python
+metadata = tracker.start_run(
+    project_run_id=project_run_id,
+    tracking_mode="new" | "resume",
+    mlflow_run_id=mlflow_run_id,
+    tracking_session_id=tracking_session_id,
+)
+
+tracker.log_session_metadata(...)
+tracker.log_training_summary(..., tracking_session_id=tracking_session_id)
+tracker.log_evaluation_summary(..., tracking_session_id=tracking_session_id)
+tracker.log_checkpoint_reference(..., tracking_session_id=tracking_session_id)
+```
+
+No es obligatorio usar exactamente estas firmas si el diseño resultante conserva la misma trazabilidad y separación de responsabilidades.
+
+### 15.12 Notebook
+
+El notebook debe imprimir de forma visible:
+
+```text
+project_run_id
+mlflow_run_id
+tracking_session_id
+tracking_mode
+initial_global_step
+final_global_step
+checkpoint input/output
+MLFLOW_TRACKING_PASS
+```
+
+Para validar HU008 en Colab se esperan dos sesiones independientes:
+
+```text
+runtime Colab A
+tracking_mode=new
+tracking_session_id=session_001
+↓
+MLflow run ABC123
+↓
+cerrar runtime
+
+runtime Colab B limpio
+tracking_mode=resume
+mlflow_run_id=ABC123
+tracking_session_id=session_002
+↓
+mismo MLflow run ABC123
+```
+
+El tracking URI debe ser persistente entre ambos runtimes.
+
+### 15.13 Nuevas tareas de implementación
+
+Agregar al alcance de Codex:
+
+- **T17 — Session identity:** implementar `tracking_session_id` explícito.
+- **T18 — Session artifact namespace:** almacenar artefactos variables bajo `sessions/<tracking_session_id>/`.
+- **T19 — Session metadata:** registrar metadata estructurada por sesión.
+- **T20 — Collision protection:** rechazar reutilización accidental de un session ID existente.
+- **T21 — Resume linkage:** relacionar checkpoint de salida de una sesión con checkpoint de entrada de la siguiente.
+- **T22 — Session tests:** validar dos sesiones sobre un mismo `mlflow_run_id` con artefactos históricos preservados.
+- **T23 — Notebook session orchestration:** exponer/configurar `tracking_session_id` y evidencia por sesión.
+
+### 15.14 Criterios de aceptación adicionales
+
+- **CA31 — Session identity:** cada sesión posee un `tracking_session_id` explícito y único dentro del run.
+- **CA32 — Session artifact isolation:** artefactos de una sesión no sobrescriben otra.
+- **CA33 — Session metadata:** cada sesión conserva runtime, SHA, modo, steps y checkpoint references propios.
+- **CA34 — Same run resume:** `session_001` y `session_002` reutilizan el mismo `mlflow_run_id` durante resume real.
+- **CA35 — Historical preservation:** tras session_002, `MlflowClient` permite comprobar que siguen existiendo los artefactos de session_001.
+- **CA36 — Collision fail-fast:** reutilizar accidentalmente un session ID existente falla explícitamente.
+- **CA37 — Checkpoint linkage:** la continuidad checkpoint output → checkpoint input queda trazable cuando aplica.
+- **CA38 — Session queryability:** la implementación permite enumerar/consultar las sesiones registradas de un run mediante artefactos/metadata sin heurísticas ambiguas.
+
+### 15.15 Autovalidaciones adicionales
+
+- **AV24 — Two-session local run:** crear session_001 y session_002 sobre el mismo `mlflow_run_id` usando backend temporal.
+- **AV25 — Artifact preservation:** después de session_002 comprobar que ambos namespaces existen y sus contenidos corresponden a cada sesión.
+- **AV26 — Session collision:** intentar repetir session_001 y esperar fail-fast.
+- **AV27 — Same run identity:** validar programáticamente que ambas sesiones pertenecen al mismo `project_run_id` y `mlflow_run_id`.
+- **AV28 — Session metadata continuity:** validar `session_001.final_global_step == session_002.initial_global_step` cuando el resume de entrenamiento use ese checkpoint.
+- **AV29 — Persistent Colab store:** ejecutar session_001 y session_002 en runtimes Colab separados usando el mismo tracking URI persistente.
+
+### 15.16 Evidencia adicional obligatoria
+
+La revisión final de HU008 debe incluir:
+
+- `tracking_session_id` de cada sesión;
+- mismo `project_run_id` entre sesiones de resume;
+- mismo `mlflow_run_id` entre sesiones de resume;
+- Git SHA por sesión;
+- runtime/hardware por sesión;
+- `initial_global_step` y `final_global_step` por sesión;
+- checkpoint input/output por sesión;
+- listado de artefactos de `session_001`;
+- listado de artefactos de `session_002`;
+- evidencia de que session_002 no sobrescribió session_001;
+- resultado de consulta programática de ambas sesiones;
+- evidencia de persistencia entre runtimes Colab separados.
+
+### 15.17 Definition of Done adicional
+
+HU008 **no puede marcarse `[COMPLETADA]`** hasta que además se cumpla:
+
+- [ ] existe `tracking_session_id` explícito;
+- [ ] las sesiones tienen artefactos independientes e inmutables;
+- [ ] `new` crea session_001 y un nuevo MLflow run;
+- [ ] `resume` crea session_002 reutilizando el mismo MLflow run;
+- [ ] session_001 permanece íntegra después de session_002;
+- [ ] existe metadata estructurada por sesión;
+- [ ] existe protección contra colisión/overwrite de session IDs;
+- [ ] checkpoints de entrada/salida quedan asociados a la sesión cuando aplican;
+- [ ] tests automatizados de dos sesiones pasan;
+- [ ] dos runtimes Colab separados pueden consultar el mismo tracking store persistente;
+- [ ] la evidencia final permite reconstruir individualmente cada sesión.
+
+El estado posterior a implementación local de Codex debe seguir siendo:
+
+```text
+HU008 [IMPLEMENTADA — VALIDACIONES LOCALES COMPLETADAS — VALIDACIÓN COLAB MULTISESIÓN PENDIENTE]
+```
+
+hasta ejecutar y verificar las dos sesiones reales en Colab.
