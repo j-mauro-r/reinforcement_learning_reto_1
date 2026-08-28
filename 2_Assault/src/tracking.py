@@ -245,13 +245,14 @@ class MLflowTracker:
         runtime: Optional[str] = None,
         device: Optional[str] = None,
     ) -> None:
-        """Logs identity, environment, preprocessing, DDQN and runtime params.
+        """Logs immutable run-level params for a logical DDQN experiment.
 
         Args:
-            config: Parsed configuration used by the run.
-            runtime_info: Runtime metadata, preferably from ``get_runtime_info``.
-            git_commit: Git SHA executed.
-            git_ref: Optional requested Git ref.
+            config: Parsed base configuration used by the logical run.
+            runtime_info: Accepted for backward compatibility; variable runtime
+                details are stored in ``log_session_metadata``.
+            git_commit: Git SHA executed by the current session.
+            git_ref: Optional requested Git ref for the current session.
             project_run_id: Optional logical run id to validate/log.
             action_space: Optional action-space string from the environment.
             observation_dtype: Optional observed dtype.
@@ -266,10 +267,6 @@ class MLflowTracker:
 
         params: Dict[str, Any] = {
             "identity.seed": _get_nested(config, "reproducibility", "seed"),
-            "git.commit": git_commit,
-            "git.ref": git_ref,
-            "runtime.name": runtime,
-            "runtime.device": device,
             "environment.id": _get_nested(config, "environment", "id"),
             "environment.obs_type": _get_nested(config, "environment", "obs_type"),
             "environment.action_space": action_space,
@@ -292,21 +289,6 @@ class MLflowTracker:
             "ddqn.learning_starts": _get_nested(config, "training", "learning_starts"),
             "ddqn.train_frequency": _get_nested(config, "training", "train_frequency"),
             "ddqn.target_update_frequency": _get_nested(config, "training", "target_update_frequency"),
-            "ddqn.total_timesteps": _get_nested(config, "training", "total_timesteps"),
-            "versions.python": runtime_info.get("python_version"),
-            "versions.gymnasium": runtime_info.get("gymnasium_version"),
-            "versions.ale_py": runtime_info.get("ale_py_version"),
-            "versions.torch": runtime_info.get("torch_version"),
-            "versions.cuda": runtime_info.get("cuda_version"),
-            "versions.mlflow": _package_version("mlflow"),
-            "hardware.cpu": runtime_info.get("cpu"),
-            "hardware.cpu_count_logical": runtime_info.get("cpu_count_logical"),
-            "hardware.cpu_count_physical": runtime_info.get("cpu_count_physical"),
-            "hardware.ram_total_gb": runtime_info.get("ram_total_gb"),
-            "hardware.ram_available_gb": runtime_info.get("ram_available_gb"),
-            "hardware.gpu_available": runtime_info.get("gpu_available"),
-            "hardware.gpu_name": runtime_info.get("gpu_name"),
-            "hardware.gpu_vram_total_gb": runtime_info.get("gpu_vram_total_gb"),
         }
         if project_run_id is not None:
             params["identity.project_run_id"] = project_run_id
@@ -315,8 +297,10 @@ class MLflowTracker:
             {
                 "algorithm": "DDQN",
                 "project_run_id": _to_mlflow_value(project_run_id),
-                "git_commit": _to_mlflow_value(git_commit),
-                "runtime": _to_mlflow_value(runtime),
+                "latest_git_commit": _to_mlflow_value(git_commit),
+                "latest_git_ref": _to_mlflow_value(git_ref),
+                "latest_runtime": _to_mlflow_value(runtime),
+                "latest_device": _to_mlflow_value(device),
             }
         )
 
@@ -410,6 +394,17 @@ class MLflowTracker:
         if self.enabled:
             self.log_dict_artifact(dict(config), artifact_file, session_scoped=False)
 
+    def log_session_config(self, config: Mapping[str, Any], artifact_file: str = "effective_config.json", tracking_session_id: Optional[str] = None) -> str:
+        """Logs the effective per-session configuration and returns its path."""
+        if not self.enabled:
+            return str(artifact_file)
+        session_id = self._resolve_session_id(tracking_session_id)
+        artifact_path = str(artifact_file).replace("\\", "/").lstrip("/")
+        if not artifact_path.startswith("sessions/"):
+            artifact_path = f"sessions/{session_id}/{artifact_path}"
+        self.log_dict_artifact(dict(config), artifact_path, session_scoped=False)
+        return artifact_path
+
     def log_runtime_metadata(
         self,
         runtime_info: Mapping[str, Any],
@@ -442,6 +437,8 @@ class MLflowTracker:
         restored_global_step: Optional[int] = None,
         replay_buffer_restored: Optional[bool] = None,
         resume_mode: Optional[str] = None,
+        session_target_timesteps: Optional[int] = None,
+        effective_config_artifact: Optional[str] = None,
         started_at: Optional[str] = None,
         ended_at: Optional[str] = None,
         duration_seconds: Optional[float] = None,
@@ -471,6 +468,7 @@ class MLflowTracker:
             "cpu": runtime_info.get("cpu"),
             "initial_global_step": initial_global_step,
             "final_global_step": final_global_step,
+            "session_target_timesteps": session_target_timesteps,
             "checkpoint_input_reference": checkpoint_input_reference,
             "checkpoint_output_reference": checkpoint_output_reference,
             "checkpoint_input_loaded": checkpoint_input_loaded,
@@ -478,6 +476,18 @@ class MLflowTracker:
             "restored_global_step": restored_global_step,
             "replay_buffer_restored": replay_buffer_restored,
             "resume_mode": resume_mode,
+            "effective_config_artifact": effective_config_artifact,
+            "ram_total_gb": runtime_info.get("ram_total_gb"),
+            "ram_available_gb": runtime_info.get("ram_available_gb"),
+            "gpu_vram_total_gb": runtime_info.get("gpu_vram_total_gb"),
+            "cpu_count_logical": runtime_info.get("cpu_count_logical"),
+            "cpu_count_physical": runtime_info.get("cpu_count_physical"),
+            "python_version": runtime_info.get("python_version"),
+            "gymnasium_version": runtime_info.get("gymnasium_version"),
+            "ale_py_version": runtime_info.get("ale_py_version"),
+            "torch_version": runtime_info.get("torch_version"),
+            "cuda_version": runtime_info.get("cuda_version"),
+            "mlflow_version": _package_version("mlflow"),
             "versions": {
                 "python": runtime_info.get("python_version"),
                 "torch": runtime_info.get("torch_version"),

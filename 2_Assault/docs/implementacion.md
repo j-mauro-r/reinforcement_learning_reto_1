@@ -50,7 +50,7 @@ HU006  Observabilidad con TensorBoard                  [COMPLETADA]
   ↓
 HU007  Smoke test end-to-end                         [COMPLETADA]
   ↓
-HU008  MLflow y trazabilidad de experimentos         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB PENDIENTE]
+HU008  MLflow y trazabilidad de experimentos         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - LISTA PARA VALIDACION COLAB MULTISESION]
   ↓
 HU009  Entrenamiento DDQN completo
   ↓
@@ -983,47 +983,59 @@ Cada run relevante debe registrar como mínimo:
   - queda pendiente ejecutar el notebook en Google Colab con tracking URI persistente/configurable y conservar evidencia de `MLFLOW_TRACKING_PASS=True`;
   - HU008 no implementa entrenamiento largo, HPO, evaluación formal, video, Model Registry, serving ni MLflow server.
 
-**Correccion tecnica HU008 multi-sesion y resume real (2026-08-28, rama `feature/hu008-mlflow-tracking`):**
+**Correccion tecnica HU008 multi-sesion, params estables y evaluacion corta (2026-08-28, rama `feature/hu008-mlflow-tracking`):**
 
 - Se agrega `tracking_session_id` como tercer identificador explicito junto con `project_run_id` y `mlflow_run_id`.
 - `MLflowRunMetadata` expone `tracking_session_id` y el notebook imprime `project_run_id`, `mlflow_run_id`, `tracking_session_id`, modo, pasos inicial/final y referencias de checkpoint.
 - La configuracion central incluye `mlflow.tracking_session_id: session_001`.
 - Overrides soportados para multi-sesion: `ASSAULT_MLFLOW_SESSION_ID`, `ASSAULT_MLFLOW_CHECKPOINT_INPUT`, `ASSAULT_MLFLOW_SESSION_TARGET_TIMESTEPS` y `ASSAULT_RESUME_MODE`.
+- `log_run_context(...)` queda limitado a params globales/inmutables: identidad, seed, entorno, preprocessing y configuracion core DDQN compatible entre sesiones.
+- Git SHA/ref, runtime, device, versiones, RAM/GPU y `training.total_timesteps` dejan de registrarse como params inmutables y se conservan por sesion.
+- `training.total_timesteps` se trata como `session_target_timesteps` cuando HU008 ejecuta segmentos multi-sesion.
 - Con MLflow habilitado, iniciar un run sin `tracking_session_id` produce `ValueError`.
 - En modo `resume`, reusar un `tracking_session_id` que ya contiene `sessions/<tracking_session_id>/session_metadata.json` dentro del mismo `mlflow_run_id` produce `RuntimeError` fail-fast.
 - La deteccion de colision de sesion ya no oculta errores reales de backend: si `MlflowClient.list_artifacts(...)` falla por permisos, I/O o store invalido, el error se propaga.
 - Se agrega `src/training_session.py` como orquestador HU008 de una sesion reanudable: crea agente/buffer nuevos, usa `CheckpointManager.load(..., mode="resume_full")` para cargar el checkpoint externo, valida `restored_global_step == initial_global_step`, exige `replay_buffer_restored=True` en resume completo y continua de `N` a `T`.
 - El notebook usa el orquestador HU008 para sesiones `new` y `resume`; `new` produce un checkpoint final de `session_001` y `resume` carga explicitamente `ASSAULT_MLFLOW_CHECKPOINT_INPUT` para `session_002` sobre el mismo `mlflow_run_id`.
-- Los artefactos variables se registran bajo `sessions/<tracking_session_id>/`: `session_metadata.json`, `runtime.json`, `training_summary.json`, `checkpoint_reference.json` y `training_session_summary.json`.
-- `config/ddqn_config.json` permanece como artefacto global porque representa configuracion efectiva invariante del run.
-- `session_metadata.json` registra al menos identidad completa, modo, inicio/fin, runtime, Git ref/SHA, device, CPU/GPU, pasos inicial/final, checkpoint input/output, `checkpoint_input_loaded`, `restored_global_step`, `replay_buffer_restored`, `resume_mode` y versiones disponibles.
+- La evaluacion corta HU008 se restaura despues del entrenamiento de cada sesion usando `evaluate_agent(...)` con `epsilon=0.0` y episodios cortos configurables; no es evaluacion formal HU011.
+- Los artefactos variables se registran bajo `sessions/<tracking_session_id>/`: `effective_config.json`, `session_metadata.json`, `runtime.json`, `training_summary.json`, `evaluation_summary.json`, `checkpoint_reference.json` y `training_session_summary.json`.
+- `config/base_config.json` permanece como artefacto global de configuracion logica base; la configuracion efectiva real vive por sesion en `sessions/<tracking_session_id>/effective_config.json`.
+- `session_metadata.json` registra al menos identidad completa, modo, inicio/fin, runtime, Git ref/SHA, device, CPU/GPU, pasos inicial/final, `session_target_timesteps`, checkpoint input/output, `checkpoint_input_loaded`, `restored_global_step`, `replay_buffer_restored`, `resume_mode`, `effective_config_artifact` y versiones disponibles.
 - `checkpoint_reference.json` incluye `checkpoint_input_reference` y `checkpoint_output_reference` para reconstruir lineage entre sesiones.
 - Las metricas agregadas conservan nombres canonicos globales; cuando aplica se registran con step final de entrenamiento.
 - Tags actualizados: `latest_tracking_session_id` y `tracking_mode`.
 - Validaciones locales ejecutadas:
   - `python -m compileall -q 2_Assault/src` -> PASS;
-  - `python -m pytest 2_Assault/tests/test_tracking.py -q` -> `12 passed, 1 warning`;
-  - `python -m pytest 2_Assault/tests -q` -> `77 passed, 2 skipped, 1 warning`;
+  - `python -m pytest 2_Assault/tests/test_tracking.py -q` -> `13 passed, 1 warning`;
+  - `python -m pytest 2_Assault/tests -q` -> `78 passed, 2 skipped, 1 warning`;
   - tests agregados validan resume externo real A=0->N, checkpoint A, agente/buffer/trainer B nuevos, restore `resume_full` y continuacion N->T;
   - tests agregados validan lineage `session_001.checkpoint_output_reference == session_002.checkpoint_input_reference`;
+  - tests agregados validan que hardware/runtime y target por sesion pueden cambiar sin `MLflow param mismatch`;
+  - tests agregados validan que un cambio core real como `ddqn.gamma` sigue fallando por param inmutable;
+  - tests agregados validan evaluacion corta, metricas `eval/*` y `evaluation_summary.json`;
+  - tests agregados validan `effective_config.json` independiente por sesion;
   - tests agregados validan que un fallo real de `MlflowClient.list_artifacts(...)` se propaga y no se interpreta como lista vacia;
-  - validacion estatica del notebook -> JSON parseable y celdas HU008 actualizadas para `new`/`resume`.
+  - validacion estatica del notebook -> JSON parseable y celdas HU008 actualizadas para `new`/`resume` con evaluacion corta;
+  - `nbclient`/`nbconvert` no estan disponibles en el entorno local Codex, por lo que no se declara Run All local; se ejecuto flujo equivalente real.
 - Evidencia del smoke multi-sesion local:
-  - `project_run_id=assault_ddqn_hu008_multisession_smoke`;
-  - `mlflow_run_id=733b9536cec740afb2d676631c86ee6e` en store temporal local;
+  - `project_run_id=assault_ddqn_hu008_multisession_final`;
+  - `mlflow_run_id=d8d73f89e4f34e0aa64b4c0e23239821` en store temporal local;
   - un mismo `mlflow_run_id` contiene `sessions/session_001/` y `sessions/session_002/`;
   - `session_001.final_global_step == session_002.initial_global_step`;
   - `session_002.checkpoint_input_loaded=True`;
   - `session_002.replay_buffer_restored=True`;
   - `session_002.final_global_step > session_002.initial_global_step`;
+  - evaluacion corta: `evaluation_episodes=2`, `evaluation_mean_reward=5.0`, `evaluation_epsilon=0.0`;
+  - `evaluation_artifacts_present=True`;
+  - `effective_config_artifacts_present=True`;
   - `MULTISESSION_CHECKPOINT_RESUME_PASS=True`;
   - `MLFLOW_TRACKING_PASS=True`;
   - intento duplicado de `session_001` sobre el mismo run falla como se espera.
 - Evidencia equivalente local del notebook:
   - modo `new`: `tracking_mode=new`, `tracking_session_id=session_001`, `checkpoint_input_loaded=False`, `initial_global_step=0`;
   - modo `resume`: `tracking_mode=resume`, `tracking_session_id=session_002`, mismo `mlflow_run_id`, `checkpoint_input_loaded=True`, `restored_global_step=N`, `replay_buffer_restored=True`, `final_global_step>T`;
-  - artefactos verificados bajo `sessions/<tracking_session_id>/`: `session_metadata.json`, `runtime.json`, `training_summary.json`, `checkpoint_reference.json`, `training_session_summary.json`.
-- Limitacion documentada: no se ejecuto runtime remoto de Google Colab desde Codex y no se inventan resultados Colab/GPU; queda pendiente la evidencia Colab persistente multi-sesion con `MLFLOW_TRACKING_PASS=True`.
+  - artefactos verificados bajo `sessions/<tracking_session_id>/`: `effective_config.json`, `session_metadata.json`, `runtime.json`, `training_summary.json`, `evaluation_summary.json`, `checkpoint_reference.json`, `training_session_summary.json`.
+- Limitacion documentada: no se ejecuto runtime remoto de Google Colab desde Codex y no se inventan resultados Colab/GPU; HU008 queda lista para validar dos sesiones Colab persistentes con `MLFLOW_TRACKING_PASS=True`.
 
 **Habilita:** HU009.
 

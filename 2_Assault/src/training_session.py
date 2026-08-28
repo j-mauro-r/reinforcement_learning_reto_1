@@ -32,6 +32,8 @@ class TrainingSessionSummary:
     replay_buffer_restored: bool = False
     resume_mode: Optional[str] = None
     device: str = "cpu"
+    agent: Optional[DDQNAgent] = field(default=None, repr=False, compare=False)
+    replay_buffer: Optional[ReplayBuffer] = field(default=None, repr=False, compare=False)
     restored: Optional[CheckpointState] = field(default=None, repr=False)
 
     @property
@@ -167,5 +169,7 @@ def run_training_session(
         replay_buffer_restored=bool(restored_state.replay_buffer_restored) if restored_state else False,
         resume_mode=resume_mode if selected_mode == "resume" else None,
         device=str(selected_device),
+        agent=agent,
+        replay_buffer=replay_buffer,
         restored=restored_state,
     )

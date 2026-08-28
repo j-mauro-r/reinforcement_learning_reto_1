@@ -4,7 +4,7 @@
 
 - **ID:** HU008
 - **Nombre:** MLflow y trazabilidad de experimentos
-- **Estado:** Implementada con validaciones locales; validacion Colab multisesion pendiente.
+- **Estado:** Implementada con validaciones locales; lista para validacion Colab multisesion.
 - **Dependencia previa:** HU007 — Smoke test end-to-end `[COMPLETADA]`
 - **Dependencias funcionales:** HU002/HU002B, HU003, HU004, HU005, HU006 y HU007.
 - **Habilita:** HU009 — Entrenamiento DDQN completo.
@@ -1714,18 +1714,23 @@ HU008 [IMPLEMENTADA — VALIDACIONES LOCALES COMPLETADAS — VALIDACIÓN COLAB M
 
 hasta ejecutar y verificar las dos sesiones reales en Colab.
 
-### 15.18 Correccion tecnica local de resume real
+### 15.18 Correccion tecnica local de resume real, params estables y evaluacion corta
 
 La correccion tecnica del 2026-08-28 agrega evidencia local para cerrar los hallazgos pendientes de HU008 sin cambiar el alcance de HU009:
 
+- `tracking.py` separa params globales/inmutables de metadata variable por sesion. Los params globales conservan identidad, seed, entorno, preprocessing y configuracion core DDQN compatible.
+- Git SHA/ref, runtime, device, hardware, versiones y `training.total_timesteps` se conservan por sesion y no bloquean una reanudacion valida con el mismo `mlflow_run_id`.
+- `training.total_timesteps` se registra como `session_target_timesteps` dentro de `session_metadata.json`.
+- `config/base_config.json` representa la configuracion logica base del run; `sessions/<tracking_session_id>/effective_config.json` registra la configuracion efectiva usada por cada sesion.
 - `tracking.py` deja de ocultar errores de `MlflowClient.list_artifacts(...)` al validar colisiones de `tracking_session_id`; fallos reales de backend se propagan fail-fast.
-- `tracking.py` registra evidencia explicita de restauracion en `session_metadata.json`: `checkpoint_input_loaded`, `restored_checkpoint_path`, `restored_global_step`, `replay_buffer_restored` y `resume_mode`.
+- `tracking.py` registra evidencia explicita de restauracion en `session_metadata.json`: `checkpoint_input_loaded`, `restored_checkpoint_path`, `restored_global_step`, `replay_buffer_restored`, `resume_mode`, `session_target_timesteps` y `effective_config_artifact`.
 - `training_session.py` orquesta una unica sesion HU008 reanudable usando `CheckpointManager.load(..., mode="resume_full")`; no implementa una segunda ruta de restauracion.
 - En modo `resume`, la sesion valida que el checkpoint externo fue cargado, que `restored_global_step` coincide con `initial_global_step`, que el Replay Buffer fue restaurado en `resume_full` y que el entrenamiento continua de `N` a `T`.
+- La evaluacion corta posterior al entrenamiento se restaura usando `evaluate_agent(...)` desde `src/evaluator.py`, con `epsilon=0.0` y episodios cortos configurables. No es evaluacion formal HU011 ni comparacion contra baseline.
 - El notebook soporta explicitamente:
   - `tracking_mode=new`, `tracking_session_id=session_001`, sin checkpoint de entrada, `initial_global_step=0`;
   - `tracking_mode=resume`, `tracking_session_id=session_002`, mismo `mlflow_run_id`, `ASSAULT_MLFLOW_CHECKPOINT_INPUT` explicito, restore real del checkpoint y continuacion con `final_global_step > initial_global_step`.
-- Las salidas visibles del notebook incluyen `checkpoint_input_loaded`, `restored_global_step`, `replay_buffer_restored`, `checkpoint_output_reference`, `MULTISESSION_CHECKPOINT_RESUME_PASS`, `E2E_SMOKE_PASS` y `MLFLOW_TRACKING_PASS`.
-- Tests locales agregados cubren resume externo real A=0->N y B=N->T, lineage checkpoint output/input, duplicado de sesion y propagacion de fallo real del backend MLflow.
+- Las salidas visibles del notebook incluyen `session_target_timesteps`, `checkpoint_input_loaded`, `restored_global_step`, `replay_buffer_restored`, `checkpoint_output_reference`, `evaluation_episodes`, `evaluation_mean_reward`, `evaluation_epsilon`, `MULTISESSION_CHECKPOINT_RESUME_PASS` y `MLFLOW_TRACKING_PASS`.
+- Tests locales cubren resume externo real A=0->N y B=N->T, hardware/runtime distinto entre sesiones, target distinto por sesion, fallo por cambio core `ddqn.gamma`, evaluacion corta, artefacto `evaluation_summary.json`, artefacto `effective_config.json`, lineage checkpoint output/input, duplicado de sesion y propagacion de fallo real del backend MLflow.
 
-Esta correccion no ejecuta Colab desde Codex ni inventa resultados remotos; la evidencia final de dos runtimes Colab separados sigue pendiente.
+Esta correccion no ejecuta Colab desde Codex ni inventa resultados remotos; HU008 queda lista para la validacion final de dos runtimes Colab separados con tracking URI persistente.

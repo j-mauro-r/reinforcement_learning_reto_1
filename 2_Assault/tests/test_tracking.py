@@ -15,7 +15,7 @@ if str(ASSAULT_DIR) not in sys.path:
 
 from src.callbacks import TensorBoardLogger, load_tensorboard_scalars
 from src.checkpointing import CheckpointMetadata
-from src.evaluator import EvaluationSummary
+from src.evaluator import EvaluationSummary, evaluate_agent
 from src.replay_buffer import ReplayBuffer
 from src.tracking import MLflowTracker
 from src.training_session import run_training_session
@@ -94,6 +94,30 @@ def _evaluation_summary() -> EvaluationSummary:
     )
 
 
+def _runtime_info(
+    *,
+    gpu_available: bool = False,
+    gpu_name: str | None = None,
+    ram_available_gb: float = 10.0,
+    cuda_version: str | None = None,
+) -> dict:
+    return {
+        "python_version": "3.11",
+        "gymnasium_version": "1.1.1",
+        "ale_py_version": "0.10.1",
+        "torch_version": "2.0",
+        "cuda_version": cuda_version,
+        "gpu_available": gpu_available,
+        "gpu_name": gpu_name,
+        "gpu_vram_total_gb": 16.0 if gpu_available else None,
+        "cpu": "test-cpu",
+        "cpu_count_logical": 8,
+        "cpu_count_physical": 4,
+        "ram_total_gb": 32.0,
+        "ram_available_gb": ram_available_gb,
+    }
+
+
 def _start_logged_run(
     tmp_path: Path,
     project_run_id: str = "assault_ddqn_exp_tracking",
@@ -108,7 +132,7 @@ def _start_logged_run(
     )
     tracker.log_run_context(
         config=config,
-        runtime_info=get_runtime_info(),
+        runtime_info=_runtime_info(),
         git_commit=get_git_commit(ASSAULT_DIR.parents[0]),
         git_ref="feature/hu008-mlflow-tracking",
         project_run_id=project_run_id,
@@ -159,7 +183,8 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
     config, tracker, metadata = _start_logged_run(tmp_path)
     checkpoint = CheckpointMetadata(tmp_path / "checkpoint_step_000008.pt", metadata.project_run_id, 8, 4096, True)
 
-    tracker.log_config_snapshot(config)
+    tracker.log_config_snapshot(config, artifact_file="config/base_config.json")
+    effective_config_artifact = tracker.log_session_config(config)
     tracker.log_runtime_metadata(get_runtime_info(), git_commit="abc123", runtime="local")
     tracker.log_training_summary(_training_summary())
     tracker.log_evaluation_summary(_evaluation_summary())
@@ -177,8 +202,10 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
         device="cpu",
         initial_global_step=0,
         final_global_step=8,
+        session_target_timesteps=8,
         checkpoint_input_reference=None,
         checkpoint_output_reference=str(checkpoint.path),
+        effective_config_artifact=effective_config_artifact,
     )
     run = tracker.get_run(metadata.mlflow_run_id)
     artifacts = _artifact_paths(tracker, metadata.mlflow_run_id, ("config", "sessions/session_001"))
@@ -198,15 +225,15 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
     assert run.data.tags["latest_tracking_session_id"] == "session_001"
     assert run.data.params["identity.algorithm"] == "DDQN"
     assert run.data.params["identity.project_run_id"] == metadata.project_run_id
-    assert run.data.params["git.commit"]
     assert run.data.params["environment.id"] == "ALE/Assault-v5"
     assert run.data.params["environment.action_space"] == "Discrete(7)"
     assert run.data.params["preprocessing.frame_stack"] == "4"
     assert run.data.params["ddqn.gamma"] == "0.99"
     assert run.data.params["ddqn.batch_size"] == "4"
-    assert run.data.params["versions.python"]
-    assert run.data.params["versions.mlflow"]
-    assert run.data.params["hardware.gpu_available"] in {"True", "False"}
+    assert "ddqn.total_timesteps" not in run.data.params
+    assert "runtime.device" not in run.data.params
+    assert "hardware.gpu_available" not in run.data.params
+    assert "versions.python" not in run.data.params
     assert run.data.metrics["train/final_global_step"] == pytest.approx(8.0)
     assert run.data.metrics["train/last_loss"] == pytest.approx(0.25)
     assert run.data.metrics["train/mean_q_mean"] == pytest.approx(1.0)
@@ -217,8 +244,9 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
     assert run.data.metrics["eval/episodes"] == pytest.approx(2.0)
     assert run.data.metrics["checkpoint/step"] == pytest.approx(8.0)
     assert run.data.tags["checkpoint_resume_mode"] == "resume_full"
-    assert "config/ddqn_config.json" in artifacts
+    assert "config/base_config.json" in artifacts
     assert "sessions/session_001/runtime.json" in artifacts
+    assert "sessions/session_001/effective_config.json" in artifacts
     assert "sessions/session_001/training_summary.json" in artifacts
     assert "sessions/session_001/evaluation_summary.json" in artifacts
     assert "sessions/session_001/checkpoint_reference.json" in artifacts
@@ -228,8 +256,10 @@ def test_new_run_logs_identity_params_runtime_metrics_artifacts_and_checkpoint_r
     assert session_metadata["mlflow_run_id"] == metadata.mlflow_run_id
     assert session_metadata["initial_global_step"] == 0
     assert session_metadata["final_global_step"] == 8
+    assert session_metadata["session_target_timesteps"] == 8
     assert session_metadata["checkpoint_input_reference"] is None
     assert session_metadata["checkpoint_output_reference"] == str(checkpoint.path)
+    assert session_metadata["effective_config_artifact"] == "sessions/session_001/effective_config.json"
 
 
 def test_external_checkpoint_resume_restores_buffer_and_continues(tmp_path):
@@ -272,6 +302,8 @@ def test_external_checkpoint_resume_restores_buffer_and_continues(tmp_path):
 def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_lineage(tmp_path):
     project_run_id = "assault_ddqn_exp_resume"
     config_a, tracker_a, metadata_a = _start_logged_run(tmp_path, project_run_id=project_run_id)
+    runtime_a = _runtime_info(gpu_available=False, ram_available_gb=10.0)
+    effective_config_a = tracker_a.log_session_config(config_a, tracking_session_id="session_001")
     session_a = run_training_session(
         config=config_a,
         checkpoint_root=tmp_path / "checkpoints",
@@ -281,7 +313,9 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
         total_timesteps=8,
         device="cpu",
     )
+    evaluation_a = evaluate_agent(FakeEnv(total_steps=4, episode_length=2), session_a.agent, episodes=2, epsilon=0.0)
     tracker_a.log_training_summary(session_a.training)
+    tracker_a.log_evaluation_summary(evaluation_a)
     tracker_a.log_checkpoint_reference(
         session_a.checkpoint,
         resume_mode="new",
@@ -289,19 +323,23 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
     )
     tracker_a.log_session_metadata(
         tracking_mode="new",
-        runtime_info={"python_version": "3.11", "torch_version": "2.0", "cuda_version": None, "gpu_available": False},
+        runtime_info=runtime_a,
         runtime="local",
         device="cpu",
         initial_global_step=session_a.initial_global_step,
         final_global_step=session_a.final_global_step,
+        session_target_timesteps=config_a["training"]["total_timesteps"],
         checkpoint_input_loaded=session_a.checkpoint_input_loaded,
         replay_buffer_restored=session_a.replay_buffer_restored,
         checkpoint_output_reference=session_a.checkpoint_output_reference,
+        effective_config_artifact=effective_config_a,
     )
     tracker_a._mlflow.log_metric("custom/session_a_marker", 1.0)
     tracker_a.end_run()
 
     config_b = _config(tmp_path)
+    config_b["training"]["total_timesteps"] = 12
+    runtime_b = _runtime_info(gpu_available=True, gpu_name="T4", ram_available_gb=20.0, cuda_version="12.1")
     tracker_b = MLflowTracker.from_config(config_b)
     metadata_b = tracker_b.start_run(
         project_run_id=project_run_id,
@@ -309,6 +347,18 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
         mlflow_run_id=metadata_a.mlflow_run_id,
         tracking_session_id="session_002",
     )
+    tracker_b.log_run_context(
+        config=config_b,
+        runtime_info=runtime_b,
+        git_commit="session-b-sha",
+        git_ref="feature/hu008-mlflow-tracking",
+        project_run_id=project_run_id,
+        action_space="Discrete(7)",
+        observation_dtype="uint8",
+        runtime="Google Colab",
+        device="cuda",
+    )
+    effective_config_b = tracker_b.log_session_config(config_b, tracking_session_id="session_002")
     session_b = run_training_session(
         config=config_b,
         checkpoint_root=tmp_path / "checkpoints",
@@ -320,7 +370,9 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
         total_timesteps=12,
         device="cpu",
     )
+    evaluation_b = evaluate_agent(FakeEnv(total_steps=4, episode_length=2), session_b.agent, episodes=2, epsilon=0.0)
     tracker_b.log_training_summary(session_b.training)
+    tracker_b.log_evaluation_summary(evaluation_b)
     tracker_b.log_checkpoint_reference(
         session_b.checkpoint,
         resume_mode="resume_full",
@@ -329,11 +381,12 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
     )
     tracker_b.log_session_metadata(
         tracking_mode="resume",
-        runtime_info={"python_version": "3.11", "torch_version": "2.0", "cuda_version": "12.1", "gpu_available": True, "gpu_name": "T4"},
+        runtime_info=runtime_b,
         runtime="Google Colab",
         device="cuda",
         initial_global_step=session_b.initial_global_step,
         final_global_step=session_b.final_global_step,
+        session_target_timesteps=config_b["training"]["total_timesteps"],
         checkpoint_input_reference=session_b.checkpoint_input_reference,
         checkpoint_output_reference=session_b.checkpoint_output_reference,
         checkpoint_input_loaded=session_b.checkpoint_input_loaded,
@@ -341,6 +394,7 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
         restored_global_step=session_b.restored_global_step,
         replay_buffer_restored=session_b.replay_buffer_restored,
         resume_mode=session_b.resume_mode,
+        effective_config_artifact=effective_config_b,
     )
     tracker_b._mlflow.log_metric("custom/session_b_marker", 2.0)
     run = tracker_b.get_run(metadata_b.mlflow_run_id)
@@ -358,10 +412,21 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
     assert run.data.metrics["custom/session_b_marker"] == pytest.approx(2.0)
     assert run.data.metrics["train/initial_global_step"] == pytest.approx(8.0)
     assert run.data.metrics["train/final_global_step"] == pytest.approx(12.0)
+    assert run.data.metrics["eval/episodes"] == pytest.approx(2.0)
+    assert run.data.metrics["eval/epsilon"] == pytest.approx(0.0)
+    assert run.data.tags["latest_runtime"] == "Google Colab"
+    assert run.data.tags["latest_device"] == "cuda"
+    assert "ddqn.total_timesteps" not in run.data.params
+    assert "runtime.name" not in run.data.params
+    assert "hardware.ram_available_gb" not in run.data.params
     assert "sessions/session_001/session_metadata.json" in artifacts
     assert "sessions/session_002/session_metadata.json" in artifacts
     assert "sessions/session_001/training_summary.json" in artifacts
     assert "sessions/session_002/training_summary.json" in artifacts
+    assert "sessions/session_001/evaluation_summary.json" in artifacts
+    assert "sessions/session_002/evaluation_summary.json" in artifacts
+    assert "sessions/session_001/effective_config.json" in artifacts
+    assert "sessions/session_002/effective_config.json" in artifacts
     assert session_a["checkpoint_output_reference"] == session_b["checkpoint_input_reference"]
     assert session_b["checkpoint_input_reference"] == str(Path(session_a["checkpoint_output_reference"]))
     assert session_b["checkpoint_output_reference"] == str(Path(session_b["checkpoint_output_reference"]))
@@ -371,7 +436,19 @@ def test_resume_existing_run_reuses_same_mlflow_run_loads_checkpoint_and_logs_li
     assert session_b["initial_global_step"] == session_a["final_global_step"]
     assert session_b["final_global_step"] == 12
     assert session_b["final_global_step"] > session_b["initial_global_step"]
+    assert session_a["runtime"] == "local"
+    assert session_a["device"] == "cpu"
+    assert session_a["gpu_available"] is False
+    assert session_a["ram_available_gb"] == 10.0
+    assert session_a["session_target_timesteps"] == 8
+    assert session_b["runtime"] == "Google Colab"
+    assert session_b["device"] == "cuda"
+    assert session_b["gpu_available"] is True
     assert session_b["gpu_name"] == "T4"
+    assert session_b["ram_available_gb"] == 20.0
+    assert session_b["session_target_timesteps"] == 12
+    assert session_a["effective_config_artifact"] == "sessions/session_001/effective_config.json"
+    assert session_b["effective_config_artifact"] == "sessions/session_002/effective_config.json"
 
 
 def test_duplicate_tracking_session_id_fails_fast_on_resume(tmp_path):
@@ -389,6 +466,38 @@ def test_duplicate_tracking_session_id_fails_fast_on_resume(tmp_path):
             mlflow_run_id=metadata_a.mlflow_run_id,
             tracking_session_id="session_001",
         )
+
+
+def test_resume_rejects_global_ddqn_core_param_mismatch(tmp_path):
+    project_run_id = "assault_ddqn_exp_core_mismatch"
+    _, tracker_a, metadata_a = _start_logged_run(tmp_path, project_run_id=project_run_id)
+    tracker_a.log_session_metadata(tracking_mode="new", initial_global_step=0, final_global_step=8)
+    tracker_a.end_run()
+
+    config_b = _config(tmp_path)
+    config_b["agent"]["gamma"] = 0.5
+    tracker_b = MLflowTracker.from_config(config_b)
+    tracker_b.start_run(
+        project_run_id=project_run_id,
+        tracking_mode="resume",
+        mlflow_run_id=metadata_a.mlflow_run_id,
+        tracking_session_id="session_002",
+    )
+    try:
+        with pytest.raises(ValueError, match="MLflow param mismatch for ddqn.gamma"):
+            tracker_b.log_run_context(
+                config=config_b,
+                runtime_info=_runtime_info(gpu_available=True, gpu_name="T4", ram_available_gb=20.0),
+                git_commit="session-b-sha",
+                git_ref="feature/hu008-mlflow-tracking",
+                project_run_id=project_run_id,
+                action_space="Discrete(7)",
+                observation_dtype="uint8",
+                runtime="Google Colab",
+                device="cuda",
+            )
+    finally:
+        tracker_b.end_run(status="FAILED")
 
 
 def test_resume_session_artifact_backend_failure_propagates(monkeypatch, tmp_path):
