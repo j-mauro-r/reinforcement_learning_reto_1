@@ -6,5 +6,7 @@ venv/
 
 2_Assault/checkpoints/
 2_Assault/logs/
+2_Assault/mlruns/
+mlruns/
 2_Assault/models/
 2_Assault/videos/

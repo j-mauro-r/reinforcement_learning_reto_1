@@ -50,7 +50,7 @@ HU006  Observabilidad con TensorBoard                  [COMPLETADA]
   ↓
 HU007  Smoke test end-to-end                         [COMPLETADA]
   ↓
-HU008  MLflow y trazabilidad de experimentos
+HU008  MLflow y trazabilidad de experimentos         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB PENDIENTE]
   ↓
 HU009  Entrenamiento DDQN completo
   ↓
@@ -857,6 +857,8 @@ Debe ejecutar una corrida corta con GPU y verificar conjuntamente:
 
 ### HU008 — MLflow y trazabilidad de experimentos
 
+**Estado:** implementada - validaciones locales completadas - validacion Colab pendiente.
+
 **Propósito:** registrar de forma comparable las ejecuciones que sí importan para tomar decisiones y extender HU002B con tracking persistente cuando corresponda.
 
 Cada run relevante debe registrar como mínimo:
@@ -875,6 +877,111 @@ Cada run relevante debe registrar como mínimo:
 - referencia al checkpoint/modelo.
 
 **Resultado esperado:** dos corridas pueden compararse en MLflow y es posible identificar exactamente qué código y configuración produjo cada resultado.
+
+**Evidencia de implementación HU008 (2026-08-28, rama `feature/hu008-mlflow-tracking`):**
+
+- Archivos creados/modificados:
+  - `2_Assault/src/tracking.py`: capa única que importa y encapsula MLflow.
+  - `2_Assault/tests/test_tracking.py`: validaciones de tracking con backend filesystem temporal.
+  - `2_Assault/configs/ddqn_config.yaml`: bloque `mlflow` centralizado.
+  - `2_Assault/requirements.txt`: dependencia `mlflow>=2.16,<3.0`.
+  - `2_Assault/assault_ddqn.ipynb`: orquestación HU008 con new/resume explícito y logging posterior al smoke.
+  - `2_Assault/src/utils.py`: agrega `cuda_version` reutilizable en runtime metadata.
+  - `.gitignore`: evita versionar stores locales `mlruns/`.
+  - `2_Assault/docs/implementacion.md`: registra evidencia real.
+- Arquitectura implementada:
+  - `Trainer`, `Evaluator`, `CheckpointManager`, `agent`, `network`, `environment` y `replay_buffer` permanecen sin imports ni llamadas directas a MLflow.
+  - El notebook actúa como orquestador y usa `MLflowTracker` para iniciar/cerrar runs y registrar resúmenes.
+  - TensorBoard conserva las curvas densas; MLflow registra identidad, parámetros, métricas agregadas, artefactos livianos y referencias.
+- Configuración MLflow:
+  - `enabled: true`;
+  - `experiment_name: assault_ddqn`;
+  - `tracking_uri: null`;
+  - `local_directory: logs/mlflow`;
+  - `tracking_mode: new`;
+  - `mlflow_run_id: null`;
+  - `artifact_location: null`;
+  - `log_checkpoint_binary: false`.
+- Overrides soportados:
+  - `ASSAULT_MLFLOW_TRACKING_URI`;
+  - `ASSAULT_MLFLOW_EXPERIMENT`;
+  - `ASSAULT_MLFLOW_TRACKING_MODE`;
+  - `ASSAULT_MLFLOW_RUN_ID`;
+  - `ASSAULT_MLFLOW_ARTIFACT_LOCATION`.
+- Identidad:
+  - se diferencia `project_run_id` del proyecto/checkpoint/TensorBoard frente a `mlflow_run_id` técnico de MLflow;
+  - ambos quedan disponibles mediante `MLflowRunMetadata`;
+  - `project_run_id` se registra como tag y como param `identity.project_run_id`.
+- API principal:
+  - `MLflowTracker.from_config(...)`;
+  - `start_run(project_run_id, tracking_mode, mlflow_run_id, ...)`;
+  - `log_run_context(...)`;
+  - `log_training_summary(...)`;
+  - `log_evaluation_summary(...)`;
+  - `log_checkpoint_reference(...)`;
+  - `log_config_snapshot(...)`;
+  - `log_runtime_metadata(...)`;
+  - `get_run(...)`;
+  - `end_run(...)`;
+  - context manager soportado.
+- Parámetros/tags registrados:
+  - identidad: `DDQN`, `project_run_id`, experimento, seed;
+  - Git/runtime: commit, ref, runtime local/Colab, device;
+  - entorno: id, obs type, action space, frameskip, repeat action probability, full action space;
+  - preprocessing: grayscale, resize, frame stack, dtype, normalización en entorno;
+  - DDQN/training: gamma, learning rate, epsilon start/final/decay, batch size, Replay Buffer capacity, learning starts, train frequency, Target update frequency, total timesteps;
+  - versiones/hardware: Python, Gymnasium, ALE-Py, PyTorch, CUDA, MLflow, CPU, RAM, GPU disponible, nombre GPU y VRAM cuando aplica.
+- Métricas agregadas registradas:
+  - entrenamiento: initial/final global step, duration, updates count, last/mean loss, last/mean q mean, final epsilon, replay buffer size, episodes completed y best episode reward cuando existe;
+  - evaluación: episodes, mean/median/std/min/max reward, mean episode length y epsilon;
+  - checkpoint: step y size bytes.
+- Artefactos livianos:
+  - `config/ddqn_config.json`;
+  - `metadata/runtime.json`;
+  - `summaries/train_summary.json`;
+  - `summaries/eval_summary.json`;
+  - `summaries/e2e_smoke_summary.json` desde notebook;
+  - `artifacts/checkpoint_reference.json`.
+- Checkpoint reference:
+  - registra `checkpoint_path`, `project_run_id`, `checkpoint_step`, `checkpoint_size_bytes`, `resume_mode`, `save_replay_buffer` y `checkpoint_binary_logged=false`;
+  - no duplica por defecto checkpoints `resume_full` con Replay Buffer.
+- Evidencia de new run:
+  - backend temporal local;
+  - experimento `assault_ddqn_tests`;
+  - `MlflowClient` recupera la run creada;
+  - params, metrics, tags y artefactos esperados verificados en `test_tracking.py`.
+- Evidencia de resume:
+  - sesión A crea run y registra métricas;
+  - sesión B crea otro objeto `MLflowTracker`, reabre explícitamente el mismo `mlflow_run_id` y registra métricas adicionales;
+  - se valida mismo `mlflow_run_id`, mismo `project_run_id`, métrica de sesión A preservada y métrica de sesión B agregada.
+- Evidencia de coexistencia TensorBoard + MLflow:
+  - `TensorBoardLogger` escribe event files para el mismo `project_run_id`;
+  - `MLflowTracker` registra resumen agregado sin modificar TensorBoard ni depender de sus internals.
+- Fail-fast:
+  - tracking URI local inválido/no escribible produce `RuntimeError` visible cuando `mlflow.enabled=true`;
+  - `tracking_mode="resume"` sin `mlflow_run_id` explícito produce `ValueError`;
+  - parámetros inmutables de MLflow se validan para no cambiar identidad al reanudar.
+- Modo disabled:
+  - con `mlflow.enabled=false`, el tracker es no-op, no importa MLflow y no crea store local.
+- Validaciones locales ejecutadas:
+  - `python -m compileall -q 2_Assault/src` -> PASS;
+  - `python -m pytest 2_Assault/tests/test_tracking.py -q` -> `8 passed, 1 warning`;
+  - `python -m pytest 2_Assault/tests -q` -> `73 passed, 2 skipped, 1 warning`.
+- Notebook local automatizable:
+  - variables usadas: `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu008-mlflow-tracking`, `ASSAULT_E2E_REQUIRE_CUDA=0`, `ASSAULT_RUN_ID=assault_ddqn_hu008_notebook_local`, `ASSAULT_CHECKPOINT_DIR=<temp>`, `ASSAULT_TENSORBOARD_DIR=<temp>`, `ASSAULT_MLFLOW_TRACKING_URI=<temp>/mlruns`, `ASSAULT_MLFLOW_EXPERIMENT=assault_ddqn_hu008_notebook_local`;
+  - celdas ejecutadas: `[2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]`;
+  - resultado: `NOTEBOOK_CODE_CELLS_OK`;
+  - `MLFLOW_TRACKING_PASS=True`;
+  - `project_run_id=assault_ddqn_hu008_notebook_local`;
+  - `mlflow_run_id=86068e5989aa480da6df72a927d8922e`;
+  - tracking URI temporal: `file:///C:/Users/Usuario/AppData/Local/Temp/.../mlruns`;
+  - `LOCAL_E2E_SMOKE_PASS=True`;
+  - `E2E_SMOKE_PASS=False` porque la validación fue local CPU, no Colab GPU.
+- Limitaciones y pendientes:
+  - no se ejecutó runtime remoto de Google Colab desde Codex;
+  - no se inventan resultados Colab/GPU;
+  - queda pendiente ejecutar el notebook en Google Colab con tracking URI persistente/configurable y conservar evidencia de `MLFLOW_TRACKING_PASS=True`;
+  - HU008 no implementa entrenamiento largo, HPO, evaluación formal, video, Model Registry, serving ni MLflow server.
 
 **Habilita:** HU009.
 
