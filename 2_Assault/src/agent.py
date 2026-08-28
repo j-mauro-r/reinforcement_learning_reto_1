@@ -118,7 +118,12 @@ class DDQNAgent:
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
         self.optimizer.step()
-        return {"loss": float(loss.detach().cpu().item())}
+        learning_rate = float(self.optimizer.param_groups[0]["lr"])
+        return {
+            "loss": float(loss.detach().cpu().item()),
+            "q_mean": float(current_q.detach().mean().cpu().item()),
+            "learning_rate": learning_rate,
+        }
 
     def sync_target_network(self) -> None:
         """Copies online network weights into the target network."""

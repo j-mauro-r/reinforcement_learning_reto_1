@@ -49,3 +49,10 @@ checkpointing:
   run_id: assault_ddqn_exp_001
   resume_checkpoint: null
   save_replay_buffer: true
+
+tensorboard:
+  enabled: true
+  directory: logs/tensorboard
+  log_frequency_steps: 4
+  reward_window_episodes: 10
+  flush_frequency_steps: 24
