@@ -830,6 +830,20 @@ Debe ejecutar una corrida corta con GPU y verificar conjuntamente:
   - `python -m pytest 2_Assault/tests/test_e2e_smoke.py -q` -> `5 passed`;
   - `python -m pytest 2_Assault/tests/test_tensorboard.py::test_resume_reuses_run_id_and_continues_global_steps 2_Assault/tests/test_e2e_smoke.py -q` -> `6 passed`;
   - `python -m pytest 2_Assault/tests -q` -> `64 passed, 2 skipped`.
+- Corrección post revisión de pares - liberación de memoria entre segmentos (2026-08-28, rama `fix/hu007-release-gpu-memory`):
+  - problema detectado: el flujo E2E creaba `agent_b` y `buffer_b` mientras `agent_a` y `buffer_a` seguían referenciados después del checkpoint del segmento A;
+  - impacto potencial: en Colab GPU podían coexistir dos agentes completos en VRAM durante el segmento B, debilitando el objetivo de HU007 de detectar problemas de memoria antes de HU009;
+  - causa: después de `checkpoint`, `logger_a.flush()`, `logger_a.close()` y `env_a.close()`, el código conservaba referencias Python a objetos pesados del segmento A;
+  - solución: capturar primero la evidencia liviana del segmento A (`TrainingSummary`, `CheckpointMetadata`, event files, scalars y snapshots), luego ejecutar explícitamente `del agent_a`, `del buffer_a`, `del logger_a`, `del env_a`, `gc.collect()` y `torch.cuda.empty_cache()` solo si CUDA está disponible;
+  - orden implementado: Segment A -> checkpoint -> flush/close logger -> close env -> scalars/event files -> `memory_after_segment_a` -> liberar referencias A -> `gc.collect()` -> `torch.cuda.empty_cache()` condicional -> `memory_after_release` -> crear `agent_b`, `buffer_b`, `logger_b`, `env_b` -> `resume_full`;
+  - snapshot agregado: `memory_after_release`, tomado después de liberar referencias y antes de crear las instancias B;
+  - snapshots expuestos por HU007: `memory_before`, `memory_after_segment_a`, `memory_after_release`, `memory_after`;
+  - CUDA cleanup: `torch.cuda.empty_cache()` no se usa como prueba de ausencia de referencias; primero se eliminan referencias Python, luego se ejecuta GC y finalmente se limpia caché CUDA si aplica;
+  - archivos modificados: `2_Assault/src/e2e_smoke.py`, `2_Assault/tests/test_e2e_smoke.py`, `2_Assault/assault_ddqn.ipynb`, `2_Assault/docs/implementacion.md`;
+  - tests agregados/extendidos: validación de snapshot post-release, campos CUDA `None` en CPU y llamada condicional a `torch.cuda.empty_cache()` mediante monkeypatch sin falsear una ejecución GPU completa;
+  - resultados locales de la corrección: `python -m compileall -q 2_Assault/src` -> PASS; `python -m pytest 2_Assault/tests/test_e2e_smoke.py -q` -> `6 passed`; `python -m pytest 2_Assault/tests -q` -> `65 passed, 2 skipped`;
+  - notebook local automatizable ejecutado con `ASSAULT_BOOTSTRAP_REF=fix/hu007-release-gpu-memory`, directorios temporales y `ASSAULT_E2E_REQUIRE_CUDA=0` -> `NOTEBOOK_CODE_CELLS_OK`, `LOCAL_E2E_SMOKE_PASS=True`, `E2E_SMOKE_PASS=False`;
+  - limitación: Codex no ejecutó Colab GPU para esta corrección; la reducción real de VRAM y el cierre formal `E2E_SMOKE_PASS=True` quedan pendientes de validación por el usuario en Google Colab GPU.
 - Limitaciones y pendientes:
   - no se ejecutó runtime remoto de Google Colab desde Codex;
   - no se inventan resultados GPU ni Colab;

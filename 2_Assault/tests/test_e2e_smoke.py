@@ -14,6 +14,7 @@ ASSAULT_DIR = Path(__file__).resolve().parents[1]
 if str(ASSAULT_DIR) not in sys.path:
     sys.path.insert(0, str(ASSAULT_DIR))
 
+from src import e2e_smoke
 from src.agent import DDQNAgent
 from src.e2e_smoke import run_e2e_smoke
 from src.evaluator import evaluate_agent
@@ -185,7 +186,33 @@ def test_real_assault_cpu_e2e_smoke_checkpoint_resume_tensorboard_and_evaluation
     assert summary.optimizer_unchanged_during_evaluation is True
     assert summary.replay_buffer_unchanged_during_evaluation is True
     assert summary.training_global_step_unchanged_during_evaluation is True
+    assert summary.memory_after_segment_a.process_rss_mb > 0
+    assert summary.memory_after_release.process_rss_mb > 0
+    assert summary.memory_after_release.cuda_allocated_mb is None
+    assert summary.memory_after_release.cuda_reserved_mb is None
     assert summary.memory_after.process_rss_mb > 0
+
+
+def test_e2e_smoke_cuda_cache_cleanup_is_conditional(monkeypatch):
+    calls = {"collect": 0, "empty_cache": 0}
+
+    def collect():
+        calls["collect"] += 1
+        return 0
+
+    def empty_cache():
+        calls["empty_cache"] += 1
+
+    monkeypatch.setattr(e2e_smoke.gc, "collect", collect)
+    monkeypatch.setattr(e2e_smoke.torch.cuda, "empty_cache", empty_cache)
+
+    monkeypatch.setattr(e2e_smoke.torch.cuda, "is_available", lambda: False)
+    e2e_smoke._release_unused_memory()
+    assert calls == {"collect": 1, "empty_cache": 0}
+
+    monkeypatch.setattr(e2e_smoke.torch.cuda, "is_available", lambda: True)
+    e2e_smoke._release_unused_memory()
+    assert calls == {"collect": 2, "empty_cache": 1}
 
 
 def test_e2e_summary_reports_replay_buffer_unchanged_contract(tmp_path):
@@ -204,5 +231,9 @@ def test_e2e_summary_reports_replay_buffer_unchanged_contract(tmp_path):
 
     assert summary["LOCAL_E2E_SMOKE_PASS"] is True
     assert summary["E2E_SMOKE_PASS"] is False
+    assert summary["memory_after_segment_a"]["process_rss_mb"] > 0
+    assert summary["memory_after_release"]["process_rss_mb"] > 0
+    assert summary["memory_after_release"]["cuda_allocated_mb"] is None
+    assert summary["memory_after_release"]["cuda_reserved_mb"] is None
     assert summary["replay_buffer_unchanged_during_evaluation"] is True
     assert summary["training_global_step_unchanged_during_evaluation"] is True
