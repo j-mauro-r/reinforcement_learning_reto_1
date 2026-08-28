@@ -40,7 +40,7 @@ HU002  Pipeline reproducible del entorno              [IMPLEMENTADA — VALIDACI
   ↓
 HU002B Pipeline de ejecución Local → GitHub → Colab
   ↓
-HU003  Núcleo DDQN
+HU003  Núcleo DDQN                                      [COMPLETADA]
   ↓
 HU004  Ciclo de entrenamiento
   ↓
@@ -243,6 +243,8 @@ Debe implementar:
 
 ### HU003 — Núcleo DDQN
 
+**Estado:** completada.
+
 **Propósito:** implementar los componentes propios del algoritmo seleccionado sin incorporar aún el ciclo completo de entrenamiento.
 
 Debe implementar:
@@ -263,6 +265,79 @@ Debe implementar:
 **Resultado esperado:** los componentes reciben batches sintéticos/reales con las dimensiones esperadas, producen Q-values para las 7 acciones y ejecutan al menos un paso de optimización sin errores.
 
 **Habilita:** HU004.
+
+**Evidencia de implementación HU003 (2026-08-27, rama `feature/hu003-nucleo-ddqn`):**
+
+- Archivos creados/modificados:
+  - `2_Assault/src/network.py`
+  - `2_Assault/src/replay_buffer.py`
+  - `2_Assault/src/agent.py`
+  - `2_Assault/tests/test_network.py`
+  - `2_Assault/tests/test_replay_buffer.py`
+  - `2_Assault/tests/test_agent.py`
+  - `2_Assault/configs/ddqn_config.yaml`
+  - `2_Assault/requirements.txt`
+  - `2_Assault/docs/implementacion.md`
+- Configuración agregada:
+  - `network.input_channels=4`
+  - `network.num_actions=7`
+  - `agent.gamma=0.99`
+  - `agent.learning_rate=0.0001`
+  - `agent.epsilon_start=1.0`
+  - `agent.epsilon_final=0.01`
+  - `replay_buffer.capacity=100000`
+  - `replay_buffer.batch_size=32`
+- Dependencia agregada:
+  - `torch>=2.0`
+- Arquitectura QNetwork:
+  - CNN Atari/DQN simple con `Conv2d(4,32,8,stride=4)`, `Conv2d(32,64,4,stride=2)`, `Conv2d(64,64,3,stride=1)`, `Linear(3136,512)` y salida `Linear(512,7)`.
+  - Entrada `(batch,4,84,84)`; acepta `uint8`, convierte a `float32` y normaliza a `[0,1]`.
+  - Salida validada: `(batch,7)` con valores finitos.
+- Replay Buffer:
+  - capacidad fija;
+  - escritura circular/FIFO;
+  - estados y siguientes estados almacenados como `uint8`;
+  - muestreo uniforme sin reemplazo;
+  - sin PER ni prioridades.
+- DDQNAgent:
+  - Online Network y Target Network independientes;
+  - Target inicializada con los mismos pesos de Online;
+  - Target sin gradientes;
+  - `select_action` epsilon-greedy para `epsilon=0` y `epsilon=1`;
+  - `compute_ddqn_targets` implementa selección con Online y evaluación con Target;
+  - `update` usa Adam y `SmoothL1Loss`;
+  - `sync_target_network` explícito;
+  - `save/load` básico de Online, Target, optimizer y metadatos de red/agente.
+- Validaciones ejecutadas:
+  - `python -m pytest 2_Assault/tests -q` -> `21 passed, 1 skipped in 9.10s`.
+  - `python -m compileall -q 2_Assault/src` -> PASS.
+- Ambiente local:
+  - PyTorch `2.4.1+cpu`.
+  - CUDA local: `False`; test GPU omitido correctamente con `skip`.
+- Smoke HU003:
+  - `qnetwork_shape=(2, 7)`;
+  - `qnetwork_finite=True`;
+  - `update_loss=2.8990249633789062`;
+  - `loss_finite=True`;
+  - `target_stable_after_update=True`;
+  - `target_equals_online_after_sync=True`;
+  - `save_load_outputs_match=True`.
+- Test específico DDQN:
+  - Online seleccionó la acción `1`.
+  - Target evaluó esa acción con Q-value `10.0`.
+  - Target DDQN calculado: `10.899999618530273`.
+  - El target DQN clásico con `max(Target(next_state))` habría sido `50.5`; el test detectaría esa regresión.
+  - Transición terminal validada sin bootstrap.
+- Smoke con Assault real:
+  - observación real desde `create_assault_env`: `(4, 84, 84)`;
+  - dtype: `uint8`;
+  - Q-values reales: `(1, 7)`;
+  - acción seleccionada válida: `6`.
+- Desviaciones respecto del DWP:
+  - Ninguna desviación funcional.
+  - Validación GPU queda para Colab/futuro runtime con CUDA disponible, tal como permite AV11.
+- Scope excluido confirmado:
+  - No se implementó trainer completo, ciclo de entrenamiento, TensorBoard, MLflow, callbacks, checkpoints avanzados, resume, evaluación formal, videos, PER, Dueling DQN, Rainbow, n-step ni Noisy Nets.
 
 ---
 
