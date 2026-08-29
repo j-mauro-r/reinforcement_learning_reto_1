@@ -280,6 +280,23 @@ def evaluate_full_training_ready(
     )
 
 
+def assert_training_can_start(profile_context: TrainingProfileContext, full_training_gate: FullTrainingGate) -> None:
+    """Fails fast before side effects when full training is not ready.
+
+    Smoke sessions are allowed to continue even when the full-training gate is
+    false because the gate only controls HU009 full runs.
+
+    Args:
+        profile_context: Resolved training profile.
+        full_training_gate: Evaluated HU009 readiness gate.
+
+    Raises:
+        RuntimeError: If the active profile is ``full`` and the gate is not ready.
+    """
+    if profile_context.name == "full" and not full_training_gate.ready:
+        raise RuntimeError(f"FULL_TRAINING_READY=False: {full_training_gate.issues}")
+
+
 def expected_epsilon_at_step(config: Mapping[str, Any], global_step: int) -> float:
     """Computes epsilon from the active profile config and global step."""
     return compute_epsilon(

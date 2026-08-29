@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from src.session_bootstrap import compute_config_fingerprint, prepare_training_s
 from src.training_profiles import (  # noqa: E402
     DEFAULT_FULL_REPLAY_BUFFER_CAPACITY,
     FULL_TRAINING_TARGET_TIMESTEPS,
+    FullTrainingGate,
+    assert_training_can_start,
     estimate_replay_buffer_memory,
     evaluate_full_training_ready,
     expected_epsilon_at_step,
@@ -198,6 +201,45 @@ def test_full_gate_rejects_smoke_profile(tmp_path):
     assert "profile_not_full" in gate.issues
 
 
+def test_full_invalid_gate_aborts_before_mlflow_trainer_or_manifest_side_effects(tmp_path):
+    profile = resolve_training_profile(_config(), "full")
+    gate = _gate(profile, ready=False, issues=["device_not_cuda"])
+    side_effects = []
+    manifest = tmp_path / "experiments_manifest.json"
+
+    with pytest.raises(RuntimeError, match="FULL_TRAINING_READY=False"):
+        assert_training_can_start(profile, gate)
+        side_effects.append("mlflow.start_run")
+        side_effects.append("run_training_session")
+        manifest.write_text("modified", encoding="utf-8")
+
+    assert side_effects == []
+    assert not manifest.exists()
+
+
+def test_full_valid_gate_allows_mlflow_and_training_boundary():
+    profile = resolve_training_profile(_config(), "full")
+    gate = _gate(profile, ready=True, issues=[])
+    side_effects = []
+
+    assert_training_can_start(profile, gate)
+    side_effects.append("mlflow.start_run")
+    side_effects.append("run_training_session")
+
+    assert side_effects == ["mlflow.start_run", "run_training_session"]
+
+
+def test_smoke_profile_is_not_blocked_by_false_full_gate():
+    profile = resolve_training_profile(_config(), "smoke")
+    gate = _gate(profile, ready=False, issues=["profile_not_full", "device_not_cuda"])
+    side_effects = []
+
+    assert_training_can_start(profile, gate)
+    side_effects.append("smoke_session_continue")
+
+    assert side_effects == ["smoke_session_continue"]
+
+
 def test_no_regression_hu008b_prepare_auto_new(tmp_path):
     profile = resolve_training_profile(_config(), "smoke")
     context = _session_context(tmp_path, profile)
@@ -215,3 +257,33 @@ def test_notebook_uses_explicit_training_profile_without_historical_full_target(
     assert "FULL_TRAINING_READY" in source
     assert "assault_ddqn_full_001" not in source
     assert "250000" not in source
+
+
+def test_notebook_full_gate_runs_before_mlflow_training_or_manifest_side_effects():
+    notebook = json.loads((ASSAULT_DIR / "assault_ddqn.ipynb").read_text(encoding="utf-8"))
+    cells = ["".join(cell.get("source", [])) for cell in notebook["cells"]]
+    source = "\n".join(cells)
+    gate_cell_index = next(
+        index for index, cell in enumerate(cells) if "assert_training_can_start(profile_context, full_training_gate)" in cell
+    )
+    side_effect_cell_index = next(index for index, cell in enumerate(cells) if "mlflow_tracker.start_run(" in cell)
+    side_effect_cell = cells[side_effect_cell_index]
+
+    assert gate_cell_index < side_effect_cell_index
+    assert "MLflowTracker.from_config" in side_effect_cell
+    assert "run_training_session(" in side_effect_cell
+    assert "update_experiment_state_after_success(" in side_effect_cell
+    assert 'profile_context.name == "full" and not FULL_TRAINING_READY' not in source
+
+
+def _gate(profile, ready: bool, issues: list[str]) -> FullTrainingGate:
+    return FullTrainingGate(
+        ready=ready,
+        issues=issues,
+        profile=profile.name,
+        device="cuda" if ready else "cpu",
+        runtime="Google Colab",
+        replay_buffer_memory=profile.replay_buffer_memory,
+        ram_available_gib=12.0,
+        ram_margin_gib=12.0 - profile.replay_buffer_memory.total_gib,
+    )

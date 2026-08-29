@@ -1122,6 +1122,7 @@ Cada run relevante debe registrar como mínimo:
 - `resolve_training_profile(...)` aplica `ASSAULT_TRAINING_PROFILE=smoke|full` desde `2_Assault/configs/ddqn_config.yaml` y devuelve una configuracion efectiva unica para entorno, preflight, bootstrap, Trainer, TensorBoard y MLflow.
 - `estimate_replay_buffer_memory(...)` calcula memoria aproximada sin instanciar el Replay Buffer, considerando `states`, `next_states`, `actions`, `rewards` y `dones`.
 - `evaluate_full_training_ready(...)` implementa el gate `FULL_TRAINING_READY` sin iniciar entrenamiento.
+- `assert_training_can_start(...)` centraliza el fail-fast de HU009: si el perfil es `full` y `FULL_TRAINING_READY=False`, aborta antes de abrir o modificar MLflow, iniciar Trainer, crear checkpoints o actualizar el manifest.
 - `expected_epsilon_at_step(...)` valida que epsilon continue segun `global_step` y `epsilon_decay_steps` del perfil activo.
 - El notebook conserva `prepare_training_session(...)` de HU008B y actualiza el manifest solo despues de entrenamiento, checkpoint, logging MLflow y cierre `FINISHED`.
 
@@ -1163,7 +1164,7 @@ Solo es `True` si se cumple:
   - `ASSAULT_REQUESTED_MODE=auto`.
 - No solicita `mlflow_run_id`, `tracking_session_id`, checkpoint path ni `tracking_mode` manual.
 - Antes de entrenar imprime `TRAINING_PROFILE`, `SESSION_BOOTSTRAP_READY`, `FULL_TRAINING_READY`, identidad, checkpoint input, restored step, target, SHA, fingerprint, capacidad/memoria del Replay Buffer, RAM disponible y device.
-- En perfil `full`, si el gate no pasa se aborta antes de `run_training_session(...)`.
+- En perfil `full`, si el gate no pasa se aborta antes de `MLflowTracker.from_config(...)`, `MLflowTracker.start_run(...)`, logging, `run_training_session(...)`, checkpoint y manifest.
 - En perfil `smoke`, el flujo sigue disponible para G0 HU009/HU008B sin requerir CUDA local.
 
 **Archivos creados/modificados:**
@@ -1176,9 +1177,18 @@ Solo es `True` si se cumple:
 
 **Validaciones locales HU009 ejecutadas:**
 
-- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `15 passed`.
+- `python -m compileall -q 2_Assault/src` -> OK.
+- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `19 passed`.
 - `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
-- Validacion estatica del notebook -> `NOTEBOOK_HU009_STATIC_VALIDATION_PASS=True`.
+- `python -m pytest 2_Assault/tests -q` -> `114 passed, 2 skipped, 1 warning`.
+- `git diff --check` -> OK.
+- Validacion estatica del notebook -> `NOTEBOOK_HU009_FULL_GATE_ORDER_PASS=True`.
+
+**Correccion PR #14:**
+
+- El gate `FULL_TRAINING_READY` ahora se evalua y aborta antes de abrir/modificar MLflow o iniciar entrenamiento.
+- `FULL_TRAINING_READY=False` en perfil `full` no crea ni reabre run de MLflow, no registra parametros/tags/artifacts, no ejecuta Trainer, no crea checkpoint y no modifica manifest.
+- Perfil `smoke` conserva el flujo G0/HU008B y no queda bloqueado por `FULL_TRAINING_READY=False`.
 
 **Pendientes:**
 
