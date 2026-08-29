@@ -77,3 +77,53 @@ e2e_smoke:
   evaluation_max_steps_per_episode: 256
   replay_buffer_capacity: 128
   require_cuda: true
+
+training_profiles:
+  smoke:
+    description: Short local/Colab validation profile used by HU007-HU009 gates.
+    target_timesteps: 48
+    memory_margin_gib: 0.5
+    replay_buffer:
+      capacity: 1024
+      batch_size: 32
+    training:
+      total_timesteps: 48
+      learning_starts: 32
+      train_frequency: 4
+      target_update_frequency: 16
+      epsilon_decay_steps: 48
+    checkpointing:
+      interval_steps: 24
+      save_replay_buffer: true
+    tensorboard:
+      log_frequency_steps: 4
+      reward_window_episodes: 10
+      flush_frequency_steps: 24
+    evaluation:
+      episodes: 2
+      epsilon: 0.0
+      max_steps_per_episode: 256
+  full:
+    description: Conservative first full DDQN profile for HU009 Colab GPU runs.
+    target_timesteps: 250000
+    memory_margin_gib: 4.0
+    replay_buffer:
+      capacity: 50000
+      batch_size: 32
+    training:
+      total_timesteps: 250000
+      learning_starts: 10000
+      train_frequency: 4
+      target_update_frequency: 1000
+      epsilon_decay_steps: 200000
+    checkpointing:
+      interval_steps: 25000
+      save_replay_buffer: true
+    tensorboard:
+      log_frequency_steps: 1000
+      reward_window_episodes: 10
+      flush_frequency_steps: 5000
+    evaluation:
+      episodes: 5
+      epsilon: 0.0
+      max_steps_per_episode: null
