@@ -57,6 +57,17 @@ tensorboard:
   reward_window_episodes: 10
   flush_frequency_steps: 24
 
+mlflow:
+  enabled: true
+  experiment_name: assault_ddqn
+  tracking_uri: null
+  local_directory: logs/mlflow
+  tracking_mode: new
+  mlflow_run_id: null
+  tracking_session_id: session_001
+  artifact_location: null
+  log_checkpoint_binary: false
+
 e2e_smoke:
   enabled: true
   segment_a_timesteps: 48

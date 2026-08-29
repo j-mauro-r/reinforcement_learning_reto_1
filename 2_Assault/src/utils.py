@@ -103,11 +103,13 @@ def get_runtime_info() -> Dict[str, Any]:
         "gpu_available": False,
         "gpu_name": None,
         "gpu_vram_total_gb": None,
+        "cuda_version": None,
     }
 
     try:
         import torch
 
+        info["cuda_version"] = torch.version.cuda
         if torch.cuda.is_available():
             device_index = torch.cuda.current_device()
             properties = torch.cuda.get_device_properties(device_index)
