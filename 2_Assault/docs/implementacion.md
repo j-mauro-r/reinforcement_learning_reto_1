@@ -52,6 +52,8 @@ HU007  Smoke test end-to-end                         [COMPLETADA]
   ↓
 HU008  MLflow y trazabilidad de experimentos         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - LISTA PARA VALIDACION COLAB MULTISESION]
   ↓
+HU008B Automatizacion de reanudacion de experimentos [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB MULTISESION AUTOMATICA PENDIENTE]
+  â†“
 HU009  Entrenamiento DDQN completo
   ↓
 HU010  Optimización controlada de hiperparámetros
@@ -1038,6 +1040,73 @@ Cada run relevante debe registrar como mínimo:
 - Limitacion documentada: no se ejecuto runtime remoto de Google Colab desde Codex y no se inventan resultados Colab/GPU; HU008 queda lista para validar dos sesiones Colab persistentes con `MLFLOW_TRACKING_PASS=True`.
 
 **Habilita:** HU009.
+
+---
+
+### HU008B - Automatizacion de arranque y reanudacion de experimentos
+
+**Estado:** IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB MULTISESION AUTOMATICA PENDIENTE.
+
+**Proposito:** automatizar el arranque y la reanudacion de experimentos DDQN multisesion para que el usuario indique solo `project_run_id`, `target_timesteps` y `requested_mode=auto`, sin copiar manualmente `mlflow_run_id`, `tracking_session_id`, checkpoint de entrada ni rutas internas.
+
+**Diseno final implementado:**
+
+- Se agrega `2_Assault/src/session_bootstrap.py` como componente reutilizable de orquestacion previa/posterior a la sesion.
+- `prepare_training_session(...)` resuelve `new` o `resume` desde `<BASE>/experiments/<project_run_id>/experiment_state.json`.
+- Si no existe manifest, `auto` produce `tracking_mode=new`, `tracking_session_id=session_001`, `mlflow_run_id=None` y `checkpoint_input=None`.
+- Si existe manifest valido, `auto` produce `tracking_mode=resume`, reutiliza el mismo `mlflow_run_id`, calcula el siguiente `session_NNN` y resuelve el checkpoint persistente del manifest.
+- El manifest contiene solo estado de orquestacion: schema, project id, MLflow run id, ultima sesion, ultimo checkpoint, ultimo global step, resume mode, commit, fingerprint y timestamp.
+- La actualizacion del manifest usa escritura temporal + reemplazo atomico mediante `update_experiment_state_after_success(...)`.
+- El manifest se actualiza unicamente despues de entrenamiento OK, checkpoint existente, logging MLflow OK, cierre `FINISHED` y llamada explicita posterior.
+- `inspect_experiment_state(...)` permite diagnostico no destructivo de manifest, checkpoint y MLflow.
+- El fingerprint deterministico cubre invariantes de entorno, preprocessing, network, gamma, learning rate, politica epsilon, batch size, Replay Buffer, frecuencias de entrenamiento/target y seed.
+- El modulo no contiene logica DDQN, seleccion de acciones, Trainer ni evaluacion.
+
+**Fail-fast implementado:**
+
+- checkpoint fisico inexistente;
+- `project_run_id` inconsistente entre manifest/checkpoint/MLflow;
+- MLflow run ausente o perteneciente a otro experimento logico;
+- checkpoint que no pertenece al experimento;
+- `global_step` incoherente;
+- Replay Buffer ausente o incompatible en `resume_full`;
+- fingerprint/config incompatible;
+- `target_timesteps <= restored_global_step`;
+- `tracking_session_id` duplicado en artefactos MLflow;
+- manifest corrupto o incompleto;
+- commit/ref no explicitos.
+
+**Notebook HU008B:**
+
+- `2_Assault/assault_ddqn.ipynb` queda como orquestador ligero.
+- Entrada operacional normal:
+  - `ASSAULT_PROJECT_RUN_ID` o default logico nuevo;
+  - `ASSAULT_TARGET_TIMESTEPS`;
+  - `ASSAULT_REQUESTED_MODE=auto`.
+- El notebook llama `prepare_training_session(...)` despues del bootstrap versionado.
+- El notebook imprime `SESSION_BOOTSTRAP_READY=True`, `project_run_id`, `tracking_mode`, `mlflow_run_id`, `tracking_session_id`, `checkpoint_input`, `restored_expected_step`, `target_global_step`, `bootstrap_commit` y `config_fingerprint`.
+- Ya no requiere copiar manualmente `mlflow_run_id`, `tracking_session_id` ni checkpoint input entre runtimes.
+- Sigue usando `MLflowTracker`, `run_training_session`, `evaluate_agent` y `execution_bootstrap`.
+- No se hardcodean IDs reales de MLflow, checkpoints historicos ni SHA de validaciones anteriores como valores operativos.
+
+**Archivos creados/modificados:**
+
+- `2_Assault/src/session_bootstrap.py`;
+- `2_Assault/tests/test_session_bootstrap.py`;
+- `2_Assault/assault_ddqn.ipynb`;
+- `2_Assault/docs/implementacion.md`.
+
+**Validaciones locales HU008B ejecutadas:**
+
+- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
+- Los tests focales cubren: `new -> session_001`, `resume -> session_002`, mismo `mlflow_run_id`, checkpoint correcto, checkpoint inexistente, Replay Buffer incompatible, fingerprint incompatible, target no mayor al restored step, sesion duplicada, MLflow run de otro `project_run_id`, manifest corrupto, manifest ausente, escritura atomica, fallo previo a update sin modificar manifest, MLflow disabled, diagnostico no destructivo y notebook sin IDs historicos.
+
+**Pendientes:**
+
+- Ejecutar la prueba real en dos runtimes independientes de Google Colab con almacenamiento persistente.
+- No se declara HU008B `[COMPLETADA]` hasta observar en Colab: Runtime A `new/session_001 0->48`, destruccion del runtime, Runtime B `resume/session_002 48->64`, mismo `project_run_id`, mismo `mlflow_run_id`, checkpoint cargado, Replay Buffer restaurado, `SESSION_BOOTSTRAP_READY=True`, `MULTISESSION_CHECKPOINT_RESUME_PASS=True` y `MLFLOW_TRACKING_PASS=True`.
+
+**Habilita:** HU009 solo despues de la validacion Colab multisesion automatica.
 
 ---
 
