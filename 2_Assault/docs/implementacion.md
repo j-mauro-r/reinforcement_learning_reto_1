@@ -54,7 +54,7 @@ HU008  MLflow y trazabilidad de experimentos         [IMPLEMENTADA - VALIDACIONE
   ↓
 HU008B Automatizacion de reanudacion de experimentos [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB MULTISESION AUTOMATICA PENDIENTE]
   â†“
-HU009  Entrenamiento DDQN completo
+HU009  Entrenamiento DDQN completo                 [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - G0 COLAB + ENTRENAMIENTO FULL PENDIENTES]
   ↓
 HU010  Optimización controlada de hiperparámetros
   ↓
@@ -1110,24 +1110,84 @@ Cada run relevante debe registrar como mínimo:
 
 ---
 
-### HU009 — Entrenamiento DDQN completo
+### HU009 - Entrenamiento DDQN completo
 
-**Propósito:** ejecutar el primer entrenamiento largo del agente usando la arquitectura validada.
+**Estado:** IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - G0 COLAB + ENTRENAMIENTO FULL PENDIENTES.
 
-Debe:
+**Proposito:** preparar el primer flujo de entrenamiento DDQN completo y prolongado para `ALE/Assault-v5`, reutilizando entorno reproducible, DDQN, Trainer, checkpoints/resume, TensorBoard, MLflow y automatizacion HU008B, sin ejecutar entrenamiento largo desde Codex.
 
-- usar GPU de Colab;
-- entrenar por timesteps;
-- persistir checkpoints fuera del almacenamiento efímero cuando corresponda;
-- permitir varias sesiones;
-- conservar logs de TensorBoard;
-- registrar el experimento en MLflow;
-- guardar modelos candidatos;
-- registrar tiempo acumulado de entrenamiento.
+**Diseno final implementado:**
 
-**Resultado esperado:** producir al menos un modelo DDQN entrenado y evaluable, con trazabilidad completa y evidencia de evolución del aprendizaje.
+- Se agrega `2_Assault/src/training_profiles.py` para resolver perfiles de entrenamiento y gates de proteccion de computo.
+- `resolve_training_profile(...)` aplica `ASSAULT_TRAINING_PROFILE=smoke|full` desde `2_Assault/configs/ddqn_config.yaml` y devuelve una configuracion efectiva unica para entorno, preflight, bootstrap, Trainer, TensorBoard y MLflow.
+- `estimate_replay_buffer_memory(...)` calcula memoria aproximada sin instanciar el Replay Buffer, considerando `states`, `next_states`, `actions`, `rewards` y `dones`.
+- `evaluate_full_training_ready(...)` implementa el gate `FULL_TRAINING_READY` sin iniciar entrenamiento.
+- `expected_epsilon_at_step(...)` valida que epsilon continue segun `global_step` y `epsilon_decay_steps` del perfil activo.
+- El notebook conserva `prepare_training_session(...)` de HU008B y actualiza el manifest solo despues de entrenamiento, checkpoint, logging MLflow y cierre `FINISHED`.
 
-**Habilita:** HU010.
+**Perfiles configurados:**
+
+- `smoke`: conserva contrato barato previo con `target_timesteps=48`, Replay Buffer `1024`, `learning_starts=32`, `train_frequency=4`, `target_update_frequency=16`, `epsilon_decay_steps=48`, checkpoint cada `24` steps y TensorBoard cada `4` steps.
+- `full`: perfil conservador para primera corrida HU009 en Colab GPU con `FULL_TRAINING_TARGET_TIMESTEPS=250000`, Replay Buffer `50000`, `learning_starts=10000`, `train_frequency=4`, `target_update_frequency=1000`, `epsilon_decay_steps=200000`, checkpoint cada `25000` steps, TensorBoard cada `1000` steps y flush cada `5000` steps.
+- El target full es configurable mediante `ASSAULT_TARGET_TIMESTEPS`; no esta hardcodeado en `Trainer` ni requiere editar manualmente el notebook.
+
+**Replay Buffer y memoria:**
+
+- Shape estimado: `(4, 84, 84)` con `uint8`.
+- Por transicion se consideran dos observaciones visuales (`states` y `next_states`) mas `action int64`, `reward float32` y `done bool`.
+- Perfil `full` con capacidad `50000`: memoria estimada aproximada `2.63 GiB` para arrays principales del Replay Buffer.
+- Margen requerido para full: `4.0 GiB` adicionales para entorno, Python, PyTorch, MLflow y estructuras auxiliares.
+- Si `ram_available_gb < replay_buffer_estimate + margin`, el gate falla antes de entrenar. No se reduce capacidad automaticamente.
+
+**Gate `FULL_TRAINING_READY`:**
+
+Solo es `True` si se cumple:
+
+- `READY_FOR_TRAINING=True`;
+- runtime `Google Colab`;
+- device `cuda`;
+- observacion `(4,84,84)` `uint8`;
+- action space `Discrete(7)`;
+- `SESSION_BOOTSTRAP_READY=True` y fingerprint consistente;
+- tracking store, checkpoint root y TensorBoard root accesibles;
+- perfil `full`;
+- target mayor que `restored_expected_step`;
+- memoria RAM suficiente.
+
+**Notebook HU009:**
+
+- Entrada operacional normal:
+  - `ASSAULT_PROJECT_RUN_ID`;
+  - `ASSAULT_TRAINING_PROFILE=smoke|full`;
+  - `ASSAULT_TARGET_TIMESTEPS`;
+  - `ASSAULT_REQUESTED_MODE=auto`.
+- No solicita `mlflow_run_id`, `tracking_session_id`, checkpoint path ni `tracking_mode` manual.
+- Antes de entrenar imprime `TRAINING_PROFILE`, `SESSION_BOOTSTRAP_READY`, `FULL_TRAINING_READY`, identidad, checkpoint input, restored step, target, SHA, fingerprint, capacidad/memoria del Replay Buffer, RAM disponible y device.
+- En perfil `full`, si el gate no pasa se aborta antes de `run_training_session(...)`.
+- En perfil `smoke`, el flujo sigue disponible para G0 HU009/HU008B sin requerir CUDA local.
+
+**Archivos creados/modificados:**
+
+- `2_Assault/src/training_profiles.py`;
+- `2_Assault/tests/test_training_profiles.py`;
+- `2_Assault/configs/ddqn_config.yaml`;
+- `2_Assault/assault_ddqn.ipynb`;
+- `2_Assault/docs/implementacion.md`.
+
+**Validaciones locales HU009 ejecutadas:**
+
+- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `15 passed`.
+- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
+- Validacion estatica del notebook -> `NOTEBOOK_HU009_STATIC_VALIDATION_PASS=True`.
+
+**Pendientes:**
+
+- Ejecutar G0 en dos runtimes independientes de Colab: `hu009_preflight_001`, `48 -> 64`, `mode=auto`, sin copiar IDs ni checkpoint.
+- Si G0 pasa, actualizar evidencia real y cerrar HU008B antes de iniciar entrenamiento prolongado.
+- Ejecutar la primera corrida full HU009 en Colab GPU con almacenamiento persistente.
+- No se declara HU009 `[COMPLETADA]` sin entrenamiento real, checkpoint final cargable, TensorBoard/MLflow persistentes y evaluacion tecnica registrada.
+
+**Habilita:** HU010 solo despues de G0 Colab y entrenamiento full HU009 validado.
 
 ---
 
