@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 
 
 @dataclass(frozen=True)
 class EvaluationSummary:
-    """Structured result returned by a short evaluation run."""
+    """Structured result returned by an evaluation run."""
 
     episodes: int
     rewards: List[float]
@@ -24,6 +24,7 @@ class EvaluationSummary:
     terminated_episodes: int
     truncated_episodes: int
     max_steps_per_episode: Optional[int] = None
+    episode_seeds: Optional[List[int]] = None
 
     def as_dict(self) -> Dict[str, Any]:
         """Returns a notebook-friendly dictionary representation."""
@@ -40,6 +41,7 @@ class EvaluationSummary:
             "terminated_episodes": self.terminated_episodes,
             "truncated_episodes": self.truncated_episodes,
             "max_steps_per_episode": self.max_steps_per_episode,
+            "episode_seeds": list(self.episode_seeds) if self.episode_seeds is not None else None,
         }
 
 
@@ -49,6 +51,7 @@ def evaluate_agent(
     episodes: int = 2,
     epsilon: float = 0.0,
     max_steps_per_episode: Optional[int] = None,
+    episode_seeds: Optional[Sequence[int]] = None,
 ) -> EvaluationSummary:
     """Evaluates an agent without training or mutating replay state.
 
@@ -59,12 +62,14 @@ def evaluate_agent(
         epsilon: Epsilon used by the evaluation policy. Defaults to greedy
             evaluation with no additional exploration.
         max_steps_per_episode: Optional safety bound for smoke runs.
+        episode_seeds: Optional explicit seed per episode. HU011 uses this to
+            make the final >=10 episode protocol auditable and reproducible.
 
     Returns:
         Evaluation metrics based on raw rewards returned by the environment.
 
     Raises:
-        ValueError: If episodes, epsilon or max step limits are invalid.
+        ValueError: If episodes, epsilon, max step limits or seeds are invalid.
     """
     if int(episodes) <= 0:
         raise ValueError("episodes must be positive.")
@@ -72,6 +77,14 @@ def evaluate_agent(
         raise ValueError("epsilon must be in [0, 1].")
     if max_steps_per_episode is not None and int(max_steps_per_episode) <= 0:
         raise ValueError("max_steps_per_episode must be positive when provided.")
+
+    selected_seeds: Optional[List[int]] = None
+    if episode_seeds is not None:
+        selected_seeds = [int(seed) for seed in episode_seeds]
+        if len(selected_seeds) != int(episodes):
+            raise ValueError("episode_seeds length must match episodes.")
+        if len(selected_seeds) != len(set(selected_seeds)):
+            raise ValueError("episode_seeds must be unique for independent final episodes.")
 
     online_was_training = getattr(getattr(agent, "online_network", None), "training", None)
     target_was_training = getattr(getattr(agent, "target_network", None), "training", None)
@@ -81,8 +94,11 @@ def evaluate_agent(
     truncated_count = 0
 
     try:
-        for _ in range(int(episodes)):
-            observation, _ = env.reset()
+        for episode_index in range(int(episodes)):
+            reset_kwargs = {}
+            if selected_seeds is not None:
+                reset_kwargs["seed"] = selected_seeds[episode_index]
+            observation, _ = env.reset(**reset_kwargs)
             episode_reward = 0.0
             episode_length = 0
             terminated = False
@@ -122,4 +138,5 @@ def evaluate_agent(
         terminated_episodes=terminated_count,
         truncated_episodes=truncated_count,
         max_steps_per_episode=max_steps_per_episode,
+        episode_seeds=selected_seeds,
     )
