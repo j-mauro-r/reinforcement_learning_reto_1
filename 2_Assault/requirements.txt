@@ -10,3 +10,4 @@ torch>=2.0
 tensorboard>=2.14
 mlflow>=2.16,<3.0
 imageio[ffmpeg]>=2.34
+matplotlib>=3.7
