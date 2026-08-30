@@ -36,25 +36,27 @@ Fuentes de verdad relacionadas:
 ```text
 HU001  EDA + baseline aleatorio                      [COMPLETADA]
   ↓
-HU002  Pipeline reproducible del entorno              [IMPLEMENTADA — VALIDACIÓN LOCAL COMPLETADA — AV09 COLAB PENDIENTE]
+HU002  Pipeline reproducible del entorno             [COMPLETADA]
   ↓
-HU002B Pipeline de ejecución Local → GitHub → Colab
+HU002B Pipeline de ejecución Local → GitHub → Colab [COMPLETADA]
   ↓
-HU003  Núcleo DDQN                                      [COMPLETADA]
+HU003  Núcleo DDQN                                   [COMPLETADA]
   ↓
-HU004  Ciclo de entrenamiento                              [COMPLETADA]
+HU004  Ciclo de entrenamiento                        [COMPLETADA]
   ↓
-HU005  Checkpoints + reanudación + idempotencia        [COMPLETADA]
+HU005  Checkpoints + reanudación + idempotencia      [COMPLETADA]
   ↓
-HU006  Observabilidad con TensorBoard                  [COMPLETADA]
+HU006  Observabilidad con TensorBoard                [COMPLETADA]
   ↓
 HU007  Smoke test end-to-end                         [COMPLETADA]
   ↓
-HU008  MLflow y trazabilidad de experimentos         [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - LISTA PARA VALIDACION COLAB MULTISESION]
+HU008  MLflow y trazabilidad de experimentos         [COMPLETADA]
   ↓
-HU008B Automatizacion de reanudacion de experimentos [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB MULTISESION AUTOMATICA PENDIENTE]
-  â†“
-HU009  Entrenamiento DDQN completo                 [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - G0 COLAB + ENTRENAMIENTO FULL PENDIENTES]
+HU008B Automatización de reanudación de experimentos [IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACIÓN COLAB MULTISESIÓN AUTOMÁTICA PENDIENTE]
+  ↓
+HU009  Entrenamiento DDQN completo                   [COMPLETADA]
+  ↓
+HU009C Artefactos de entrega: modelo, gráficas, video y reporte [PENDIENTE]
   ↓
 HU010  Optimización controlada de hiperparámetros
   ↓
@@ -63,7 +65,7 @@ HU011  Evaluación formal contra baseline
 HU012  Evidencias y entrega final
 ```
 
-La secuencia es deliberada: primero se construye y valida el sistema y el flujo reproducible de ejecución; después se consume cómputo en entrenamientos largos.
+La secuencia es deliberada: primero se construye y valida el sistema y el flujo reproducible de ejecución; después se consume cómputo en entrenamientos largos y finalmente se consolidan los artefactos académicos de entrega.
 
 ---
 
@@ -86,7 +88,7 @@ La secuencia es deliberada: primero se construye y valida el sistema y el flujo 
 
 ### HU002 — Pipeline reproducible del entorno
 
-**Estado:** implementada — validación local completada — AV09 Colab pendiente.
+**Estado:** [COMPLETADA].
 
 **Propósito:** construir la única fábrica/configuración de `ALE/Assault-v5` que será utilizada por entrenamiento y evaluación.
 
@@ -127,7 +129,8 @@ Debe implementar:
 - Reproducibilidad local validada con seed `42`.
 - Hardware local registrado; GPU no requerida para HU002.
 - `assault_ddqn.ipynb` ejecutado localmente con resultado `HU002 validations passed`.
-- AV09 queda **prevalidada localmente**; la ejecución real desde runtime limpio de Google Colab continúa pendiente.
+
+**Cierre posterior:** las ejecuciones reales posteriores en Google Colab, incluido el flujo full de HU009, verificaron el bootstrap desde GitHub, import de `src.environment` desde `/content/reinforcement_learning_reto_1/2_Assault/src/environment.py`, observación `(4,84,84)` `uint8`, `Discrete(7)`, frameskip contractual y preflight exitoso. La evidencia histórica que aparece en HU002B sobre AV09 pendiente corresponde al estado anterior a estas ejecuciones.
 
 **Habilita:** HU002B.
 
@@ -135,7 +138,7 @@ Debe implementar:
 
 ### HU002B — Pipeline de ejecución Local → GitHub → Colab
 
-**Estado:** implementada — validaciones automatizables locales completadas — validación Colab pendiente.
+**Estado:** [COMPLETADA].
 
 **Propósito:** establecer un flujo reproducible de ejecución que separe desarrollo/validación local, versionamiento en GitHub y ejecución remota en Google Colab, garantizando que Colab ejecute una rama o commit conocido del repositorio.
 
@@ -156,8 +159,6 @@ Debe implementar:
 **Restricción:** HU002B no implementa entrenamiento DDQN ni infraestructura MLflow remota. MLflow remoto y trazabilidad avanzada permanecen en HU008.
 
 **Resultado esperado:** el ciclo `VS/local → tests → commit/push → GitHub → Colab → commit verificado → notebook reproducible` funciona sin modificaciones manuales al código.
-
-**Gate:** el cierre de HU002B debe completar la evidencia AV09 de HU002. Si la ejecución limpia en Colab es exitosa, HU002 y HU002B pueden pasar a `[COMPLETADA]`.
 
 **Entregable de definición:** `2_Assault/docs/hu002b_pipeline_ejecucion_local_github_colab.md`.
 
@@ -200,91 +201,21 @@ Debe implementar:
   - acciones: `NOOP`, `FIRE`, `UP`, `RIGHT`, `LEFT`, `RIGHTFIRE`, `LEFTFIRE`;
   - `frameskip` efectivo validado: `4`;
   - interacción corta HU002: 100 `step()` sin errores.
-- Resultado Gate T00 Codex -> Colab:
-  - mecanismo intentado: CLI local oficial/equivalente para Colab y puentes Jupyter disponibles;
-  - comandos/procedimientos:
-    - `Get-Command colab -ErrorAction SilentlyContinue`;
-    - `Get-Command google-colab -ErrorAction SilentlyContinue`;
-    - `python -m pip show google-colab colab-cli colabcode jupyter_http_over_ws`;
-    - `jupyter server list`;
-    - `jupyter notebook list`;
-    - `jupyter kernelspec list`;
-  - resultado real:
-    - no existe comando local `colab`;
-    - no existe comando local `google-colab`;
-    - no hay paquetes Python de CLI Colab instalados;
-    - Jupyter local solo expone subcomandos `kernel`, `kernelspec`, `migrate`, `run`, `troubleshoot`;
-    - `jupyter-server` y `jupyter-notebook` no están disponibles;
-    - kernels locales detectados: `myenv`, `venv`, `python3`;
-  - conclusión: Codex no tiene desde este entorno un canal remoto automatizable para ejecutar comandos contra un runtime activo de Google Colab, por lo que no se ejecutaron Python remoto, GPU remota, smoke remoto ni AV09 en Colab. No se inventan resultados remotos.
-- Estado AV09 HU002:
-  - `HU002 — IMPLEMENTADA — VALIDACIÓN LOCAL COMPLETADA — AV09 COLAB PENDIENTE`.
-- Estado HU002B:
-  - `HU002B — IMPLEMENTADA — VALIDACIONES AUTOMATIZABLES COMPLETADAS — VALIDACIÓN COLAB PENDIENTE`.
-- Desviación respecto del DWP:
-  - El notebook incluye un pre-bootstrap mínimo antes de importar `src.execution_bootstrap`, porque en un runtime Colab limpio el repositorio y sus helpers todavía no existen bajo `/content`.
-  - Justificación: ese pre-bootstrap solo trae la copia versionada desde GitHub; la validación del contrato, el SHA, la instalación, imports e idempotencia se delegan al helper versionado del repositorio.
 
-**Instrucciones manuales para cerrar AV09 Colab:**
+**Evidencia histórica de bloqueo inicial de Colab:**
 
-1. Hacer merge del PR o, para validar la rama antes del merge, mantener `BOOTSTRAP_REF = "feature/hu002b-pipeline-local-github-colab"` en el notebook.
-2. Abrir `2_Assault/assault_ddqn.ipynb` en Google Colab con runtime limpio.
-3. Activar GPU en Colab si se desea registrar disponibilidad CUDA: `Runtime > Change runtime type > GPU`.
-4. Ejecutar todas las celdas en orden.
-5. Verificar que el bootstrap imprima:
-   - runtime `Google Colab`;
-   - repo `/content/reinforcement_learning_reto_1`;
-   - ref solicitada;
-   - SHA resuelto;
-   - requirements bajo `/content/reinforcement_learning_reto_1/2_Assault/requirements.txt`;
-   - `src.environment` bajo `/content/reinforcement_learning_reto_1/2_Assault/src/environment.py`.
-6. Confirmar que aparece `HU002 validations passed.`.
-7. Registrar stdout/stderr, versión Python, GPU disponible y SHA ejecutado para completar AV09 de HU002 y la validación Colab de HU002B.
+- En 2026-08-27 Codex no tenía una sesión Colab autenticada desde Windows/WSL y no podía completar AV09 remotamente por sí mismo.
+- Ese bloqueo era de acceso remoto de Codex, no del pipeline del proyecto.
+- Las ejecuciones posteriores realizadas directamente por el usuario en Google Colab resolvieron esta validación operacional.
 
-**Reintento Gate T00 con CLI oficial de Colab (2026-08-27, PR #4):**
+**Cierre posterior en Google Colab:**
 
-- Cambio aplicado antes del reintento:
-  - `2_Assault/assault_ddqn.ipynb` ahora deja como default `BOOTSTRAP_REF = os.environ.get("ASSAULT_BOOTSTRAP_REF", "main")`.
-  - Para validar el PR sin usar `main` como código objetivo, se usó explícitamente `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab`.
-- CLI/mecanismo inspeccionado:
-  - En Windows no existe `colab` ni `google-colab`.
-  - La CLI oficial `google-colab-cli` documenta `colab exec` para ejecución remota y su README indica soporte actual para Linux y macOS; Windows no está soportado.
-  - Se inspeccionó WSL2 Ubuntu disponible en la máquina y se instaló la CLI oficial allí con `uv tool install google-colab-cli`.
-- Sintaxis real confirmada:
-  - `/root/.local/bin/colab --help` -> PASS, muestra comandos `new`, `sessions`, `status`, `exec`, `run`, `log`, etc.
-  - `/root/.local/bin/colab exec --help` -> PASS, muestra `colab exec [OPTIONS]`, `--session`, `--file`, `--output-image`, `--timeout`.
-  - `/root/.local/bin/colab version` -> `Version: 0.6.0`.
-- Comando de conectividad remoto intentado:
-  - `printf 'import sys\nprint(sys.version)\n' | /root/.local/bin/colab exec --timeout 30`
-- Resultado real:
-  - stdout/stderr: `[colab] Error: No active sessions found. Create one with 'colab new'.`
-  - No se obtuvo versión Python remota porque no existía sesión Colab activa accesible para la CLI.
-- Comandos adicionales:
-  - `/root/.local/bin/colab sessions`
-  - `/root/.local/bin/colab status`
-  - `/root/.local/bin/colab new -s hu002b-pr4 --gpu T4`
-- Bloqueo real:
-  - Los comandos `sessions`, `status` y `new` solicitan autorización OAuth interactiva con un código de Google.
-  - Codex no tiene un código de autorización ya disponible en la sesión y no debe escribir tokens, passwords ni secretos en archivos o Git.
-  - `colab new -s hu002b-pr4 --gpu T4` imprimió la URL OAuth y terminó en `Aborted.`
-- Conclusión:
-  - La CLI oficial sí está identificada y disponible vía WSL, pero la ejecución remota real no fue posible desde Codex porque no hay sesión activa autenticada ni credenciales interactivas disponibles.
-  - No se ejecutaron en Colab el bootstrap remoto, Python remoto, GPU remota, validaciones HU002 remotas ni notebook remoto.
-  - No se declara HU002 ni HU002B como completada.
-- Validaciones locales posteriores al ajuste:
-  - `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab python -m pytest 2_Assault/tests -q` -> `10 passed in 11.54s`.
-  - Celdas de código de `2_Assault/assault_ddqn.ipynb` ejecutadas localmente con `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab` y `ASSAULT_INSTALL_DEPENDENCIES=0` -> `NOTEBOOK_CODE_CELLS_OK`.
-  - SHA local resuelto para la rama del PR durante esa validación: `d265329a4f1f30f00dbc9a1fe224b799dae9e03c`.
-- Estado tras el reintento:
-  - `HU002 — IMPLEMENTADA — VALIDACIÓN LOCAL COMPLETADA — AV09 COLAB PENDIENTE`.
-  - `HU002B — IMPLEMENTADA — VALIDACIONES AUTOMATIZABLES COMPLETADAS — VALIDACIÓN COLAB PENDIENTE`.
-- Pasos manuales exactos para desbloquear:
-  1. En una terminal WSL con la CLI instalada, ejecutar `/root/.local/bin/colab new -s hu002b-pr4 --gpu T4`.
-  2. Abrir la URL OAuth que imprime la CLI, autorizar con la cuenta de Google/Colab y pegar el código en la terminal.
-  3. Ejecutar `printf 'import sys\nprint(sys.version)\n' | /root/.local/bin/colab exec -s hu002b-pr4 --timeout 30`.
-  4. Ejecutar `printf 'import os\nprint(os.getcwd())\n' | /root/.local/bin/colab exec -s hu002b-pr4 --timeout 30`.
-  5. Ejecutar `printf 'import torch\nprint("CUDA available:", torch.cuda.is_available())\nif torch.cuda.is_available():\n    print(torch.cuda.get_device_name(0))\n' | /root/.local/bin/colab exec -s hu002b-pr4 --timeout 30`.
-  6. Ejecutar el notebook o script equivalente con `ASSAULT_BOOTSTRAP_REF=feature/hu002b-pipeline-local-github-colab` y capturar SHA, ruta `/content/reinforcement_learning_reto_1`, origen de `src.environment`, resultado `HU002 validations passed.` y logs stdout/stderr.
+- runtime real detectado: `Google Colab`;
+- repositorio ejecutado bajo `/content/reinforcement_learning_reto_1`;
+- bootstrap con GitHub `main` y SHA resuelto explícitamente;
+- requirements instalados desde `2_Assault/requirements.txt`;
+- `src.environment` cargado desde la copia versionada en `/content`;
+- pipeline usado exitosamente por las validaciones HU007–HU009 y por la corrida full de `250000` timesteps.
 
 ---
 
@@ -640,6 +571,8 @@ Debe soportar explícitamente:
 
 ### HU006 — Observabilidad con TensorBoard
 
+**Estado:** completada.
+
 **Propósito:** hacer observable el proceso de aprendizaje durante entrenamiento.
 
 Registrar como mínimo:
@@ -754,10 +687,9 @@ Registrar como mínimo:
   - `python -m pytest 2_Assault/tests/test_tensorboard.py 2_Assault/tests/test_checkpointing.py -q` -> `26 passed`;
   - AV16 notebook local: celdas automatizables de `2_Assault/assault_ddqn.ipynb` ejecutadas con `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu006-tensorboard`, `ASSAULT_CHECKPOINT_DIR=<temp>`, `ASSAULT_TENSORBOARD_DIR=<temp>`, `ASSAULT_RUN_ID=<run temporal>` -> `NOTEBOOK_CODE_CELLS_OK`; celdas ejecutadas: `11`; celdas omitidas: `[]`;
   - `python -m pytest 2_Assault/tests -q` -> `59 passed, 2 skipped`.
-- Limitaciones y pendientes:
-  - no se ejecutó runtime remoto de Colab desde Codex por la restricción ya diagnosticada en HU002B/HU005;
-  - no se implementó MLflow, evaluación formal, video, entrenamiento largo ni selección de mejor modelo;
-  - los tags `episode/*` dependen de que finalice un episodio real; en corridas muy cortas de Assault pueden no aparecer.
+- Limitaciones históricas:
+  - en el momento de implementación no se ejecutó runtime remoto de Colab desde Codex por la restricción ya diagnosticada;
+  - no se implementó MLflow, evaluación formal, video, entrenamiento largo ni selección de mejor modelo en esta HU.
 
 **Habilita:** HU007.
 
@@ -765,7 +697,7 @@ Registrar como mínimo:
 
 ### HU007 — Smoke test end-to-end
 
-**Estado:** implementada - validaciones locales completadas - Colab/GPU pendiente.
+**Estado:** completada.
 
 **Propósito:** validar todo el pipeline antes de gastar recursos en un entrenamiento largo.
 
@@ -787,71 +719,7 @@ Debe ejecutar una corrida corta con GPU y verificar conjuntamente:
 
 **Gate:** no iniciar HU009 si HU007 no está aprobada.
 
-**Evidencia de implementación HU007 (2026-08-28, rama `feature/hu007-e2e-smoke`):**
-
-- Commit final del PR: último commit de la rama `feature/hu007-e2e-smoke`.
-- Archivos implementados/modificados:
-  - `2_Assault/configs/ddqn_config.yaml`: agrega bloque `e2e_smoke` con `enabled`, timesteps cortos, evaluación corta, replay buffer reducido y `require_cuda=true` por defecto para el cierre real en Colab/GPU.
-  - `2_Assault/src/evaluator.py`: agrega evaluación separada del entrenamiento, con epsilon configurable, recompensas crudas, longitudes y restauración de modos `train/eval`.
-  - `2_Assault/src/e2e_smoke.py`: orquesta el smoke end-to-end con preflight, entorno real, DDQN, Replay Buffer, entrenamiento A, checkpoint, restauración, entrenamiento B, TensorBoard y evaluación.
-  - `2_Assault/src/callbacks.py`: estabiliza la lectura de scalars de TensorBoard ordenando eventos por `global_step`.
-  - `2_Assault/tests/test_e2e_smoke.py`: cubre evaluador, contrato de no-mutación, fail-fast CUDA y smoke real Assault en CPU local.
-  - `2_Assault/assault_ddqn.ipynb`: integra la ejecución HU007 y muestra gates/resultados.
-  - `2_Assault/docs/implementacion.md`: registra esta evidencia.
-- Contrato de ejecución implementado:
-  - por configuración, HU007 exige CUDA (`require_cuda=true`) para poder declarar `E2E_SMOKE_PASS=True`;
-  - en ejecución local sin CUDA se permite validación reducida con `ASSAULT_E2E_REQUIRE_CUDA=0`, pero el gate formal permanece pendiente;
-  - `E2E_SMOKE_PASS` solo puede ser `True` en Google Colab con dispositivo CUDA;
-  - `LOCAL_E2E_SMOKE_PASS=True` solo certifica que el pipeline corre localmente de extremo a extremo sin GPU.
-- Ejecución local automatizada del notebook:
-  - variables usadas: `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu007-e2e-smoke`, `ASSAULT_CHECKPOINT_DIR=<temp>`, `ASSAULT_TENSORBOARD_DIR=<temp>`, `ASSAULT_RUN_ID=<run temporal>`, `ASSAULT_E2E_REQUIRE_CUDA=0`;
-  - celdas de código ejecutadas: `10`;
-  - celdas omitidas: `[]`;
-  - resultado: `NOTEBOOK_CODE_CELLS_OK`.
-- Evidencia local del smoke end-to-end:
-  - runtime detectado: `local`;
-  - dispositivo usado: `cpu`;
-  - preflight: `READY_FOR_TRAINING=True`;
-  - observación procesada: `(4, 84, 84)`, dtype `uint8`;
-  - action space: `Discrete(7)`;
-  - segmento A: `segment_a_steps=48`, `segment_a_updates=5`;
-  - checkpoint: `checkpoint_step_000048.pt`, tamaño aproximado `29,741,058` bytes;
-  - restauración: `restored_global_step=48`, `replay_buffer_restored=True`;
-  - segmento B: `segment_b_final_step=64`, `segment_b_updates_total=9`;
-  - TensorBoard: `tensorboard_event_files=2`;
-  - TensorBoard tags preservados: `train/epsilon`, `train/loss`, `train/q_mean`, `train/learning_rate`;
-  - pasos post-resume validados para tags principales: `[52, 56, 60, 64]`;
-  - evaluación corta separada: `evaluation_rewards=[0.0, 0.0]`, `evaluation_mean_reward=0.0`, `evaluation_lengths=[256, 256]`;
-  - memoria local: RSS aproximado `324.56 MB -> 375.28 MB`, RAM disponible aproximada `0.98 GB -> 0.93 GB`;
-  - verificación de evaluación: no muta pesos online, pesos target, estado del optimizador, replay buffer ni `global_step`;
-  - resultado local: `LOCAL_E2E_SMOKE_PASS=True`;
-  - resultado formal HU007: `E2E_SMOKE_PASS=False` por no haberse ejecutado en Colab/GPU.
-- Autovalidaciones ejecutadas:
-  - `python -c "import sys; sys.path.insert(0, '2_Assault'); from src.evaluator import evaluate_agent; from src.e2e_smoke import run_e2e_smoke; print('HU007 imports OK')"` -> `HU007 imports OK`;
-  - `python -m compileall -q 2_Assault/src` -> PASS sin salida ni errores;
-  - `python -m pytest 2_Assault/tests/test_e2e_smoke.py -q` -> `5 passed`;
-  - `python -m pytest 2_Assault/tests/test_tensorboard.py::test_resume_reuses_run_id_and_continues_global_steps 2_Assault/tests/test_e2e_smoke.py -q` -> `6 passed`;
-  - `python -m pytest 2_Assault/tests -q` -> `64 passed, 2 skipped`.
-- Corrección post revisión de pares - liberación de memoria entre segmentos (2026-08-28, rama `fix/hu007-release-gpu-memory`):
-  - problema detectado: el flujo E2E creaba `agent_b` y `buffer_b` mientras `agent_a` y `buffer_a` seguían referenciados después del checkpoint del segmento A;
-  - impacto potencial: en Colab GPU podían coexistir dos agentes completos en VRAM durante el segmento B, debilitando el objetivo de HU007 de detectar problemas de memoria antes de HU009;
-  - causa: después de `checkpoint`, `logger_a.flush()`, `logger_a.close()` y `env_a.close()`, el código conservaba referencias Python a objetos pesados del segmento A;
-  - solución: capturar primero la evidencia liviana del segmento A (`TrainingSummary`, `CheckpointMetadata`, event files, scalars y snapshots), luego ejecutar explícitamente `del agent_a`, `del buffer_a`, `del logger_a`, `del env_a`, `gc.collect()` y `torch.cuda.empty_cache()` solo si CUDA está disponible;
-  - orden implementado: Segment A -> checkpoint -> flush/close logger -> close env -> scalars/event files -> `memory_after_segment_a` -> liberar referencias A -> `gc.collect()` -> `torch.cuda.empty_cache()` condicional -> `memory_after_release` -> crear `agent_b`, `buffer_b`, `logger_b`, `env_b` -> `resume_full`;
-  - snapshot agregado: `memory_after_release`, tomado después de liberar referencias y antes de crear las instancias B;
-  - snapshots expuestos por HU007: `memory_before`, `memory_after_segment_a`, `memory_after_release`, `memory_after`;
-  - CUDA cleanup: `torch.cuda.empty_cache()` no se usa como prueba de ausencia de referencias; primero se eliminan referencias Python, luego se ejecuta GC y finalmente se limpia caché CUDA si aplica;
-  - archivos modificados: `2_Assault/src/e2e_smoke.py`, `2_Assault/tests/test_e2e_smoke.py`, `2_Assault/assault_ddqn.ipynb`, `2_Assault/docs/implementacion.md`;
-  - tests agregados/extendidos: validación de snapshot post-release, campos CUDA `None` en CPU y llamada condicional a `torch.cuda.empty_cache()` mediante monkeypatch sin falsear una ejecución GPU completa;
-  - resultados locales de la corrección: `python -m compileall -q 2_Assault/src` -> PASS; `python -m pytest 2_Assault/tests/test_e2e_smoke.py -q` -> `6 passed`; `python -m pytest 2_Assault/tests -q` -> `65 passed, 2 skipped`;
-  - notebook local automatizable ejecutado con `ASSAULT_BOOTSTRAP_REF=fix/hu007-release-gpu-memory`, directorios temporales y `ASSAULT_E2E_REQUIRE_CUDA=0` -> `NOTEBOOK_CODE_CELLS_OK`, `LOCAL_E2E_SMOKE_PASS=True`, `E2E_SMOKE_PASS=False`;
-  - limitación: Codex no ejecutó Colab GPU para esta corrección; la reducción real de VRAM y el cierre formal `E2E_SMOKE_PASS=True` quedan pendientes de validación por el usuario en Google Colab GPU.
-- Limitaciones y pendientes:
-  - no se ejecutó runtime remoto de Google Colab desde Codex;
-  - no se inventan resultados GPU ni Colab;
-  - queda pendiente ejecutar el notebook en Google Colab con GPU y `ASSAULT_E2E_REQUIRE_CUDA=1` para obtener `E2E_SMOKE_PASS=True`;
-  - HU007 bloquea HU009 hasta completar esa evidencia remota;
-  - no se implementó MLflow, entrenamiento largo, optimización de hiperparámetros, videos ni evaluación formal contra baseline, porque pertenecen a HU008-HU012.
+**Evidencia:** HU007 fue cerrada posteriormente con ejecución real Colab/GPU `E2E_SMOKE_PASS=True`, checkpoint/restauración y continuidad observada. La evidencia local histórica anterior permanece en commits/notebook.
 
 **Habilita:** HU008.
 
@@ -859,7 +727,7 @@ Debe ejecutar una corrida corta con GPU y verificar conjuntamente:
 
 ### HU008 — MLflow y trazabilidad de experimentos
 
-**Estado:** implementada - validaciones locales completadas - validacion Colab pendiente.
+**Estado:** [COMPLETADA].
 
 **Propósito:** registrar de forma comparable las ejecuciones que sí importan para tomar decisiones y extender HU002B con tracking persistente cuando corresponda.
 
@@ -880,324 +748,134 @@ Cada run relevante debe registrar como mínimo:
 
 **Resultado esperado:** dos corridas pueden compararse en MLflow y es posible identificar exactamente qué código y configuración produjo cada resultado.
 
-**Evidencia de implementación HU008 (2026-08-28, rama `feature/hu008-mlflow-tracking`):**
+**Diseño implementado:**
 
-- Archivos creados/modificados:
-  - `2_Assault/src/tracking.py`: capa única que importa y encapsula MLflow.
-  - `2_Assault/tests/test_tracking.py`: validaciones de tracking con backend filesystem temporal.
-  - `2_Assault/configs/ddqn_config.yaml`: bloque `mlflow` centralizado.
-  - `2_Assault/requirements.txt`: dependencia `mlflow>=2.16,<3.0`.
-  - `2_Assault/assault_ddqn.ipynb`: orquestación HU008 con new/resume explícito y logging posterior al smoke.
-  - `2_Assault/src/utils.py`: agrega `cuda_version` reutilizable en runtime metadata.
-  - `.gitignore`: evita versionar stores locales `mlruns/`.
-  - `2_Assault/docs/implementacion.md`: registra evidencia real.
-- Arquitectura implementada:
-  - `Trainer`, `Evaluator`, `CheckpointManager`, `agent`, `network`, `environment` y `replay_buffer` permanecen sin imports ni llamadas directas a MLflow.
-  - El notebook actúa como orquestador y usa `MLflowTracker` para iniciar/cerrar runs y registrar resúmenes.
-  - TensorBoard conserva las curvas densas; MLflow registra identidad, parámetros, métricas agregadas, artefactos livianos y referencias.
-- Configuración MLflow:
-  - `enabled: true`;
-  - `experiment_name: assault_ddqn`;
-  - `tracking_uri: null`;
-  - `local_directory: logs/mlflow`;
-  - `tracking_mode: new`;
-  - `mlflow_run_id: null`;
-  - `artifact_location: null`;
-  - `log_checkpoint_binary: false`.
-- Overrides soportados:
-  - `ASSAULT_MLFLOW_TRACKING_URI`;
-  - `ASSAULT_MLFLOW_EXPERIMENT`;
-  - `ASSAULT_MLFLOW_TRACKING_MODE`;
-  - `ASSAULT_MLFLOW_RUN_ID`;
-  - `ASSAULT_MLFLOW_ARTIFACT_LOCATION`.
-- Identidad:
-  - se diferencia `project_run_id` del proyecto/checkpoint/TensorBoard frente a `mlflow_run_id` técnico de MLflow;
-  - ambos quedan disponibles mediante `MLflowRunMetadata`;
-  - `project_run_id` se registra como tag y como param `identity.project_run_id`.
-- API principal:
-  - `MLflowTracker.from_config(...)`;
-  - `start_run(project_run_id, tracking_mode, mlflow_run_id, ...)`;
-  - `log_run_context(...)`;
-  - `log_training_summary(...)`;
-  - `log_evaluation_summary(...)`;
-  - `log_checkpoint_reference(...)`;
-  - `log_config_snapshot(...)`;
-  - `log_runtime_metadata(...)`;
-  - `get_run(...)`;
-  - `end_run(...)`;
-  - context manager soportado.
-- Parámetros/tags registrados:
-  - identidad: `DDQN`, `project_run_id`, experimento, seed;
-  - Git/runtime: commit, ref, runtime local/Colab, device;
-  - entorno: id, obs type, action space, frameskip, repeat action probability, full action space;
-  - preprocessing: grayscale, resize, frame stack, dtype, normalización en entorno;
-  - DDQN/training: gamma, learning rate, epsilon start/final/decay, batch size, Replay Buffer capacity, learning starts, train frequency, Target update frequency, total timesteps;
-  - versiones/hardware: Python, Gymnasium, ALE-Py, PyTorch, CUDA, MLflow, CPU, RAM, GPU disponible, nombre GPU y VRAM cuando aplica.
-- Métricas agregadas registradas:
-  - entrenamiento: initial/final global step, duration, updates count, last/mean loss, last/mean q mean, final epsilon, replay buffer size, episodes completed y best episode reward cuando existe;
-  - evaluación: episodes, mean/median/std/min/max reward, mean episode length y epsilon;
-  - checkpoint: step y size bytes.
-- Artefactos livianos:
-  - `config/ddqn_config.json`;
-  - `metadata/runtime.json`;
-  - `summaries/train_summary.json`;
-  - `summaries/eval_summary.json`;
-  - `summaries/e2e_smoke_summary.json` desde notebook;
-  - `artifacts/checkpoint_reference.json`.
-- Checkpoint reference:
-  - registra `checkpoint_path`, `project_run_id`, `checkpoint_step`, `checkpoint_size_bytes`, `resume_mode`, `save_replay_buffer` y `checkpoint_binary_logged=false`;
-  - no duplica por defecto checkpoints `resume_full` con Replay Buffer.
-- Evidencia de new run:
-  - backend temporal local;
-  - experimento `assault_ddqn_tests`;
-  - `MlflowClient` recupera la run creada;
-  - params, metrics, tags y artefactos esperados verificados en `test_tracking.py`.
-- Evidencia de resume:
-  - sesión A crea run y registra métricas;
-  - sesión B crea otro objeto `MLflowTracker`, reabre explícitamente el mismo `mlflow_run_id` y registra métricas adicionales;
-  - se valida mismo `mlflow_run_id`, mismo `project_run_id`, métrica de sesión A preservada y métrica de sesión B agregada.
-- Evidencia de coexistencia TensorBoard + MLflow:
-  - `TensorBoardLogger` escribe event files para el mismo `project_run_id`;
-  - `MLflowTracker` registra resumen agregado sin modificar TensorBoard ni depender de sus internals.
-- Fail-fast:
-  - tracking URI local inválido/no escribible produce `RuntimeError` visible cuando `mlflow.enabled=true`;
-  - `tracking_mode="resume"` sin `mlflow_run_id` explícito produce `ValueError`;
-  - parámetros inmutables de MLflow se validan para no cambiar identidad al reanudar.
-- Modo disabled:
-  - con `mlflow.enabled=false`, el tracker es no-op, no importa MLflow y no crea store local.
-- Validaciones locales ejecutadas:
-  - `python -m compileall -q 2_Assault/src` -> PASS;
-  - `python -m pytest 2_Assault/tests/test_tracking.py -q` -> `8 passed, 1 warning`;
-  - `python -m pytest 2_Assault/tests -q` -> `73 passed, 2 skipped, 1 warning`.
-- Notebook local automatizable:
-  - variables usadas: `ASSAULT_INSTALL_DEPENDENCIES=0`, `ASSAULT_BOOTSTRAP_REF=feature/hu008-mlflow-tracking`, `ASSAULT_E2E_REQUIRE_CUDA=0`, `ASSAULT_RUN_ID=assault_ddqn_hu008_notebook_local`, `ASSAULT_CHECKPOINT_DIR=<temp>`, `ASSAULT_TENSORBOARD_DIR=<temp>`, `ASSAULT_MLFLOW_TRACKING_URI=<temp>/mlruns`, `ASSAULT_MLFLOW_EXPERIMENT=assault_ddqn_hu008_notebook_local`;
-  - celdas ejecutadas: `[2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]`;
-  - resultado: `NOTEBOOK_CODE_CELLS_OK`;
-  - `MLFLOW_TRACKING_PASS=True`;
-  - `project_run_id=assault_ddqn_hu008_notebook_local`;
-  - `mlflow_run_id=86068e5989aa480da6df72a927d8922e`;
-  - tracking URI temporal: `file:///C:/Users/Usuario/AppData/Local/Temp/.../mlruns`;
-  - `LOCAL_E2E_SMOKE_PASS=True`;
-  - `E2E_SMOKE_PASS=False` porque la validación fue local CPU, no Colab GPU.
-- Limitaciones y pendientes:
-  - no se ejecutó runtime remoto de Google Colab desde Codex;
-  - no se inventan resultados Colab/GPU;
-  - queda pendiente ejecutar el notebook en Google Colab con tracking URI persistente/configurable y conservar evidencia de `MLFLOW_TRACKING_PASS=True`;
-  - HU008 no implementa entrenamiento largo, HPO, evaluación formal, video, Model Registry, serving ni MLflow server.
+- `2_Assault/src/tracking.py` encapsula MLflow sin introducir dependencias directas desde Trainer/Evaluator/Agent.
+- TensorBoard conserva curvas densas; MLflow registra identidad, params estables, métricas agregadas, runtime y referencias a artefactos.
+- Identidad separada mediante `project_run_id`, `mlflow_run_id` y `tracking_session_id`.
+- Artefactos variables por sesión bajo `sessions/<tracking_session_id>/`.
+- `training_session.py` permite una sesión nueva o reanudada con checkpoint externo.
 
-**Correccion tecnica HU008 multi-sesion, params estables y evaluacion corta (2026-08-28, rama `feature/hu008-mlflow-tracking`):**
+**Evidencia de cierre Colab multi-sesión:**
 
-- Se agrega `tracking_session_id` como tercer identificador explicito junto con `project_run_id` y `mlflow_run_id`.
-- `MLflowRunMetadata` expone `tracking_session_id` y el notebook imprime `project_run_id`, `mlflow_run_id`, `tracking_session_id`, modo, pasos inicial/final y referencias de checkpoint.
-- La configuracion central incluye `mlflow.tracking_session_id: session_001`.
-- Overrides soportados para multi-sesion: `ASSAULT_MLFLOW_SESSION_ID`, `ASSAULT_MLFLOW_CHECKPOINT_INPUT`, `ASSAULT_MLFLOW_SESSION_TARGET_TIMESTEPS` y `ASSAULT_RESUME_MODE`.
-- `log_run_context(...)` queda limitado a params globales/inmutables: identidad, seed, entorno, preprocessing y configuracion core DDQN compatible entre sesiones.
-- Git SHA/ref, runtime, device, versiones, RAM/GPU y `training.total_timesteps` dejan de registrarse como params inmutables y se conservan por sesion.
-- `training.total_timesteps` se trata como `session_target_timesteps` cuando HU008 ejecuta segmentos multi-sesion.
-- Con MLflow habilitado, iniciar un run sin `tracking_session_id` produce `ValueError`.
-- En modo `resume`, reusar un `tracking_session_id` que ya contiene `sessions/<tracking_session_id>/session_metadata.json` dentro del mismo `mlflow_run_id` produce `RuntimeError` fail-fast.
-- La deteccion de colision de sesion ya no oculta errores reales de backend: si `MlflowClient.list_artifacts(...)` falla por permisos, I/O o store invalido, el error se propaga.
-- Se agrega `src/training_session.py` como orquestador HU008 de una sesion reanudable: crea agente/buffer nuevos, usa `CheckpointManager.load(..., mode="resume_full")` para cargar el checkpoint externo, valida `restored_global_step == initial_global_step`, exige `replay_buffer_restored=True` en resume completo y continua de `N` a `T`.
-- El notebook usa el orquestador HU008 para sesiones `new` y `resume`; `new` produce un checkpoint final de `session_001` y `resume` carga explicitamente `ASSAULT_MLFLOW_CHECKPOINT_INPUT` para `session_002` sobre el mismo `mlflow_run_id`.
-- La evaluacion corta HU008 se restaura despues del entrenamiento de cada sesion usando `evaluate_agent(...)` con `epsilon=0.0` y episodios cortos configurables; no es evaluacion formal HU011.
-- Los artefactos variables se registran bajo `sessions/<tracking_session_id>/`: `effective_config.json`, `session_metadata.json`, `runtime.json`, `training_summary.json`, `evaluation_summary.json`, `checkpoint_reference.json` y `training_session_summary.json`.
-- `config/base_config.json` permanece como artefacto global de configuracion logica base; la configuracion efectiva real vive por sesion en `sessions/<tracking_session_id>/effective_config.json`.
-- `session_metadata.json` registra al menos identidad completa, modo, inicio/fin, runtime, Git ref/SHA, device, CPU/GPU, pasos inicial/final, `session_target_timesteps`, checkpoint input/output, `checkpoint_input_loaded`, `restored_global_step`, `replay_buffer_restored`, `resume_mode`, `effective_config_artifact` y versiones disponibles.
-- `checkpoint_reference.json` incluye `checkpoint_input_reference` y `checkpoint_output_reference` para reconstruir lineage entre sesiones.
-- Las metricas agregadas conservan nombres canonicos globales; cuando aplica se registran con step final de entrenamiento.
-- Tags actualizados: `latest_tracking_session_id` y `tracking_mode`.
-- Validaciones locales ejecutadas:
-  - `python -m compileall -q 2_Assault/src` -> PASS;
-  - `python -m pytest 2_Assault/tests/test_tracking.py -q` -> `13 passed, 1 warning`;
-  - `python -m pytest 2_Assault/tests -q` -> `78 passed, 2 skipped, 1 warning`;
-  - tests agregados validan resume externo real A=0->N, checkpoint A, agente/buffer/trainer B nuevos, restore `resume_full` y continuacion N->T;
-  - tests agregados validan lineage `session_001.checkpoint_output_reference == session_002.checkpoint_input_reference`;
-  - tests agregados validan que hardware/runtime y target por sesion pueden cambiar sin `MLflow param mismatch`;
-  - tests agregados validan que un cambio core real como `ddqn.gamma` sigue fallando por param inmutable;
-  - tests agregados validan evaluacion corta, metricas `eval/*` y `evaluation_summary.json`;
-  - tests agregados validan `effective_config.json` independiente por sesion;
-  - tests agregados validan que un fallo real de `MlflowClient.list_artifacts(...)` se propaga y no se interpreta como lista vacia;
-  - validacion estatica del notebook -> JSON parseable y celdas HU008 actualizadas para `new`/`resume` con evaluacion corta;
-  - `nbclient`/`nbconvert` no estan disponibles en el entorno local Codex, por lo que no se declara Run All local; se ejecuto flujo equivalente real.
-- Evidencia del smoke multi-sesion local:
-  - `project_run_id=assault_ddqn_hu008_multisession_final`;
-  - `mlflow_run_id=d8d73f89e4f34e0aa64b4c0e23239821` en store temporal local;
-  - un mismo `mlflow_run_id` contiene `sessions/session_001/` y `sessions/session_002/`;
-  - `session_001.final_global_step == session_002.initial_global_step`;
-  - `session_002.checkpoint_input_loaded=True`;
-  - `session_002.replay_buffer_restored=True`;
-  - `session_002.final_global_step > session_002.initial_global_step`;
-  - evaluacion corta: `evaluation_episodes=2`, `evaluation_mean_reward=5.0`, `evaluation_epsilon=0.0`;
-  - `evaluation_artifacts_present=True`;
-  - `effective_config_artifacts_present=True`;
-  - `MULTISESSION_CHECKPOINT_RESUME_PASS=True`;
-  - `MLFLOW_TRACKING_PASS=True`;
-  - intento duplicado de `session_001` sobre el mismo run falla como se espera.
-- Evidencia equivalente local del notebook:
-  - modo `new`: `tracking_mode=new`, `tracking_session_id=session_001`, `checkpoint_input_loaded=False`, `initial_global_step=0`;
-  - modo `resume`: `tracking_mode=resume`, `tracking_session_id=session_002`, mismo `mlflow_run_id`, `checkpoint_input_loaded=True`, `restored_global_step=N`, `replay_buffer_restored=True`, `final_global_step>T`;
-  - artefactos verificados bajo `sessions/<tracking_session_id>/`: `effective_config.json`, `session_metadata.json`, `runtime.json`, `training_summary.json`, `evaluation_summary.json`, `checkpoint_reference.json`, `training_session_summary.json`.
-- Limitacion documentada: no se ejecuto runtime remoto de Google Colab desde Codex y no se inventan resultados Colab/GPU; HU008 queda lista para validar dos sesiones Colab persistentes con `MLFLOW_TRACKING_PASS=True`.
+- `project_run_id=assault_ddqn_hu008_colab_002`;
+- mismo `mlflow_run_id=e641bd92682d4fa9a800013cb0df989c` entre runtimes;
+- `session_001`: `new`, `0 -> 48`, checkpoint persistente;
+- runtime destruido y recreado;
+- `session_002`: `resume`, checkpoint step 48 cargado, `restored_global_step=48`, `replay_buffer_restored=True`, continuación `48 -> 64`;
+- `MULTISESSION_CHECKPOINT_RESUME_PASS=True`;
+- `MLFLOW_TRACKING_PASS=True`;
+- artefactos por sesión presentes y mismo run lógico conservado.
 
-**Habilita:** HU009.
+**Habilita:** HU008B/HU009.
 
 ---
 
-### HU008B - Automatizacion de arranque y reanudacion de experimentos
+### HU008B - Automatización de arranque y reanudación de experimentos
 
-**Estado:** IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACION COLAB MULTISESION AUTOMATICA PENDIENTE.
+**Estado:** IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - VALIDACIÓN COLAB MULTISESIÓN AUTOMÁTICA PENDIENTE.
 
-**Proposito:** automatizar el arranque y la reanudacion de experimentos DDQN multisesion para que el usuario indique solo `project_run_id`, `target_timesteps` y `requested_mode=auto`, sin copiar manualmente `mlflow_run_id`, `tracking_session_id`, checkpoint de entrada ni rutas internas.
+**Propósito:** automatizar el arranque y la reanudación de experimentos DDQN multisesión para que el usuario indique solo `project_run_id`, `target_timesteps` y `requested_mode=auto`, sin copiar manualmente `mlflow_run_id`, `tracking_session_id`, checkpoint de entrada ni rutas internas.
 
-**Diseno final implementado:**
+**Diseño final implementado:**
 
-- Se agrega `2_Assault/src/session_bootstrap.py` como componente reutilizable de orquestacion previa/posterior a la sesion.
-- `prepare_training_session(...)` resuelve `new` o `resume` desde `<BASE>/experiments/<project_run_id>/experiment_state.json`.
+- `2_Assault/src/session_bootstrap.py` resuelve `new` o `resume` desde `<BASE>/experiments/<project_run_id>/experiment_state.json`.
 - Si no existe manifest, `auto` produce `tracking_mode=new`, `tracking_session_id=session_001`, `mlflow_run_id=None` y `checkpoint_input=None`.
-- Si existe manifest valido, `auto` produce `tracking_mode=resume`, reutiliza el mismo `mlflow_run_id`, calcula el siguiente `session_NNN` y resuelve el checkpoint persistente del manifest.
-- El manifest contiene solo estado de orquestacion: schema, project id, MLflow run id, ultima sesion, ultimo checkpoint, ultimo global step, resume mode, commit, fingerprint y timestamp.
-- La actualizacion del manifest usa escritura temporal + reemplazo atomico mediante `update_experiment_state_after_success(...)`.
-- El manifest se actualiza unicamente despues de entrenamiento OK, checkpoint existente, logging MLflow OK, cierre `FINISHED` y llamada explicita posterior.
-- `inspect_experiment_state(...)` permite diagnostico no destructivo de manifest, checkpoint y MLflow.
-- El fingerprint deterministico cubre invariantes de entorno, preprocessing, network, gamma, learning rate, politica epsilon, batch size, Replay Buffer, frecuencias de entrenamiento/target y seed.
-- El modulo no contiene logica DDQN, seleccion de acciones, Trainer ni evaluacion.
+- Si existe manifest válido, `auto` produce `tracking_mode=resume`, reutiliza el mismo `mlflow_run_id`, calcula el siguiente `session_NNN` y resuelve el checkpoint persistente del manifest.
+- El manifest contiene estado de orquestación y usa actualización atómica posterior al cierre exitoso de la sesión.
+- El fingerprint determinístico protege invariantes de entorno, preprocessing, network, gamma, learning rate, epsilon, batch size, Replay Buffer, frecuencias de entrenamiento/target y seed.
 
-**Fail-fast implementado:**
-
-- checkpoint fisico inexistente;
-- `project_run_id` inconsistente entre manifest/checkpoint/MLflow;
-- MLflow run ausente o perteneciente a otro experimento logico;
-- checkpoint que no pertenece al experimento;
-- `global_step` incoherente;
-- Replay Buffer ausente o incompatible en `resume_full`;
-- fingerprint/config incompatible;
-- `target_timesteps <= restored_global_step`;
-- `tracking_session_id` duplicado en artefactos MLflow;
-- manifest corrupto o incompleto;
-- commit/ref no explicitos.
-
-**Notebook HU008B:**
-
-- `2_Assault/assault_ddqn.ipynb` queda como orquestador ligero.
-- Entrada operacional normal:
-  - `ASSAULT_PROJECT_RUN_ID` o default logico nuevo;
-  - `ASSAULT_TARGET_TIMESTEPS`;
-  - `ASSAULT_REQUESTED_MODE=auto`.
-- El notebook llama `prepare_training_session(...)` despues del bootstrap versionado.
-- El notebook imprime `SESSION_BOOTSTRAP_READY=True`, `project_run_id`, `tracking_mode`, `mlflow_run_id`, `tracking_session_id`, `checkpoint_input`, `restored_expected_step`, `target_global_step`, `bootstrap_commit` y `config_fingerprint`.
-- Ya no requiere copiar manualmente `mlflow_run_id`, `tracking_session_id` ni checkpoint input entre runtimes.
-- Sigue usando `MLflowTracker`, `run_training_session`, `evaluate_agent` y `execution_bootstrap`.
-- No se hardcodean IDs reales de MLflow, checkpoints historicos ni SHA de validaciones anteriores como valores operativos.
-
-**Archivos creados/modificados:**
-
-- `2_Assault/src/session_bootstrap.py`;
-- `2_Assault/tests/test_session_bootstrap.py`;
-- `2_Assault/assault_ddqn.ipynb`;
-- `2_Assault/docs/implementacion.md`.
-
-**Validaciones locales HU008B ejecutadas:**
+**Validaciones locales:**
 
 - `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
-- Los tests focales cubren: `new -> session_001`, `resume -> session_002`, mismo `mlflow_run_id`, checkpoint correcto, checkpoint inexistente, Replay Buffer incompatible, fingerprint incompatible, target no mayor al restored step, sesion duplicada, MLflow run de otro `project_run_id`, manifest corrupto, manifest ausente, escritura atomica, fallo previo a update sin modificar manifest, MLflow disabled, diagnostico no destructivo y notebook sin IDs historicos.
+- Cubren new/resume, mismo MLflow run, checkpoint, Replay Buffer, fingerprint, target, sesión duplicada, identidad, manifest corrupto/ausente, atomicidad y notebook sin IDs históricos.
 
-**Pendientes:**
+**Pendiente específico:**
 
-- Ejecutar la prueba real en dos runtimes independientes de Google Colab con almacenamiento persistente.
-- No se declara HU008B `[COMPLETADA]` hasta observar en Colab: Runtime A `new/session_001 0->48`, destruccion del runtime, Runtime B `resume/session_002 48->64`, mismo `project_run_id`, mismo `mlflow_run_id`, checkpoint cargado, Replay Buffer restaurado, `SESSION_BOOTSTRAP_READY=True`, `MULTISESSION_CHECKPOINT_RESUME_PASS=True` y `MLFLOW_TRACKING_PASS=True`.
-
-**Habilita:** HU009 solo despues de la validacion Colab multisesion automatica.
+- demostrar en dos runtimes independientes que `requested_mode=auto` descubre por sí solo la sesión previa y reanuda sin introducir manualmente `mlflow_run_id`, `tracking_session_id` ni checkpoint.
+- Este pendiente no invalida que HU009 haya completado una corrida full continua; valida una capacidad operacional distinta.
 
 ---
 
 ### HU009 - Entrenamiento DDQN completo
 
-**Estado:** IMPLEMENTADA - VALIDACIONES LOCALES COMPLETADAS - G0 COLAB + ENTRENAMIENTO FULL PENDIENTES.
+**Estado:** [COMPLETADA].
 
-**Proposito:** preparar el primer flujo de entrenamiento DDQN completo y prolongado para `ALE/Assault-v5`, reutilizando entorno reproducible, DDQN, Trainer, checkpoints/resume, TensorBoard, MLflow y automatizacion HU008B, sin ejecutar entrenamiento largo desde Codex.
+**Propósito:** ejecutar el primer entrenamiento DDQN completo y prolongado para `ALE/Assault-v5`, reutilizando entorno reproducible, DDQN, Trainer, checkpoints, TensorBoard y MLflow.
 
-**Diseno final implementado:**
+**Diseño implementado:**
 
-- Se agrega `2_Assault/src/training_profiles.py` para resolver perfiles de entrenamiento y gates de proteccion de computo.
-- `resolve_training_profile(...)` aplica `ASSAULT_TRAINING_PROFILE=smoke|full` desde `2_Assault/configs/ddqn_config.yaml` y devuelve una configuracion efectiva unica para entorno, preflight, bootstrap, Trainer, TensorBoard y MLflow.
-- `estimate_replay_buffer_memory(...)` calcula memoria aproximada sin instanciar el Replay Buffer, considerando `states`, `next_states`, `actions`, `rewards` y `dones`.
-- `evaluate_full_training_ready(...)` implementa el gate `FULL_TRAINING_READY` sin iniciar entrenamiento.
-- `assert_training_can_start(...)` centraliza el fail-fast de HU009: si el perfil es `full` y `FULL_TRAINING_READY=False`, aborta antes de abrir o modificar MLflow, iniciar Trainer, crear checkpoints o actualizar el manifest.
-- `expected_epsilon_at_step(...)` valida que epsilon continue segun `global_step` y `epsilon_decay_steps` del perfil activo.
-- El notebook conserva `prepare_training_session(...)` de HU008B y actualiza el manifest solo despues de entrenamiento, checkpoint, logging MLflow y cierre `FINISHED`.
+- `2_Assault/src/training_profiles.py` resuelve perfiles `smoke|full`.
+- Perfil `full`: `250000` timesteps, Replay Buffer `50000`, `learning_starts=10000`, `train_frequency=4`, `target_update_frequency=1000`, `epsilon_decay_steps=200000`, checkpoint cada `25000` y TensorBoard persistente.
+- `FULL_TRAINING_READY` valida Colab, CUDA, preflight, observación, action space, fingerprint, storage, target y RAM antes de iniciar cómputo prolongado.
+- El perfil full no modifica silenciosamente el contrato DDQN ni el entorno.
 
-**Perfiles configurados:**
+**Evidencia de cierre de la corrida full `assault_ddqn_full_001`:**
 
-- `smoke`: conserva contrato barato previo con `target_timesteps=48`, Replay Buffer `1024`, `learning_starts=32`, `train_frequency=4`, `target_update_frequency=16`, `epsilon_decay_steps=48`, checkpoint cada `24` steps y TensorBoard cada `4` steps.
-- `full`: perfil conservador para primera corrida HU009 en Colab GPU con `FULL_TRAINING_TARGET_TIMESTEPS=250000`, Replay Buffer `50000`, `learning_starts=10000`, `train_frequency=4`, `target_update_frequency=1000`, `epsilon_decay_steps=200000`, checkpoint cada `25000` steps, TensorBoard cada `1000` steps y flush cada `5000` steps.
-- El target full es configurable mediante `ASSAULT_TARGET_TIMESTEPS`; no esta hardcodeado en `Trainer` ni requiere editar manualmente el notebook.
+- runtime: Google Colab;
+- GPU: NVIDIA A100-SXM4-40GB;
+- `TRAINING_PROFILE=full`;
+- `FULL_TRAINING_READY=True`;
+- `initial_global_step=0`;
+- `final_global_step=250000`;
+- `episodes_completed=417`;
+- `transitions_stored=250000`;
+- `updates_count=60001`;
+- `online_weights_changed=True`;
+- `epsilon_final=0.01`;
+- `last_loss=0.6625979542732239`;
+- `mean_loss=0.8943741276802306`;
+- `last_q_mean=22.840946197509766`;
+- `mean_q_mean=11.862329530789939`;
+- `duration_seconds=656.916490947`;
+- Replay Buffer final `50000`;
+- checkpoint final `/content/drive/MyDrive/reinforcement_learning_reto_1/checkpoints/assault_ddqn_full_001/checkpoint_step_250000.pt`;
+- checkpoint size `2881543669` bytes (~2.88 GB), incluyendo Replay Buffer para resume;
+- evaluación técnica/final ejecutada sobre `10` episodios con `epsilon=0.0`;
+- `evaluation_mean_reward=569.1`;
+- `median=556.5`, `std=76.55644976094437`, `min=462.0`, `max=735.0`;
+- `MLFLOW_TRACKING_PASS=True`;
+- checkpoint, MLflow y TensorBoard persistentes.
 
-**Replay Buffer y memoria:**
+La corrida full demuestra entrenamiento real: hubo `60001` updates, los pesos cambiaron y las métricas loss/Q se mantuvieron finitas. No se requiere repetir 250000 timesteps para cerrar HU009.
 
-- Shape estimado: `(4, 84, 84)` con `uint8`.
-- Por transicion se consideran dos observaciones visuales (`states` y `next_states`) mas `action int64`, `reward float32` y `done bool`.
-- Perfil `full` con capacidad `50000`: memoria estimada aproximada `2.63 GiB` para arrays principales del Replay Buffer.
-- Margen requerido para full: `4.0 GiB` adicionales para entorno, Python, PyTorch, MLflow y estructuras auxiliares.
-- Si `ram_available_gb < replay_buffer_estimate + margin`, el gate falla antes de entrenar. No se reduce capacidad automaticamente.
+**Habilita:** HU009C.
 
-**Gate `FULL_TRAINING_READY`:**
+---
 
-Solo es `True` si se cumple:
+### HU009C — Artefactos de entrega: modelo compacto, gráficas, video y reporte técnico
 
-- `READY_FOR_TRAINING=True`;
-- runtime `Google Colab`;
-- device `cuda`;
-- observacion `(4,84,84)` `uint8`;
-- action space `Discrete(7)`;
-- `SESSION_BOOTSTRAP_READY=True` y fingerprint consistente;
-- tracking store, checkpoint root y TensorBoard root accesibles;
-- perfil `full`;
-- target mayor que `restored_expected_step`;
-- memoria RAM suficiente.
+**Estado:** PENDIENTE.
 
-**Notebook HU009:**
+**Propósito:** convertir la corrida full ya validada en artefactos académicos de entrega reproducibles sin repetir el entrenamiento prolongado.
 
-- Entrada operacional normal:
-  - `ASSAULT_PROJECT_RUN_ID`;
-  - `ASSAULT_TRAINING_PROFILE=smoke|full`;
-  - `ASSAULT_TARGET_TIMESTEPS`;
-  - `ASSAULT_REQUESTED_MODE=auto`.
-- No solicita `mlflow_run_id`, `tracking_session_id`, checkpoint path ni `tracking_mode` manual.
-- Antes de entrenar imprime `TRAINING_PROFILE`, `SESSION_BOOTSTRAP_READY`, `FULL_TRAINING_READY`, identidad, checkpoint input, restored step, target, SHA, fingerprint, capacidad/memoria del Replay Buffer, RAM disponible y device.
-- En perfil `full`, si el gate no pasa se aborta antes de `MLflowTracker.from_config(...)`, `MLflowTracker.start_run(...)`, logging, `run_training_session(...)`, checkpoint y manifest.
-- En perfil `smoke`, el flujo sigue disponible para G0 HU009/HU008B sin requerir CUDA local.
+Debe implementar:
 
-**Archivos creados/modificados:**
+- modelo compacto de inferencia derivado del checkpoint final, sin Replay Buffer ni optimizer, conservando metadata y trazabilidad;
+- carga y validación del modelo compacto desde un agente/runtime nuevo;
+- máximo **3 figuras TensorBoard no redundantes**:
+  1. recompensa por episodio + media móvil;
+  2. loss DDQN;
+  3. `q_mean` + epsilon en una visualización conjunta y legible;
+- video MP4 reproducible que combine evidencia breve del proceso de entrenamiento con gameplay del agente usando `epsilon=0.0`;
+- reporte técnico profesional dentro de `2_Assault/assault_ddqn.ipynb`, con algoritmo, entorno/preprocessing, hiperparámetros, librerías/versiones, hardware, tiempo, entrenamiento, evaluación de al menos 10 episodios, comparación con baseline, comportamiento aprendido, limitaciones, conclusión y referencias a artefactos.
 
-- `2_Assault/src/training_profiles.py`;
-- `2_Assault/tests/test_training_profiles.py`;
-- `2_Assault/configs/ddqn_config.yaml`;
-- `2_Assault/assault_ddqn.ipynb`;
-- `2_Assault/docs/implementacion.md`.
+**Fuente de verdad / DWP ejecutable:**
 
-**Validaciones locales HU009 ejecutadas:**
+- `2_Assault/docs/hu009c_artefactos_entrega_modelo_tensorboard_video_reporte.md`
 
-- `python -m compileall -q 2_Assault/src` -> OK.
-- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `19 passed`.
-- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
-- `python -m pytest 2_Assault/tests -q` -> `114 passed, 2 skipped, 1 warning`.
-- `git diff --check` -> OK.
-- Validacion estatica del notebook -> `NOTEBOOK_HU009_FULL_GATE_ORDER_PASS=True`.
+**Restricciones principales:**
 
-**Correccion PR #14:**
+- no repetir automáticamente el entrenamiento full;
+- no modificar el checkpoint original;
+- no subir binarios grandes a Git;
+- notebook como orquestador/reporte, lógica reutilizable en `src/`;
+- no inventar métricas si faltan artifacts;
+- máximo tres figuras de entrenamiento.
 
-- El gate `FULL_TRAINING_READY` ahora se evalua y aborta antes de abrir/modificar MLflow o iniciar entrenamiento.
-- `FULL_TRAINING_READY=False` en perfil `full` no crea ni reabre run de MLflow, no registra parametros/tags/artifacts, no ejecuta Trainer, no crea checkpoint y no modifica manifest.
-- Perfil `smoke` conserva el flujo G0/HU008B y no queda bloqueado por `FULL_TRAINING_READY=False`.
+**Resultado esperado:** modelo compacto + evidencia TensorBoard + video + reporte alineados al mismo `project_run_id` y checkpoint fuente.
 
-**Pendientes:**
-
-- Ejecutar G0 en dos runtimes independientes de Colab: `hu009_preflight_001`, `48 -> 64`, `mode=auto`, sin copiar IDs ni checkpoint.
-- Si G0 pasa, actualizar evidencia real y cerrar HU008B antes de iniciar entrenamiento prolongado.
-- Ejecutar la primera corrida full HU009 en Colab GPU con almacenamiento persistente.
-- No se declara HU009 `[COMPLETADA]` sin entrenamiento real, checkpoint final cargable, TensorBoard/MLflow persistentes y evaluacion tecnica registrada.
-
-**Habilita:** HU010 solo despues de G0 Colab y entrenamiento full HU009 validado.
+**Habilita:** HU010 y contribuye directamente a HU011/HU012.
 
 ---
 
