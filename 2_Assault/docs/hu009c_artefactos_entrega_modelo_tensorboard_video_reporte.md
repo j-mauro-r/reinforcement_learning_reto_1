@@ -7,7 +7,7 @@
 - **Estado:** PENDIENTE
 - **Dependencia previa:** HU009 — Entrenamiento DDQN completo `[COMPLETADA]`.
 - **Dependencia relacionada no bloqueante:** HU008B — automatización de reanudación multisesión. HU009C no requiere interrumpir ni repetir el entrenamiento full para generar los artefactos de entrega.
-- **Habilita:** HU011 — Evaluación formal contra baseline y HU012 — Evidencias y entrega final.
+- **Habilita:** HU010 — Optimización controlada de hiperparámetros; además contribuye directamente a HU011 — Evaluación formal contra baseline y HU012 — Evidencias y entrega final.
 - **Entorno objetivo:** Google Colab, con posibilidad de validar artefactos de inferencia en CPU cuando sea suficiente.
 - **Fuente de verdad de código:** GitHub `main`/SHA explícito.
 - **Fuente de verdad de resultados:** corrida full `assault_ddqn_full_001`, checkpoint final, TensorBoard, MLflow y notebook ejecutado.
