@@ -107,14 +107,14 @@ def test_hu011_notebook_keeps_domain_logic_in_src_modules():
 def test_hu011_report_presents_values_tables_analysis_and_evidence_based_conclusion():
     text = _text()
     required_report_evidence = [
-        "Configuración experimental",
-        "Librerías, hardware y trazabilidad",
+        "Configuracion experimental",
+        "Librerias, hardware y trazabilidad",
         "Resultado del entrenamiento",
-        "Evaluación final por episodio",
-        "Estadísticas de explotación",
-        "Comparación cuantitativa contra baseline",
-        "Análisis de las curvas",
-        "Conclusión basada en evidencia",
+        "Evaluacion final por episodio",
+        "Estadisticas de explotacion",
+        "Comparacion cuantitativa contra baseline",
+        "Analisis de las curvas",
+        "Conclusion basada en evidencia",
         "Mejora absoluta",
         "Mejora relativa",
         "Tiempo entrenamiento (min)",

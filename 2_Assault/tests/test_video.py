@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -14,7 +15,7 @@ if str(ASSAULT_DIR) not in sys.path:
 
 from src.agent import DDQNAgent
 from src.utils import load_yaml_config
-from src.video import generate_assault_demo_video
+from src.video import generate_assault_demo_video, generate_training_process_demo_video
 
 
 CONFIG_PATH = ASSAULT_DIR / "configs" / "ddqn_config.yaml"
@@ -90,5 +91,42 @@ def test_generate_short_video_with_metadata_closes_env_and_does_not_mutate_agent
     assert summary.seed == 2026
     assert summary.project_run_id == "assault_ddqn_full_001"
     assert summary.model_sha256 == "a" * 64
+    assert env.closed is True
+    assert all(torch.equal(left, right) for left, right in zip(before, agent.online_network.parameters()))
+
+
+def test_generate_training_process_video_records_exploration_metadata_and_preserves_agent(tmp_path):
+    agent = _agent()
+    before = _parameters(agent)
+    env = SyntheticRgbEnv()
+    output = tmp_path / "training_process_demo.mp4"
+
+    summary = generate_training_process_demo_video(
+        agent=agent,
+        env_factory=lambda: env,
+        output_path=output,
+        metadata={
+            "project_run_id": "assault_ddqn_full_001",
+            "source_checkpoint_step": 250000,
+            "model_sha256": "b" * 64,
+            "intermediate_checkpoint_path": None,
+            "evidence_note": "Exploratory behavior demonstration; not an intermediate checkpoint replay.",
+        },
+        seed=30042,
+        epsilon=0.9,
+        max_steps=3,
+        fps=10,
+        intro_frames=1,
+    )
+    metadata = json.loads(summary.metadata_path.read_text(encoding="utf-8"))
+
+    assert output.exists()
+    assert output.stat().st_size > 0
+    assert summary.metadata_path.exists()
+    assert summary.seed == 30042
+    assert summary.epsilon == 0.9
+    assert metadata["video_kind"] == "training_process_exploration"
+    assert metadata["represents_intermediate_checkpoint"] is False
+    assert metadata["exploration_epsilon"] == 0.9
     assert env.closed is True
     assert all(torch.equal(left, right) for left, right in zip(before, agent.online_network.parameters()))

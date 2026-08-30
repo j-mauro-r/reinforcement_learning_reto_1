@@ -62,10 +62,21 @@ def test_notebook_preserves_compact_model_training_figures_and_inline_video():
     assert text.count("export_inference_model(") == 1
     assert text.count("prepare_training_figures(") == 1
     assert text.count("generate_assault_demo_video(") == 1
+    assert text.count("generate_training_process_demo_video(") == 1
     assert "training_figure_count" in text
+    assert "Evidencia visual del proceso de entrenamiento" in text
+    assert "Comportamiento del agente entrenado" in text
+    assert "training_process_demo.mp4" in text
+    assert "TRAINING_PROCESS_VIDEO_READY=True" in text
+    assert "TRAINING_PROCESS_EPSILON" in text
+    assert "intermediate_checkpoint_path" in text
+    assert "not an intermediate checkpoint replay" in text
     assert 'print("VIDEO_READY=True")' in text
     assert "display(Video(str(VIDEO_PATH), embed=True))" in text
+    assert "display(Video(str(TRAINING_PROCESS_VIDEO_PATH), embed=True))" in text
     assert "VIDEO_INLINE_WARNING" in text
+    assert "run_training_session(" in text
+    assert text.index("generate_training_process_demo_video(") > text.index("if not RUN_TRAINING:")
 
 
 def test_notebook_plans_exactly_three_training_figures_not_exploitation_as_training():

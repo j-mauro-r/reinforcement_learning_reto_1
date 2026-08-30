@@ -50,6 +50,7 @@ def generate_assault_demo_video(
     max_steps: Optional[int] = None,
     fps: int = 30,
     intro_frames: int = 45,
+    overlay_label: Optional[str] = None,
 ) -> VideoSummary:
     """Generates a reproducible MP4 with training evidence and gameplay.
 
@@ -64,6 +65,7 @@ def generate_assault_demo_video(
         max_steps: Optional cap used for short demos or tests.
         fps: Output frames per second.
         intro_frames: Number of synthetic intro frames with real run metadata.
+        overlay_label: Optional short label prepended to gameplay overlays.
 
     Returns:
         Video summary with reward, steps and metadata path.
@@ -97,7 +99,8 @@ def generate_assault_demo_video(
         frame_size = (int(first_frame.shape[1]), int(first_frame.shape[0]))
         for frame in _intro_frames(metadata, count=int(intro_frames), size=frame_size):
             writer.append_data(frame)
-        writer.append_data(_overlay(first_frame, f"seed={seed} epsilon={epsilon:.2f} reward=0.0 step=0"))
+        overlay_prefix = f"{overlay_label} - " if overlay_label else ""
+        writer.append_data(_overlay(first_frame, f"{overlay_prefix}seed={seed} epsilon={epsilon:.2f} reward=0.0 step=0"))
         terminated = False
         truncated = False
         while not (terminated or truncated):
@@ -106,7 +109,7 @@ def generate_assault_demo_video(
             reward_total += float(reward)
             steps += 1
             frame = _render_frame(env)
-            writer.append_data(_overlay(frame, f"reward={reward_total:.1f} step={steps} epsilon={epsilon:.2f}"))
+            writer.append_data(_overlay(frame, f"{overlay_prefix}reward={reward_total:.1f} step={steps} epsilon={epsilon:.2f}"))
             if max_steps is not None and steps >= int(max_steps):
                 truncated = True
     finally:
@@ -134,6 +137,42 @@ def generate_assault_demo_video(
     if not output.exists() or output.stat().st_size <= 0:
         raise ValueError(f"Video file was not produced: {output}")
     return summary
+
+
+def generate_training_process_demo_video(
+    agent: Any,
+    env_factory: Callable[[], Any],
+    output_path: str | Path,
+    metadata: Mapping[str, Any],
+    seed: int,
+    epsilon: float,
+    max_steps: Optional[int] = None,
+    fps: int = 30,
+    intro_frames: int = 30,
+) -> VideoSummary:
+    """Generates a short exploratory-policy MP4 using the shared video path."""
+    enriched_metadata = dict(metadata)
+    enriched_metadata.update(
+        {
+            "video_kind": "training_process_exploration",
+            "represents_intermediate_checkpoint": bool(metadata.get("intermediate_checkpoint_path")),
+            "exploration_epsilon": float(epsilon),
+        }
+    )
+    checkpoint_step = enriched_metadata.get("source_checkpoint_step")
+    label = f"Entrenamiento/exploracion timestep {checkpoint_step}" if checkpoint_step else "Entrenamiento/exploracion"
+    return generate_assault_demo_video(
+        agent=agent,
+        env_factory=env_factory,
+        output_path=output_path,
+        metadata=enriched_metadata,
+        seed=seed,
+        epsilon=epsilon,
+        max_steps=max_steps,
+        fps=fps,
+        intro_frames=intro_frames,
+        overlay_label=label,
+    )
 
 
 def _open_writer(path: Path, fps: int) -> Any:
