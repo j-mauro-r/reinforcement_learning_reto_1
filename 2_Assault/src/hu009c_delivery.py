@@ -63,9 +63,9 @@ def resolve_hu009c_execution_mode(
 
     In ``auto`` mode a completed final checkpoint goes directly to delivery.
     Otherwise the existing session bootstrap decides between NEW and RESUME.
-    Before that bootstrap runs, this helper repairs the specific interruption
-    case where a periodic checkpoint reached persistent storage but the final
-    experiment manifest was never written because the Colab runtime stopped.
+    Before that bootstrap runs, this helper repairs the interruption case where
+    a periodic checkpoint reached persistent storage but the successful-session
+    manifest was not yet written.
     """
     if not str(project_run_id).strip():
         raise ValueError("project_run_id must be explicit and non-empty.")
@@ -107,9 +107,9 @@ def resolve_hu009c_execution_mode(
             session_context=None,
         )
 
-    recovery_manifest_created = False
+    recovery_rollback: Optional[str] = None
     if selected_mode in {"auto", "train"}:
-        recovery_manifest_created = _recover_interrupted_periodic_checkpoint(
+        recovery_rollback = _recover_interrupted_periodic_checkpoint(
             project_run_id=str(project_run_id),
             target_timesteps=int(target_timesteps),
             prepare_training_session_kwargs=prepare_training_session_kwargs,
@@ -118,8 +118,11 @@ def resolve_hu009c_execution_mode(
     try:
         session_context = prepare_training_session_fn(**dict(prepare_training_session_kwargs))
     except Exception:
-        if recovery_manifest_created:
-            _recovery_manifest_path(prepare_training_session_kwargs, str(project_run_id)).unlink(missing_ok=True)
+        if recovery_rollback is not None:
+            _rollback_recovery_manifest(
+                _recovery_manifest_path(prepare_training_session_kwargs, str(project_run_id)),
+                recovery_rollback,
+            )
         raise
 
     resolution = "NEW" if getattr(session_context, "tracking_mode", None) == "new" else "RESUME"
@@ -142,33 +145,39 @@ def _recover_interrupted_periodic_checkpoint(
     project_run_id: str,
     target_timesteps: int,
     prepare_training_session_kwargs: Mapping[str, Any],
-) -> bool:
-    """Creates a recovery manifest for an orphan periodic checkpoint.
+) -> Optional[str]:
+    """Creates or refreshes a recovery manifest for periodic checkpoints.
 
-    Periodic checkpoints are written inside ``Trainer`` while the canonical
-    experiment manifest is normally committed only after a successful session.
-    If Colab stops between those operations, the next AUTO run would otherwise
-    be misclassified as NEW and fail because checkpoints already exist.
-
-    The synthetic manifest is only a bridge into the existing authoritative
-    ``prepare_training_session`` validation. If that validation fails, the
-    synthetic manifest is removed by the caller.
+    Returns:
+        ``None`` when no recovery mutation was necessary, an empty string when
+        a new synthetic manifest was created, or the previous manifest text
+        when an existing synthetic recovery manifest was refreshed. The caller
+        uses this value to roll back safely if authoritative bootstrap
+        validation rejects the selected checkpoint.
     """
     kwargs = dict(prepare_training_session_kwargs)
     base_path = Path(kwargs.get("base_path") or Path.cwd())
     manifest_path = _recovery_manifest_path(kwargs, project_run_id)
+    previous_manifest_text: Optional[str] = None
+    previous_step = -1
+
     if manifest_path.exists():
-        return False
+        previous_manifest_text = manifest_path.read_text(encoding="utf-8")
+        manifest = json.loads(previous_manifest_text)
+        if not bool(manifest.get("recovered_from_periodic_checkpoint")):
+            return None
+        previous_step = int(manifest.get("latest_global_step", -1))
 
     config = kwargs.get("config")
     checkpoint_root = _resolve_checkpoint_root(base_path, config, kwargs.get("checkpoint_root"))
     latest = _latest_periodic_checkpoint(checkpoint_root / project_run_id)
     if latest is None:
-        return False
+        return None
+    checkpoint_path, checkpoint_step = latest
+    if checkpoint_step <= previous_step:
+        return None
     if not isinstance(config, Mapping):
         raise ValueError("Interrupted checkpoint recovery requires the resolved training config.")
-
-    checkpoint_path, checkpoint_step = latest
     if checkpoint_step <= 0:
         raise ValueError(f"Interrupted checkpoint step must be positive: {checkpoint_path}")
     if checkpoint_step >= int(target_timesteps):
@@ -190,7 +199,10 @@ def _recover_interrupted_periodic_checkpoint(
         )
     else:
         mlflow_run_id = None
-        latest_session_id = "session_001"
+        if previous_manifest_text:
+            latest_session_id = str(json.loads(previous_manifest_text).get("latest_tracking_session_id") or "session_001")
+        else:
+            latest_session_id = "session_001"
 
     payload = {
         "schema_version": 1,
@@ -206,7 +218,15 @@ def _recover_interrupted_periodic_checkpoint(
         "recovered_from_periodic_checkpoint": True,
     }
     _atomic_write_manifest(manifest_path, payload)
-    return True
+    return previous_manifest_text if previous_manifest_text is not None else ""
+
+
+def _rollback_recovery_manifest(path: Path, previous_manifest_text: str) -> None:
+    if previous_manifest_text == "":
+        path.unlink(missing_ok=True)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(previous_manifest_text, encoding="utf-8")
 
 
 def _recovery_manifest_path(prepare_training_session_kwargs: Mapping[str, Any], project_run_id: str) -> Path:
