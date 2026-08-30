@@ -1144,3 +1144,31 @@ Si una autovalidación obligatoria depende de Google Colab y todavía no fue eje
 - AV10: confirmar consistencia `checkpoint source -> compact model + checksum -> evaluation >=10 episodes -> TensorBoard figures -> video -> notebook report`.
 
 No se ejecutó ni se repitió entrenamiento full de `250000` timesteps durante HU009C local.
+
+### Corrección PR #15 - blocker de bootstrap HU009C
+
+**Fecha local:** 2026-08-30.
+
+**Estado:** [IMPLEMENTADA - VALIDACIÓN COLAB PENDIENTE].
+
+**Causa corregida:**
+
+- `2_Assault/assault_ddqn.ipynb` ejecutaba `prepare_training_session(...)` antes de decidir si `ASSAULT_RUN_TRAINING=0`.
+- Para una corrida full ya terminada, con `target_timesteps` igual al `latest_global_step`, ese bootstrap podía fallar correctamente con `target_timesteps must be greater than the restored global_step`.
+- La validación de `session_bootstrap.py` se mantiene intacta; la corrección vive en la orquestación HU009C.
+
+**Cambio implementado:**
+
+- `2_Assault/src/hu009c_delivery.py` agrega `resolve_hu009c_execution_mode(...)`.
+- En `ASSAULT_RUN_TRAINING=0`, el notebook entra en modo post-training, no llama `prepare_training_session(...)`, no crea nueva sesión MLflow, no modifica manifest y continúa hacia export/modelo/TensorBoard/evaluación/video.
+- En `ASSAULT_RUN_TRAINING=1`, el notebook conserva el camino original: `prepare_training_session(...)`, `FULL_TRAINING_READY`, tracking, entrenamiento, checkpointing y manifest.
+
+**Validaciones locales ejecutadas y observadas para esta corrección:**
+
+- `python -m compileall -q 2_Assault/src` -> PASS sin salida.
+- `python -m pytest 2_Assault/tests/test_notebook_hu009c.py -q` -> `6 passed`.
+- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
+- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `19 passed`.
+- `python -m pytest 2_Assault/tests -q` -> `129 passed, 2 skipped, 1 warning`.
+
+AV06-AV10 reales siguen pendientes de ejecución en Colab/Drive.
