@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
-from .session_bootstrap import compute_config_fingerprint
+from .session_bootstrap import compute_config_fingerprint, _normalize_tracking_uri
 
 
 VALID_EXECUTION_MODES = {"auto", "train", "delivery"}
@@ -269,7 +269,7 @@ def _discover_mlflow_identity(
         raise RuntimeError("Interrupted checkpoint recovery requires MLflow to recover run identity.") from exc
 
     if tracking_uri:
-        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_tracking_uri(_normalize_tracking_uri(tracking_uri))
     experiment = mlflow.get_experiment_by_name(experiment_name)
     if experiment is None:
         raise RuntimeError(
