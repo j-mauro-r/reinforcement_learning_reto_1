@@ -1099,3 +1099,48 @@ HU CERRADA
 ```
 
 Si una autovalidación obligatoria depende de Google Colab y todavía no fue ejecutada, la HU debe mantenerse como **implementada pendiente de validación**, no como completada.
+
+---
+
+## 8. Evidencia de implementación HU009C
+
+**Estado:** [IMPLEMENTADA - VALIDACIÓN COLAB PENDIENTE].
+
+**Fecha local:** 2026-08-30.
+
+**Rama:** `feature/hu009c-delivery-artifacts`.
+
+**Alcance implementado:**
+
+- `2_Assault/src/model_artifact.py` agrega `export_inference_model(...)`, `load_inference_model(...)` y `compute_sha256(...)`.
+- El artefacto compacto guarda solo `online_network`, schema, arquitectura `QNetwork`, contrato de entorno/preprocessing y metadata de lineage.
+- El artefacto compacto excluye Replay Buffer, optimizer, Target Network e históricos de entrenamiento.
+- La exportación calcula SHA-256 del checkpoint fuente y del modelo compacto, escribe sidecars `.sha256` y `.metadata.json`, y aplica guardrail `<100 MiB`.
+- `2_Assault/src/reporting.py` prepara exactamente tres figuras de entrenamiento desde TensorBoard real: recompensa + media móvil, loss DDQN, y `q_mean` + `epsilon`.
+- `2_Assault/src/video.py` genera MP4 con intro de evidencia de entrenamiento y gameplay desde un agente cargado para inferencia, usando frames RGB y `epsilon` explícito.
+- `2_Assault/assault_ddqn.ipynb` queda como reporte/orquestador HU009C; el entrenamiento HU009 queda protegido por `ASSAULT_RUN_TRAINING=1` y no corre por defecto.
+- `2_Assault/requirements.txt` declara `imageio[ffmpeg]>=2.34` para MP4 portable en Colab.
+
+**Tests agregados:**
+
+- `2_Assault/tests/test_model_artifact.py`
+- `2_Assault/tests/test_reporting.py`
+- `2_Assault/tests/test_video.py`
+- `2_Assault/tests/test_notebook_hu009c.py`
+
+**Validaciones locales ejecutadas y observadas:**
+
+- `python -m compileall -q 2_Assault/src` -> PASS sin salida.
+- `python -m pytest 2_Assault/tests/test_model_artifact.py -q` -> `4 passed`.
+- `python -m pytest 2_Assault/tests/test_reporting.py 2_Assault/tests/test_video.py -q` -> `5 passed`.
+- `python -m pytest 2_Assault/tests/test_notebook_hu009c.py -q` -> `3 passed`.
+
+**Validaciones pendientes por artefactos reales Colab/Drive:**
+
+- AV06: exportar modelo compacto real desde `/content/drive/MyDrive/reinforcement_learning_reto_1/checkpoints/assault_ddqn_full_001/checkpoint_step_250000.pt`, imprimir tamaño y SHA-256, validar `<100 MiB` y smoke.
+- AV07: evaluar al menos 10 episodios desde el modelo compacto cargado desde disco con `epsilon=0.0`.
+- AV08: generar las tres figuras desde event files TensorBoard reales de `assault_ddqn_full_001`.
+- AV09: generar y reproducir MP4 real desde `render_mode="rgb_array"`.
+- AV10: confirmar consistencia `checkpoint source -> compact model + checksum -> evaluation >=10 episodes -> TensorBoard figures -> video -> notebook report`.
+
+No se ejecutó ni se repitió entrenamiento full de `250000` timesteps durante HU009C local.
