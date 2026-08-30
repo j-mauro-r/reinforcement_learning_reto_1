@@ -106,6 +106,18 @@ def _kwargs(tmp_path: Path, config: dict, project_run_id: str, target: int = 12)
     }
 
 
+def _resolve(tmp_path: Path, config: dict, project_run_id: str, target: int = 12):
+    return resolve_hu009c_execution_mode(
+        run_training=None,
+        execution_mode="auto",
+        project_run_id=project_run_id,
+        target_timesteps=target,
+        final_checkpoint_path=tmp_path / "checkpoints" / project_run_id / f"checkpoint_step_{target:06d}.pt",
+        prepare_training_session_fn=prepare_training_session,
+        prepare_training_session_kwargs=_kwargs(tmp_path, config, project_run_id, target=target),
+    )
+
+
 def test_auto_recovers_latest_orphan_periodic_checkpoint_without_manifest(tmp_path):
     config = _config(tmp_path, mlflow_enabled=False)
     project_run_id = "hu009c_periodic_recovery"
@@ -113,15 +125,7 @@ def test_auto_recovers_latest_orphan_periodic_checkpoint_without_manifest(tmp_pa
     latest = _checkpoint(tmp_path, config, project_run_id, step=8)
     manifest = tmp_path / "experiments" / project_run_id / "experiment_state.json"
 
-    mode = resolve_hu009c_execution_mode(
-        run_training=None,
-        execution_mode="auto",
-        project_run_id=project_run_id,
-        target_timesteps=12,
-        final_checkpoint_path=tmp_path / "checkpoints" / project_run_id / "checkpoint_step_000012.pt",
-        prepare_training_session_fn=prepare_training_session,
-        prepare_training_session_kwargs=_kwargs(tmp_path, config, project_run_id),
-    )
+    mode = _resolve(tmp_path, config, project_run_id)
 
     assert mode.auto_resolution == "RESUME"
     assert mode.training_required is True
@@ -153,20 +157,52 @@ def test_auto_recovery_preserves_mlflow_identity_after_interruption(tmp_path):
     tracker.end_run(status="FAILED")
     latest = _checkpoint(tmp_path, config, project_run_id, step=8)
 
-    mode = resolve_hu009c_execution_mode(
-        run_training=None,
-        execution_mode="auto",
-        project_run_id=project_run_id,
-        target_timesteps=12,
-        final_checkpoint_path=tmp_path / "checkpoints" / project_run_id / "checkpoint_step_000012.pt",
-        prepare_training_session_fn=prepare_training_session,
-        prepare_training_session_kwargs=_kwargs(tmp_path, config, project_run_id),
-    )
+    mode = _resolve(tmp_path, config, project_run_id)
 
     assert mode.auto_resolution == "RESUME"
     assert mode.session_context.checkpoint_input == latest
     assert mode.session_context.mlflow_run_id == metadata.mlflow_run_id
     assert mode.session_context.tracking_session_id == "session_002"
+
+
+def test_repeated_interruption_refreshes_recovery_manifest_to_newest_checkpoint(tmp_path):
+    config = _config(tmp_path, mlflow_enabled=True)
+    project_run_id = "hu009c_repeated_periodic_recovery"
+    tracker = MLflowTracker.from_config(config)
+    metadata = tracker.start_run(
+        project_run_id=project_run_id,
+        tracking_mode="new",
+        tracking_session_id="session_001",
+    )
+    tracker.log_run_context(config=config, git_commit="test-sha", git_ref="ref", project_run_id=project_run_id)
+    tracker.end_run(status="FAILED")
+    first_checkpoint = _checkpoint(tmp_path, config, project_run_id, step=4)
+
+    first_mode = _resolve(tmp_path, config, project_run_id)
+    assert first_mode.session_context.checkpoint_input == first_checkpoint
+    assert first_mode.session_context.tracking_session_id == "session_002"
+
+    resumed_tracker = MLflowTracker.from_config(config)
+    resumed_tracker.start_run(
+        project_run_id=project_run_id,
+        tracking_mode="resume",
+        mlflow_run_id=metadata.mlflow_run_id,
+        tracking_session_id="session_002",
+    )
+    resumed_tracker.end_run(status="FAILED")
+    newest_checkpoint = _checkpoint(tmp_path, config, project_run_id, step=8)
+
+    second_mode = _resolve(tmp_path, config, project_run_id)
+
+    assert second_mode.auto_resolution == "RESUME"
+    assert second_mode.session_context.checkpoint_input == newest_checkpoint
+    assert second_mode.session_context.restored_expected_step == 8
+    assert second_mode.session_context.tracking_session_id == "session_003"
+    manifest = json.loads(
+        (tmp_path / "experiments" / project_run_id / "experiment_state.json").read_text(encoding="utf-8")
+    )
+    assert manifest["latest_global_step"] == 8
+    assert manifest["latest_tracking_session_id"] == "session_002"
 
 
 def test_invalid_orphan_checkpoint_fails_and_removes_recovery_manifest(tmp_path):
@@ -179,15 +215,7 @@ def test_invalid_orphan_checkpoint_fails_and_removes_recovery_manifest(tmp_path)
     manifest = tmp_path / "experiments" / project_run_id / "experiment_state.json"
 
     with pytest.raises(ValueError, match="Checkpoint run_id mismatch"):
-        resolve_hu009c_execution_mode(
-            run_training=None,
-            execution_mode="auto",
-            project_run_id=project_run_id,
-            target_timesteps=12,
-            final_checkpoint_path=tmp_path / "checkpoints" / project_run_id / "checkpoint_step_000012.pt",
-            prepare_training_session_fn=prepare_training_session,
-            prepare_training_session_kwargs=_kwargs(tmp_path, config, project_run_id),
-        )
+        _resolve(tmp_path, config, project_run_id)
 
     assert not manifest.exists()
 
@@ -196,15 +224,7 @@ def test_auto_without_manifest_or_periodic_checkpoint_remains_new(tmp_path):
     config = _config(tmp_path, mlflow_enabled=False)
     project_run_id = "hu009c_clean_start"
 
-    mode = resolve_hu009c_execution_mode(
-        run_training=None,
-        execution_mode="auto",
-        project_run_id=project_run_id,
-        target_timesteps=12,
-        final_checkpoint_path=tmp_path / "checkpoints" / project_run_id / "checkpoint_step_000012.pt",
-        prepare_training_session_fn=prepare_training_session,
-        prepare_training_session_kwargs=_kwargs(tmp_path, config, project_run_id),
-    )
+    mode = _resolve(tmp_path, config, project_run_id)
 
     assert mode.auto_resolution == "NEW"
     assert mode.session_context.tracking_mode == "new"
