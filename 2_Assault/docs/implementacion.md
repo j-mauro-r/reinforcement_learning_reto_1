@@ -1188,3 +1188,38 @@ AV06-AV10 reales siguen pendientes de ejecución en Colab/Drive.
 - No se cambia entrenamiento, DDQN, checkpointing, TensorBoard, MLflow, evaluator ni `src/video.py`.
 
 HU009C contin?a como [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE] hasta ejecutar AV06-AV10 reales.
+
+### Correcci?n PR #15 - orquestaci?n AUTO para Colab limpio
+
+**Fecha local:** 2026-08-30.
+
+**Estado:** [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE].
+
+**Causa corregida:**
+
+- El notebook usaba por defecto `ASSAULT_RUN_TRAINING=0`, por lo que un Run All con Drive vac?o saltaba directamente a delivery y no entrenaba, no generaba checkpoint, TensorBoard, modelo compacto ni video.
+- Esto hac?a que la entrega dependiera de artefactos previos en un Drive personal.
+
+**Cambio implementado:**
+
+- `ASSAULT_EXECUTION_MODE=auto` es ahora el default del notebook.
+- `AUTO_RESOLUTION=NEW` cuando no existe checkpoint final ni manifest y se debe iniciar entrenamiento desde `global_step=0`.
+- `AUTO_RESOLUTION=RESUME` cuando no existe checkpoint final pero `prepare_training_session(...)` resuelve una sesi?n parcial v?lida.
+- `AUTO_RESOLUTION=DELIVERY` cuando existe el checkpoint final esperado y no debe llamarse `prepare_training_session(...)`.
+- `ASSAULT_EXECUTION_MODE=delivery` falla claramente si no existe checkpoint final.
+- `ASSAULT_EXECUTION_MODE=train` conserva el flujo de entrenamiento existente.
+- `2_Assault/src/training_session.py` ahora inyecta `CheckpointManager`, `checkpoint_interval_steps` y `checkpoint_save_replay_buffer` al `Trainer` para checkpoints peri?dicos persistentes; si el checkpoint final ya fue guardado peri?dicamente, se reutiliza y no se intenta guardarlo dos veces.
+
+**Validaciones locales ejecutadas y observadas para esta correcci?n:**
+
+- `python -m compileall -q 2_Assault/src` -> PASS sin salida.
+- `python -m pytest 2_Assault/tests/test_notebook_hu009c.py -q` -> `11 passed`.
+- `python -m pytest 2_Assault/tests/test_training_session.py -q` -> `2 passed`.
+- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
+- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `19 passed`.
+- `python -m pytest 2_Assault/tests/test_checkpointing.py -q` -> `15 passed`.
+- `python -m pytest 2_Assault/tests/test_reporting.py 2_Assault/tests/test_video.py -q` -> `5 passed`.
+
+**Validaci?n real pendiente:**
+
+- `VALIDACI?N REAL CLEAN COLAB + EMPTY DRIVE PENDIENTE`: ejecutar Run All en Colab limpio con Drive vac?o y GPU disponible para demostrar `AUTO_RESOLUTION=NEW -> checkpoint final -> HU009C_ARTIFACTS_READY`.

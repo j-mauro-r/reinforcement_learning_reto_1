@@ -598,3 +598,54 @@ TensorBoard full run
 ```
 
 HU009C debe cerrar la brecha entre **"el agente ya fue entrenado"** y **"el agente está listo para ser entregado, evaluado y demostrado"**, sin convertir el notebook en un monolito ni repetir entrenamiento costoso.
+
+---
+
+## 15. Ejecuci?n por defecto desde Colab limpio
+
+El notebook de entrega debe ser ejecutable con **Run All** desde Google Colab aun cuando el almacenamiento persistente est? vac?o.
+
+La orquestaci?n por defecto usa:
+
+```text
+ASSAULT_EXECUTION_MODE=auto
+```
+
+Sem?ntica:
+
+- si existe el checkpoint final esperado, resolver `AUTO_RESOLUTION=DELIVERY` y no volver a entrenar;
+- si no existe checkpoint final pero hay una sesi?n parcial v?lida, resolver `AUTO_RESOLUTION=RESUME` mediante `prepare_training_session(...)`;
+- si no existe manifest ni checkpoint, resolver `AUTO_RESOLUTION=NEW` mediante `prepare_training_session(...)` y entrenar desde `global_step=0`;
+- `ASSAULT_EXECUTION_MODE=train` fuerza el flujo de entrenamiento existente;
+- `ASSAULT_EXECUTION_MODE=delivery` exige checkpoint final existente y falla de forma clara si no est? disponible.
+
+Caso de aceptaci?n principal pendiente de validaci?n real:
+
+```text
+Given:
+- Colab limpio
+- repositorio clonado desde GitHub
+- Drive vac?o
+- GPU disponible
+
+When:
+- el evaluador ejecuta Run All sin modificar variables
+
+Then:
+- instala dependencias
+- monta Drive
+- valida entorno
+- inicia entrenamiento desde step 0
+- entrena DDQN hasta el target full
+- guarda checkpoints peri?dicos
+- persiste TensorBoard y MLflow
+- genera checkpoint final
+- exporta modelo compacto
+- eval?a >=10 episodios con epsilon=0
+- genera tres figuras
+- genera video
+- muestra video inline
+- presenta reporte final
+```
+
+Esta validaci?n real no debe declararse completada sin ejecutar el entrenamiento full en Colab.

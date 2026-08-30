@@ -133,6 +133,9 @@ def run_training_session(
             session_config,
             initial_global_step=initial_global_step,
             initial_metrics=restored_state.training_metrics if restored_state else None,
+            checkpoint_manager=manager,
+            checkpoint_interval_steps=int(checkpoint_config.get("interval_steps", 0) or 0),
+            checkpoint_save_replay_buffer=bool(checkpoint_config.get("save_replay_buffer", True)),
             metrics_logger=logger,
         )
         training_summary = trainer.train()
@@ -140,14 +143,24 @@ def run_training_session(
             raise RuntimeError("Restored global_step does not match the resumed trainer initial_global_step.")
         if selected_mode == "resume" and training_summary.global_step <= initial_global_step:
             raise RuntimeError("Resume session did not continue beyond the restored global_step.")
-        checkpoint_metadata = manager.save(
-            agent,
-            replay_buffer,
-            session_config,
-            training_summary.global_step,
-            training_summary,
-            save_replay_buffer=bool(checkpoint_config.get("save_replay_buffer", True)),
-        )
+        final_checkpoint_path = manager.checkpoint_path(training_summary.global_step)
+        if str(final_checkpoint_path) in set(training_summary.checkpoints_saved):
+            checkpoint_metadata = CheckpointMetadata(
+                path=final_checkpoint_path,
+                run_id=run_id,
+                checkpoint_step=int(training_summary.global_step),
+                size_bytes=final_checkpoint_path.stat().st_size,
+                save_replay_buffer=bool(checkpoint_config.get("save_replay_buffer", True)),
+            )
+        else:
+            checkpoint_metadata = manager.save(
+                agent,
+                replay_buffer,
+                session_config,
+                training_summary.global_step,
+                training_summary,
+                save_replay_buffer=bool(checkpoint_config.get("save_replay_buffer", True)),
+            )
         if logger:
             logger.flush()
     finally:
