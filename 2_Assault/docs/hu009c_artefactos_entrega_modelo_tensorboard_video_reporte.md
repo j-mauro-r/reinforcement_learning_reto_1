@@ -637,7 +637,7 @@ Then:
 - valida entorno
 - inicia entrenamiento desde step 0
 - entrena DDQN hasta el target full
-- guarda checkpoints peri?dicos
+- guarda checkpoints peri?dicos con `checkpointing.keep_last=1` para conservar solo el m?s reciente
 - persiste TensorBoard y MLflow
 - genera checkpoint final
 - exporta modelo compacto
@@ -649,3 +649,5 @@ Then:
 ```
 
 Esta validaci?n real no debe declararse completada sin ejecutar el entrenamiento full en Colab.
+
+La retenci?n de checkpoints evita acumular m?ltiples Replay Buffers completos de varios GiB en Google Drive durante la corrida full. La capacidad de resume se mantiene porque la poda ocurre solo despu?s de confirmar que el nuevo checkpoint existe y queda disponible como checkpoint m?s reciente.

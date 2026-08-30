@@ -136,6 +136,7 @@ def run_training_session(
             checkpoint_manager=manager,
             checkpoint_interval_steps=int(checkpoint_config.get("interval_steps", 0) or 0),
             checkpoint_save_replay_buffer=bool(checkpoint_config.get("save_replay_buffer", True)),
+            checkpoint_keep_last=checkpoint_config.get("keep_last"),
             metrics_logger=logger,
         )
         training_summary = trainer.train()
@@ -160,6 +161,7 @@ def run_training_session(
                 training_summary.global_step,
                 training_summary,
                 save_replay_buffer=bool(checkpoint_config.get("save_replay_buffer", True)),
+                keep_last=checkpoint_config.get("keep_last"),
             )
         if logger:
             logger.flush()

@@ -174,6 +174,7 @@ def test_full_profile_checkpointing_keeps_resume_full_capability():
 
     assert profile.config["checkpointing"]["save_replay_buffer"] is True
     assert profile.config["checkpointing"]["interval_steps"] == 25_000
+    assert profile.config["checkpointing"]["keep_last"] == 1
 
 
 def test_invalid_profile_fails_fast():

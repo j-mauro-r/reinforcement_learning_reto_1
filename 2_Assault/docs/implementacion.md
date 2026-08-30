@@ -1223,3 +1223,25 @@ HU009C contin?a como [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE] hasta ejecutar 
 **Validaci?n real pendiente:**
 
 - `VALIDACI?N REAL CLEAN COLAB + EMPTY DRIVE PENDIENTE`: ejecutar Run All en Colab limpio con Drive vac?o y GPU disponible para demostrar `AUTO_RESOLUTION=NEW -> checkpoint final -> HU009C_ARTIFACTS_READY`.
+
+### Mejora PR #15 - retenci?n de checkpoints full
+
+**Fecha local:** 2026-08-30.
+
+**Estado:** [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE].
+
+**Cambio implementado:**
+
+- `CheckpointManager.save(...)` soporta `keep_last`.
+- `CheckpointManager.prune_old_checkpoints(keep_last=1)` elimina solo checkpoints antiguos con patr?n `checkpoint_step_*.pt` dentro del directorio del `run_id`.
+- La secuencia es segura: primero se guarda el nuevo checkpoint, se confirma que existe y tiene tama?o mayor que cero, y solo despu?s se eliminan checkpoints anteriores.
+- `training_session.py` propaga `checkpointing.keep_last` al `Trainer` y al checkpoint final cuando no fue creado por el intervalo peri?dico.
+- `ddqn_config.yaml` declara `checkpointing.keep_last=1` en configuraci?n base, perfil `smoke` y perfil `full`.
+
+**Justificaci?n:**
+
+- En el perfil full, cada checkpoint con Replay Buffer completo puede ocupar varios GiB.
+- Con checkpoint cada `25000` pasos hasta `250000`, conservar todos los archivos puede acumular m?s de 15 GiB en Drive.
+- La retenci?n `keep_last=1` evita esa acumulaci?n y mantiene capacidad de resume desde el checkpoint m?s reciente.
+
+HU009C contin?a como [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE] hasta ejecutar la corrida real Clean Colab + Empty Drive + Run All.

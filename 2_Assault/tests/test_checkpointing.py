@@ -13,6 +13,7 @@ ASSAULT_DIR = Path(__file__).resolve().parents[1]
 if str(ASSAULT_DIR) not in sys.path:
     sys.path.insert(0, str(ASSAULT_DIR))
 
+from src import checkpointing  # noqa: E402
 from src.agent import DDQNAgent
 from src.checkpointing import CheckpointManager, reconstruct_epsilon
 from src.environment import create_assault_env
@@ -291,6 +292,110 @@ def test_trainer_saves_periodic_checkpoints(tmp_path):
         "checkpoint_step_000008.pt",
     ]
     assert all(Path(path).exists() for path in summary.checkpoints_saved)
+
+
+def test_checkpoint_retention_keep_last_one_after_multiple_saves(tmp_path):
+    config = _config()
+    agent, buffer, summary = _train_agent(config, total_timesteps=4)
+    manager = CheckpointManager(tmp_path, "retention_basic")
+
+    first = manager.save(agent, buffer, config, 25, summary, keep_last=1)
+    second = manager.save(agent, buffer, config, 50, summary, keep_last=1)
+
+    assert not first.path.exists()
+    assert second.path.exists()
+    assert [path.name for path in manager.run_dir.glob("checkpoint_step_*.pt")] == ["checkpoint_step_000050.pt"]
+
+
+def test_checkpoint_retention_does_not_prune_when_new_save_fails(tmp_path, monkeypatch):
+    config = _config()
+    agent, buffer, summary = _train_agent(config, total_timesteps=4)
+    manager = CheckpointManager(tmp_path, "retention_failure")
+    first = manager.save(agent, buffer, config, 25, summary, keep_last=1)
+
+    def fail_save(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(checkpointing.torch, "save", fail_save)
+    with pytest.raises(RuntimeError, match="disk full"):
+        manager.save(agent, buffer, config, 50, summary, keep_last=1)
+
+    assert first.path.exists()
+    assert not manager.checkpoint_path(50).exists()
+    assert [path.name for path in manager.run_dir.glob("checkpoint_step_*.pt")] == ["checkpoint_step_000025.pt"]
+
+
+def test_checkpoint_retention_isolated_by_run_id(tmp_path):
+    run_a = CheckpointManager(tmp_path, "run_A")
+    run_b = CheckpointManager(tmp_path, "run_B")
+    for path in [run_a.checkpoint_path(25), run_a.checkpoint_path(50), run_b.checkpoint_path(25)]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"checkpoint")
+
+    deleted = run_a.prune_old_checkpoints(keep_last=1)
+
+    assert [path.name for path in deleted] == ["checkpoint_step_000025.pt"]
+    assert not run_a.checkpoint_path(25).exists()
+    assert run_a.checkpoint_path(50).exists()
+    assert run_b.checkpoint_path(25).exists()
+
+
+def test_checkpoint_retention_allows_resume_from_newest_after_next_save(tmp_path):
+    config = _config()
+    agent, buffer, summary = _train_agent(config, total_timesteps=4)
+    manager = CheckpointManager(tmp_path, "resume_retention")
+    checkpoint_100 = manager.save(agent, buffer, config, 100, summary, keep_last=1)
+
+    loaded_agent = DDQNAgent(config, device="cpu", seed=999)
+    loaded_buffer = ReplayBuffer(capacity=64, seed=999)
+    manager.load(checkpoint_100.path, loaded_agent, loaded_buffer, config, mode="resume_full")
+    checkpoint_125 = manager.save(loaded_agent, loaded_buffer, config, 125, summary, keep_last=1)
+
+    assert not checkpoint_100.path.exists()
+    assert checkpoint_125.path.exists()
+    next_agent = DDQNAgent(config, device="cpu", seed=123)
+    next_buffer = ReplayBuffer(capacity=64, seed=123)
+    state = manager.load(checkpoint_125.path, next_agent, next_buffer, config, mode="resume_full")
+    assert state.global_step == 125
+    assert state.replay_buffer_restored is True
+
+
+def test_checkpoint_retention_keeps_final_checkpoint_only(tmp_path):
+    config = _config()
+    agent, buffer, summary = _train_agent(config, total_timesteps=4)
+    manager = CheckpointManager(tmp_path, "final_retention")
+
+    checkpoint_225 = manager.save(agent, buffer, config, 225, summary, keep_last=1)
+    checkpoint_250 = manager.save(agent, buffer, config, 250, summary, keep_last=1)
+
+    assert not checkpoint_225.path.exists()
+    assert checkpoint_250.path.exists()
+    assert sorted(path.name for path in manager.run_dir.glob("checkpoint_step_*.pt")) == ["checkpoint_step_000250.pt"]
+
+
+def test_checkpoint_retention_preserves_non_checkpoint_files(tmp_path):
+    manager = CheckpointManager(tmp_path, "non_checkpoint_retention")
+    old_checkpoint = manager.checkpoint_path(25)
+    latest_checkpoint = manager.checkpoint_path(50)
+    for path, content in [
+        (old_checkpoint, b"old"),
+        (latest_checkpoint, b"latest"),
+        (manager.run_dir / "metadata.json", b"{}"),
+        (manager.run_dir / "foo.txt", b"notes"),
+        (manager.run_dir / ".checkpoint_step_000050.pt.tmp", b"tmp"),
+        (manager.run_dir / "checkpoint_step_latest.pt", b"bad-name"),
+    ]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    manager.prune_old_checkpoints(keep_last=1)
+
+    assert not old_checkpoint.exists()
+    assert latest_checkpoint.exists()
+    assert (manager.run_dir / "metadata.json").exists()
+    assert (manager.run_dir / "foo.txt").exists()
+    assert (manager.run_dir / ".checkpoint_step_000050.pt.tmp").exists()
+    assert (manager.run_dir / "checkpoint_step_latest.pt").exists()
 
 
 def test_run_ids_use_separate_paths(tmp_path):

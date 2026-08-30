@@ -49,6 +49,7 @@ checkpointing:
   run_id: assault_ddqn_exp_001
   resume_checkpoint: null
   save_replay_buffer: true
+  keep_last: 1
 
 tensorboard:
   enabled: true
@@ -95,6 +96,7 @@ training_profiles:
     checkpointing:
       interval_steps: 24
       save_replay_buffer: true
+      keep_last: 1
     tensorboard:
       log_frequency_steps: 4
       reward_window_episodes: 10
@@ -119,6 +121,7 @@ training_profiles:
     checkpointing:
       interval_steps: 25000
       save_replay_buffer: true
+      keep_last: 1
     tensorboard:
       log_frequency_steps: 1000
       reward_window_episodes: 10

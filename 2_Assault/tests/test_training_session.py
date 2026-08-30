@@ -50,6 +50,7 @@ class FakeManager:
         training_metrics,
         save_replay_buffer=True,
         overwrite=False,
+        keep_last=None,
     ):
         call = {
             "agent": agent,
@@ -59,6 +60,7 @@ class FakeManager:
             "training_metrics": training_metrics,
             "save_replay_buffer": save_replay_buffer,
             "overwrite": overwrite,
+            "keep_last": keep_last,
         }
         self.save_calls.append(call)
         path = self.checkpoint_path(global_step)
@@ -128,7 +130,7 @@ def _config(interval_steps: int = 4, save_replay_buffer: bool = True) -> dict:
             "target_update_frequency": 4,
             "epsilon_decay_steps": 8,
         },
-        "checkpointing": {"interval_steps": interval_steps, "save_replay_buffer": save_replay_buffer},
+        "checkpointing": {"interval_steps": interval_steps, "save_replay_buffer": save_replay_buffer, "keep_last": 1},
         "tensorboard": {"enabled": False},
     }
 
@@ -159,6 +161,7 @@ def test_run_training_session_injects_periodic_checkpointing_and_reuses_final_ch
     assert FakeTrainer.last_init_kwargs["checkpoint_manager"] is manager
     assert FakeTrainer.last_init_kwargs["checkpoint_interval_steps"] == 4
     assert FakeTrainer.last_init_kwargs["checkpoint_save_replay_buffer"] is True
+    assert FakeTrainer.last_init_kwargs["checkpoint_keep_last"] == 1
     assert summary.checkpoint.path == manager.checkpoint_path(8)
     assert summary.checkpoint.path.exists()
     assert summary.training.checkpoints_saved == [str(manager.checkpoint_path(8))]
@@ -183,4 +186,5 @@ def test_run_training_session_saves_final_when_not_already_saved_by_periodic_che
     assert len(manager.save_calls) == 1
     assert manager.save_calls[0]["global_step"] == 8
     assert manager.save_calls[0]["save_replay_buffer"] is False
+    assert manager.save_calls[0]["keep_last"] == 1
     assert summary.checkpoint.path == manager.checkpoint_path(8)
