@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import json
+import os
+import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
+from .session_bootstrap import compute_config_fingerprint
+
 
 VALID_EXECUTION_MODES = {"auto", "train", "delivery"}
+_CHECKPOINT_PATTERN = re.compile(r"^checkpoint_step_(\d+)\.pt$")
 
 
 @dataclass(frozen=True)
@@ -54,6 +61,12 @@ def resolve_hu009c_execution_mode(
 ) -> DeliveryExecutionMode:
     """Resolves HU009C orchestration as auto/new-resume/delivery.
 
+    In ``auto`` mode a completed final checkpoint goes directly to delivery.
+    Otherwise the existing session bootstrap decides between NEW and RESUME.
+    Before that bootstrap runs, this helper repairs the specific interruption
+    case where a periodic checkpoint reached persistent storage but the final
+    experiment manifest was never written because the Colab runtime stopped.
+
     Args:
         run_training: Deprecated compatibility flag. When provided, true maps
             to ``execution_mode="train"`` and false maps to
@@ -70,7 +83,8 @@ def resolve_hu009c_execution_mode(
         Resolved execution mode and optional training session context.
 
     Raises:
-        ValueError: If identifiers are invalid.
+        ValueError: If identifiers, checkpoints or recovered state are invalid.
+        RuntimeError: If an interrupted MLflow run cannot be identified safely.
     """
     if not str(project_run_id).strip():
         raise ValueError("project_run_id must be explicit and non-empty.")
@@ -112,6 +126,13 @@ def resolve_hu009c_execution_mode(
             session_context=None,
         )
 
+    if selected_mode in {"auto", "train"}:
+        _recover_interrupted_periodic_checkpoint(
+            project_run_id=str(project_run_id),
+            target_timesteps=int(target_timesteps),
+            prepare_training_session_kwargs=prepare_training_session_kwargs,
+        )
+
     session_context = prepare_training_session_fn(**dict(prepare_training_session_kwargs))
     resolution = "NEW" if getattr(session_context, "tracking_mode", None) == "new" else "RESUME"
     return DeliveryExecutionMode(
@@ -127,6 +148,153 @@ def resolve_hu009c_execution_mode(
         final_checkpoint_path=checkpoint_path,
         session_context=session_context,
     )
+
+
+def _recover_interrupted_periodic_checkpoint(
+    project_run_id: str,
+    target_timesteps: int,
+    prepare_training_session_kwargs: Mapping[str, Any],
+) -> bool:
+    """Creates a recovery manifest for an orphan periodic checkpoint.
+
+    Periodic checkpoints are written inside ``Trainer`` while the canonical
+    experiment manifest is normally committed only after a successful session.
+    If Colab stops between those operations, the next AUTO run would otherwise
+    be misclassified as NEW and fail because checkpoints already exist.
+
+    This function only reconstructs the minimal manifest needed by the existing
+    ``prepare_training_session`` validation path. The bootstrap still performs
+    the authoritative checkpoint/replay/config validation before RESUME.
+    """
+    kwargs = dict(prepare_training_session_kwargs)
+    base_path = Path(kwargs.get("base_path") or Path.cwd())
+    manifest_path = base_path / "experiments" / project_run_id / "experiment_state.json"
+    if manifest_path.exists():
+        return False
+
+    config = kwargs.get("config")
+    if not isinstance(config, Mapping):
+        raise ValueError("Interrupted checkpoint recovery requires the resolved training config.")
+
+    checkpoint_root = _resolve_checkpoint_root(base_path, config, kwargs.get("checkpoint_root"))
+    latest = _latest_periodic_checkpoint(checkpoint_root / project_run_id)
+    if latest is None:
+        return False
+    checkpoint_path, checkpoint_step = latest
+    if checkpoint_step <= 0:
+        raise ValueError(f"Interrupted checkpoint step must be positive: {checkpoint_path}")
+    if checkpoint_step >= int(target_timesteps):
+        raise ValueError(
+            "Orphan checkpoint step must be lower than target_timesteps; "
+            f"found step={checkpoint_step}, target={int(target_timesteps)}."
+        )
+
+    mlflow_config = config.get("mlflow", {}) if isinstance(config, Mapping) else {}
+    mlflow_enabled = bool(kwargs.get("mlflow_enabled", mlflow_config.get("enabled", False)))
+    tracking_uri = kwargs.get("tracking_uri") or os.environ.get("ASSAULT_MLFLOW_TRACKING_URI") or mlflow_config.get("tracking_uri")
+    experiment_name = kwargs.get("mlflow_experiment_name") or mlflow_config.get("experiment_name") or "assault_ddqn"
+
+    if mlflow_enabled:
+        mlflow_run_id, latest_session_id = _discover_mlflow_identity(
+            tracking_uri=str(tracking_uri) if tracking_uri else None,
+            experiment_name=str(experiment_name),
+            project_run_id=project_run_id,
+        )
+    else:
+        mlflow_run_id = None
+        latest_session_id = "session_001"
+
+    payload = {
+        "schema_version": 1,
+        "project_run_id": project_run_id,
+        "mlflow_run_id": mlflow_run_id,
+        "latest_tracking_session_id": latest_session_id,
+        "latest_checkpoint": str(checkpoint_path),
+        "latest_global_step": int(checkpoint_step),
+        "resume_mode": str(kwargs.get("resume_mode") or "resume_full"),
+        "bootstrap_commit": str(kwargs.get("bootstrap_commit") or "recovered-periodic-checkpoint"),
+        "config_fingerprint": compute_config_fingerprint(config),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _atomic_write_manifest(manifest_path, payload)
+    return True
+
+
+def _resolve_checkpoint_root(base_path: Path, config: Mapping[str, Any], explicit_root: Any) -> Path:
+    configured = config.get("checkpointing", {}) if isinstance(config, Mapping) else {}
+    return Path(
+        explicit_root
+        or os.environ.get("ASSAULT_CHECKPOINT_DIR")
+        or base_path / str(configured.get("directory", "checkpoints"))
+    )
+
+
+def _latest_periodic_checkpoint(run_dir: Path) -> Optional[tuple[Path, int]]:
+    if not run_dir.exists():
+        return None
+    candidates: list[tuple[int, Path]] = []
+    for path in run_dir.glob("checkpoint_step_*.pt"):
+        match = _CHECKPOINT_PATTERN.match(path.name)
+        if match and path.is_file() and path.stat().st_size > 0:
+            candidates.append((int(match.group(1)), path))
+    if not candidates:
+        return None
+    step, path = max(candidates, key=lambda item: item[0])
+    return path, step
+
+
+def _discover_mlflow_identity(
+    tracking_uri: Optional[str],
+    experiment_name: str,
+    project_run_id: str,
+) -> tuple[str, str]:
+    """Finds the unique MLflow run created before an interrupted training."""
+    try:
+        import mlflow
+    except ImportError as exc:
+        raise RuntimeError("Interrupted checkpoint recovery requires MLflow to recover run identity.") from exc
+
+    if tracking_uri:
+        mlflow.set_tracking_uri(tracking_uri)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        raise RuntimeError(
+            f"Periodic checkpoint exists but MLflow experiment '{experiment_name}' was not found; refusing ambiguous recovery."
+        )
+
+    client = mlflow.tracking.MlflowClient()
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        max_results=1000,
+        order_by=["attributes.start_time DESC"],
+    )
+    matches = [
+        run
+        for run in runs
+        if (run.data.params.get("identity.project_run_id") or run.data.tags.get("project_run_id")) == project_run_id
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            "Periodic checkpoint recovery requires exactly one MLflow run for "
+            f"project_run_id='{project_run_id}', found {len(matches)}."
+        )
+
+    run = matches[0]
+    latest_session_id = str(run.data.tags.get("latest_tracking_session_id") or "session_001")
+    if not re.fullmatch(r"session_\d{3}", latest_session_id):
+        raise RuntimeError(f"Invalid MLflow latest_tracking_session_id during recovery: {latest_session_id}")
+    return str(run.info.run_id), latest_session_id
+
+
+def _atomic_write_manifest(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    try:
+        tmp_path.write_text(json.dumps(dict(payload), indent=2, sort_keys=True), encoding="utf-8")
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
 
 
 def _normalize_execution_mode(execution_mode: str, run_training: bool | None) -> str:
