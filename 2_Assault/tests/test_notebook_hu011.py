@@ -104,6 +104,36 @@ def test_hu011_notebook_keeps_domain_logic_in_src_modules():
     assert "class ReplayBuffer" not in text
 
 
+def test_hu011_report_presents_values_tables_analysis_and_evidence_based_conclusion():
+    text = _text()
+    required_report_evidence = [
+        "Configuración experimental",
+        "Librerías, hardware y trazabilidad",
+        "Resultado del entrenamiento",
+        "Evaluación final por episodio",
+        "Estadísticas de explotación",
+        "Comparación cuantitativa contra baseline",
+        "Análisis de las curvas",
+        "Conclusión basada en evidencia",
+        "Mejora absoluta",
+        "Mejora relativa",
+        "Tiempo entrenamiento (min)",
+        "Git SHA ejecutado",
+    ]
+    for item in required_report_evidence:
+        assert item in text
+
+
+def test_hu011_all_code_cells_are_syntactically_valid_python():
+    notebook = _notebook()
+    for index, cell in enumerate(notebook["cells"]):
+        if cell.get("cell_type") != "code":
+            continue
+        source = cell.get("source", "")
+        source_text = "".join(source) if isinstance(source, list) else str(source)
+        compile(source_text, f"assault_ddqn.ipynb:cell-{index}", "exec")
+
+
 def test_hu011_has_no_stale_pending_conclusion():
     text = _text()
     assert "HU009C empaqueta" not in text
