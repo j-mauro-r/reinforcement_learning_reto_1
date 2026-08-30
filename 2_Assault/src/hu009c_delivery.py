@@ -66,25 +66,6 @@ def resolve_hu009c_execution_mode(
     Before that bootstrap runs, this helper repairs the specific interruption
     case where a periodic checkpoint reached persistent storage but the final
     experiment manifest was never written because the Colab runtime stopped.
-
-    Args:
-        run_training: Deprecated compatibility flag. When provided, true maps
-            to ``execution_mode="train"`` and false maps to
-            ``execution_mode="delivery"``.
-        project_run_id: Existing logical run id used for delivery lineage.
-        target_timesteps: Target global timestep for the selected profile.
-        prepare_training_session_fn: Existing HU008B bootstrap function. It is
-            called only when training is required.
-        prepare_training_session_kwargs: Keyword arguments for the bootstrap.
-        execution_mode: ``auto`` (default), ``train`` or ``delivery``.
-        final_checkpoint_path: Expected final full checkpoint path.
-
-    Returns:
-        Resolved execution mode and optional training session context.
-
-    Raises:
-        ValueError: If identifiers, checkpoints or recovered state are invalid.
-        RuntimeError: If an interrupted MLflow run cannot be identified safely.
     """
     if not str(project_run_id).strip():
         raise ValueError("project_run_id must be explicit and non-empty.")
@@ -169,9 +150,9 @@ def _recover_interrupted_periodic_checkpoint(
     If Colab stops between those operations, the next AUTO run would otherwise
     be misclassified as NEW and fail because checkpoints already exist.
 
-    This function only reconstructs the minimal manifest needed by the existing
-    ``prepare_training_session`` validation path. The bootstrap still performs
-    the authoritative checkpoint/replay/config validation before RESUME.
+    The synthetic manifest is only a bridge into the existing authoritative
+    ``prepare_training_session`` validation. If that validation fails, the
+    synthetic manifest is removed by the caller.
     """
     kwargs = dict(prepare_training_session_kwargs)
     base_path = Path(kwargs.get("base_path") or Path.cwd())
@@ -180,13 +161,13 @@ def _recover_interrupted_periodic_checkpoint(
         return False
 
     config = kwargs.get("config")
-    if not isinstance(config, Mapping):
-        raise ValueError("Interrupted checkpoint recovery requires the resolved training config.")
-
     checkpoint_root = _resolve_checkpoint_root(base_path, config, kwargs.get("checkpoint_root"))
     latest = _latest_periodic_checkpoint(checkpoint_root / project_run_id)
     if latest is None:
         return False
+    if not isinstance(config, Mapping):
+        raise ValueError("Interrupted checkpoint recovery requires the resolved training config.")
+
     checkpoint_path, checkpoint_step = latest
     if checkpoint_step <= 0:
         raise ValueError(f"Interrupted checkpoint step must be positive: {checkpoint_path}")
@@ -233,7 +214,7 @@ def _recovery_manifest_path(prepare_training_session_kwargs: Mapping[str, Any], 
     return base_path / "experiments" / project_run_id / "experiment_state.json"
 
 
-def _resolve_checkpoint_root(base_path: Path, config: Mapping[str, Any], explicit_root: Any) -> Path:
+def _resolve_checkpoint_root(base_path: Path, config: Any, explicit_root: Any) -> Path:
     configured = config.get("checkpointing", {}) if isinstance(config, Mapping) else {}
     return Path(
         explicit_root
