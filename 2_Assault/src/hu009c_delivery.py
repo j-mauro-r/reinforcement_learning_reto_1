@@ -126,14 +126,21 @@ def resolve_hu009c_execution_mode(
             session_context=None,
         )
 
+    recovery_manifest_created = False
     if selected_mode in {"auto", "train"}:
-        _recover_interrupted_periodic_checkpoint(
+        recovery_manifest_created = _recover_interrupted_periodic_checkpoint(
             project_run_id=str(project_run_id),
             target_timesteps=int(target_timesteps),
             prepare_training_session_kwargs=prepare_training_session_kwargs,
         )
 
-    session_context = prepare_training_session_fn(**dict(prepare_training_session_kwargs))
+    try:
+        session_context = prepare_training_session_fn(**dict(prepare_training_session_kwargs))
+    except Exception:
+        if recovery_manifest_created:
+            _recovery_manifest_path(prepare_training_session_kwargs, str(project_run_id)).unlink(missing_ok=True)
+        raise
+
     resolution = "NEW" if getattr(session_context, "tracking_mode", None) == "new" else "RESUME"
     return DeliveryExecutionMode(
         execution_mode=selected_mode,
@@ -168,7 +175,7 @@ def _recover_interrupted_periodic_checkpoint(
     """
     kwargs = dict(prepare_training_session_kwargs)
     base_path = Path(kwargs.get("base_path") or Path.cwd())
-    manifest_path = base_path / "experiments" / project_run_id / "experiment_state.json"
+    manifest_path = _recovery_manifest_path(kwargs, project_run_id)
     if manifest_path.exists():
         return False
 
@@ -215,9 +222,15 @@ def _recover_interrupted_periodic_checkpoint(
         "bootstrap_commit": str(kwargs.get("bootstrap_commit") or "recovered-periodic-checkpoint"),
         "config_fingerprint": compute_config_fingerprint(config),
         "updated_at": datetime.now(timezone.utc).isoformat(),
+        "recovered_from_periodic_checkpoint": True,
     }
     _atomic_write_manifest(manifest_path, payload)
     return True
+
+
+def _recovery_manifest_path(prepare_training_session_kwargs: Mapping[str, Any], project_run_id: str) -> Path:
+    base_path = Path(prepare_training_session_kwargs.get("base_path") or Path.cwd())
+    return base_path / "experiments" / project_run_id / "experiment_state.json"
 
 
 def _resolve_checkpoint_root(base_path: Path, config: Mapping[str, Any], explicit_root: Any) -> Path:
