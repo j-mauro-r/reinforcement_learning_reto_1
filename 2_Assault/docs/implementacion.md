@@ -56,7 +56,7 @@ HU008B Automatización de reanudación de experimentos [IMPLEMENTADA - VALIDACIO
   ↓
 HU009  Entrenamiento DDQN completo                   [COMPLETADA]
   ↓
-HU009C Artefactos de entrega: modelo, gráficas, video y reporte [PENDIENTE]
+HU009C Artefactos de entrega: modelo, gráficas, video y reporte [COMPLETADA]
   ↓
 HU010  Optimización controlada de hiperparámetros
   ↓
@@ -845,11 +845,11 @@ La corrida full demuestra entrenamiento real: hubo `60001` updates, los pesos ca
 
 ### HU009C — Artefactos de entrega: modelo compacto, gráficas, video y reporte técnico
 
-**Estado:** PENDIENTE.
+**Estado:** [COMPLETADA].
 
 **Propósito:** convertir la corrida full ya validada en artefactos académicos de entrega reproducibles sin repetir el entrenamiento prolongado.
 
-Debe implementar:
+Implementado y validado:
 
 - modelo compacto de inferencia derivado del checkpoint final, sin Replay Buffer ni optimizer, conservando metadata y trazabilidad;
 - carga y validación del modelo compacto desde un agente/runtime nuevo;
@@ -857,23 +857,17 @@ Debe implementar:
   1. recompensa por episodio + media móvil;
   2. loss DDQN;
   3. `q_mean` + epsilon en una visualización conjunta y legible;
-- video MP4 reproducible que combine evidencia breve del proceso de entrenamiento con gameplay del agente usando `epsilon=0.0`;
-- reporte técnico profesional dentro de `2_Assault/assault_ddqn.ipynb`, con algoritmo, entorno/preprocessing, hiperparámetros, librerías/versiones, hardware, tiempo, entrenamiento, evaluación de al menos 10 episodios, comparación con baseline, comportamiento aprendido, limitaciones, conclusión y referencias a artefactos.
+- video MP4 reproducible que combina evidencia breve del proceso de entrenamiento con gameplay del agente usando `epsilon=0.0`;
+- reporte técnico dentro de `2_Assault/assault_ddqn.ipynb`;
+- ejecución real desde Colab limpio + Drive vacío con `AUTO -> NEW -> 250000 -> artefactos`;
+- segunda ejecución `Run All` con `AUTO -> DELIVERY` y `TRAINING_SKIPPED=True`.
 
-**Fuente de verdad / DWP ejecutable:**
+**Fuente de verdad / DWP:**
 
 - `2_Assault/docs/hu009c_artefactos_entrega_modelo_tensorboard_video_reporte.md`
+- `2_Assault/docs/hu009c_cierre_validacion_real.md`
 
-**Restricciones principales:**
-
-- no repetir automáticamente el entrenamiento full;
-- no modificar el checkpoint original;
-- no subir binarios grandes a Git;
-- notebook como orquestador/reporte, lógica reutilizable en `src/`;
-- no inventar métricas si faltan artifacts;
-- máximo tres figuras de entrenamiento.
-
-**Resultado esperado:** modelo compacto + evidencia TensorBoard + video + reporte alineados al mismo `project_run_id` y checkpoint fuente.
+**Validación final:** suite local reportada sobre el HEAD previo al cierre documental: `147 passed, 2 skipped, 1 warning`; `git diff --check` PASS; sin binarios grandes versionados accidentalmente.
 
 **Habilita:** HU010 y contribuye directamente a HU011/HU012.
 
@@ -1099,3 +1093,33 @@ HU CERRADA
 ```
 
 Si una autovalidación obligatoria depende de Google Colab y todavía no fue ejecutada, la HU debe mantenerse como **implementada pendiente de validación**, no como completada.
+
+---
+
+## 8. Evidencia de implementación HU009C
+
+**Estado actual:** [COMPLETADA].
+
+**Fecha de cierre:** 2026-08-30.
+
+**Rama:** `feature/hu009c-delivery-artifacts`.
+
+Las subsecciones históricas de esta sección registran el estado que tuvo el PR durante su evolución. Las menciones de “validación Colab pendiente” corresponden a estados intermedios y quedan superadas por el cierre real documentado en `2_Assault/docs/hu009c_cierre_validacion_real.md`.
+
+**Cierre real confirmado:**
+
+- Clean Colab + Empty Drive -> `AUTO -> NEW`.
+- entrenamiento full hasta `250000` timesteps.
+- checkpoint final persistido con retención `keep_last=1`.
+- modelo compacto generado, cargado y validado para inferencia.
+- exactamente tres figuras TensorBoard reales.
+- evaluación de 10 episodios con `epsilon=0.0`.
+- `VIDEO_READY=True` y reproducción inline del gameplay.
+- segunda ejecución `Run All` -> `AUTO -> DELIVERY`, `TRAINING_SKIPPED=True`.
+- suite completa local final previa al cierre documental: `147 passed, 2 skipped, 1 warning`.
+- `git diff --check` PASS.
+- sin `.mp4`, `.pt`, `.pth`, event files, `.bin` o `.tmp` versionados accidentalmente.
+
+**Estado de HU008B:** permanece independiente y no se marca completada por arrastre; su validación Colab multisesión automática específica continúa pendiente.
+
+**Resultado:** HU009C está cerrada y habilita el trabajo de evaluación formal/reporting final de HU011/HU012.

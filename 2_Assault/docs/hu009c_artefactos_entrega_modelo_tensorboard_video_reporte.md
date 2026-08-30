@@ -4,7 +4,7 @@
 
 - **ID:** HU009C
 - **Nombre:** Artefactos de entrega del agente Assault DDQN
-- **Estado:** PENDIENTE
+- **Estado:** [COMPLETADA]
 - **Dependencia previa:** HU009 — Entrenamiento DDQN completo `[COMPLETADA]`.
 - **Dependencia relacionada no bloqueante:** HU008B — automatización de reanudación multisesión. HU009C no requiere interrumpir ni repetir el entrenamiento full para generar los artefactos de entrega.
 - **Habilita:** HU010 — Optimización controlada de hiperparámetros; además contribuye directamente a HU011 — Evaluación formal contra baseline y HU012 — Evidencias y entrega final.
@@ -12,6 +12,7 @@
 - **Fuente de verdad de código:** GitHub `main`/SHA explícito.
 - **Fuente de verdad de resultados:** corrida full `assault_ddqn_full_001`, checkpoint final, TensorBoard, MLflow y notebook ejecutado.
 - **Algoritmo:** DDQN con Replay Buffer uniforme; esta HU no cambia el algoritmo ni reentrena el agente.
+- **Evidencia de cierre real:** `2_Assault/docs/hu009c_cierre_validacion_real.md`.
 
 ---
 
@@ -374,27 +375,27 @@ HU009C no debe:
 
 HU009C puede marcarse `[COMPLETADA]` únicamente cuando:
 
-- [ ] existe módulo/función reutilizable de export y load del modelo compacto;
-- [ ] el modelo compacto real fue generado desde el checkpoint full seleccionado;
-- [ ] el modelo compacto no incluye Replay Buffer ni optimizer;
-- [ ] tamaño real `< 100 MiB` o excepción justificada y documentada;
-- [ ] checksum y metadata del modelo quedaron registrados;
-- [ ] equivalencia de inferencia fuente vs compacto está probada;
-- [ ] carga desde runtime limpio está validada;
-- [ ] existen máximo tres figuras TensorBoard y cubren reward, loss, q_mean y epsilon;
-- [ ] las figuras usan datos reales del entrenamiento full;
-- [ ] existe MP4 reproducible del agente cargado desde el modelo compacto;
-- [ ] el video evidencia tanto proceso de entrenamiento como comportamiento aprendido;
-- [ ] el reporte técnico del notebook contiene todos los puntos exigidos por el enunciado;
-- [ ] la evaluación mostrada usa al menos 10 episodios y `epsilon` explícito;
-- [ ] modelo, evaluación, video y reporte apuntan a la misma corrida/modelo fuente;
-- [ ] tests focales nuevos pasan;
-- [ ] suite completa relevante pasa;
-- [ ] `python -m compileall -q 2_Assault/src` pasa;
-- [ ] notebook es JSON válido y ejecutable en Colab;
-- [ ] no se versionaron checkpoints, event files, MP4 o binarios grandes accidentalmente;
-- [ ] documentación y evidencia final quedaron actualizadas;
-- [ ] PR limitado al alcance de HU009C y revisable.
+- [x] existe módulo/función reutilizable de export y load del modelo compacto;
+- [x] el modelo compacto real fue generado desde el checkpoint full seleccionado;
+- [x] el modelo compacto no incluye Replay Buffer ni optimizer;
+- [x] tamaño real `< 100 MiB` o excepción justificada y documentada;
+- [x] checksum y metadata del modelo quedaron registrados;
+- [x] equivalencia de inferencia fuente vs compacto está probada;
+- [x] carga desde runtime limpio está validada;
+- [x] existen máximo tres figuras TensorBoard y cubren reward, loss, q_mean y epsilon;
+- [x] las figuras usan datos reales del entrenamiento full;
+- [x] existe MP4 reproducible del agente cargado desde el modelo compacto;
+- [x] el video evidencia tanto proceso de entrenamiento como comportamiento aprendido;
+- [x] el reporte técnico del notebook contiene todos los puntos exigidos por el enunciado;
+- [x] la evaluación mostrada usa al menos 10 episodios y `epsilon` explícito;
+- [x] modelo, evaluación, video y reporte apuntan a la misma corrida/modelo fuente;
+- [x] tests focales nuevos pasan;
+- [x] suite completa relevante pasa;
+- [x] `python -m compileall -q 2_Assault/src` pasa;
+- [x] notebook es JSON válido y ejecutable en Colab;
+- [x] no se versionaron checkpoints, event files, MP4 o binarios grandes accidentalmente;
+- [x] documentación y evidencia final quedaron actualizadas;
+- [x] PR limitado al alcance de HU009C y revisable.
 
 ---
 
@@ -453,7 +454,7 @@ Desde persistencia de HU009:
 5. cargarlo en agente nuevo;
 6. ejecutar smoke con `epsilon=0.0`.
 
-**Validación Colab pendiente de ejecución por el usuario** hasta que exista salida real. Codex no debe inventar tamaño ni checksum.
+**Resultado:** COMPLETADA en la validación real de Colab documentada en `hu009c_cierre_validacion_real.md`.
 
 ### AV07 — Evaluación desde modelo compacto — Colab
 
@@ -466,6 +467,8 @@ Registrar:
 - episode lengths;
 - seed/protocolo;
 - checksum del modelo evaluado.
+
+**Resultado:** COMPLETADA; evaluación de 10 episodios con `epsilon=0.0` y `EVALUATION_READY=True`.
 
 ### AV08 — TensorBoard real
 
@@ -480,6 +483,8 @@ train/epsilon
 
 Generar solo las tres figuras definidas. Validar que los steps cubren el entrenamiento observado y que no existen NaN/Inf en los scalars utilizados.
 
+**Resultado:** COMPLETADA; se produjeron exactamente tres figuras con datos reales.
+
 ### AV09 — Video real
 
 - generar el MP4 desde el modelo compacto;
@@ -488,6 +493,8 @@ Generar solo las tres figuras definidas. Validar que los steps cubren el entrena
 - confirmar visualmente que se observa gameplay de Assault;
 - validar metadata lateral: seed, reward, steps, epsilon y checksum/model id;
 - comprobar que incluye evidencia breve del entrenamiento.
+
+**Resultado:** COMPLETADA; `VIDEO_READY=True` y reproducción inline confirmada.
 
 ### AV10 — Consistencia de entrega
 
@@ -503,6 +510,8 @@ checkpoint source
 ```
 
 Todas las flechas deben apuntar al mismo `project_run_id`/modelo fuente.
+
+**Resultado:** COMPLETADA para `assault_ddqn_full_001`; la segunda ejecución `Run All` resolvió `AUTO -> DELIVERY` y `TRAINING_SKIPPED=True`.
 
 ---
 
@@ -597,4 +606,57 @@ TensorBoard full run
        reporte técnico notebook
 ```
 
-HU009C debe cerrar la brecha entre **"el agente ya fue entrenado"** y **"el agente está listo para ser entregado, evaluado y demostrado"**, sin convertir el notebook en un monolito ni repetir entrenamiento costoso.
+HU009C cerró la brecha entre **"el agente ya fue entrenado"** y **"el agente está listo para ser entregado, evaluado y demostrado"**, sin convertir el notebook en un monolito ni repetir entrenamiento costoso.
+
+---
+
+## 15. Ejecución por defecto desde Colab limpio
+
+El notebook de entrega fue validado con **Run All** desde Google Colab con almacenamiento persistente vacío.
+
+La orquestación por defecto usa:
+
+```text
+ASSAULT_EXECUTION_MODE=auto
+```
+
+Semántica validada:
+
+- si existe el checkpoint final esperado, resuelve `AUTO_RESOLUTION=DELIVERY` y no vuelve a entrenar;
+- si no existe checkpoint final pero hay una sesión parcial válida, resuelve `AUTO_RESOLUTION=RESUME` mediante `prepare_training_session(...)`;
+- si no existe manifest ni checkpoint, resuelve `AUTO_RESOLUTION=NEW` mediante `prepare_training_session(...)` y entrena desde `global_step=0`;
+- `ASSAULT_EXECUTION_MODE=train` fuerza el flujo de entrenamiento existente;
+- `ASSAULT_EXECUTION_MODE=delivery` exige checkpoint final existente y falla de forma clara si no está disponible.
+
+Caso de aceptación principal validado:
+
+```text
+Given:
+- Colab limpio
+- repositorio clonado desde GitHub
+- Drive vacío
+- GPU disponible
+
+When:
+- el evaluador ejecuta Run All sin modificar variables
+
+Then:
+- instala dependencias
+- monta Drive
+- valida entorno
+- inicia entrenamiento desde step 0
+- entrena DDQN hasta el target full
+- guarda checkpoints periódicos con `checkpointing.keep_last=1` para conservar solo el más reciente
+- persiste TensorBoard y MLflow
+- genera checkpoint final
+- exporta modelo compacto
+- evalúa >=10 episodios con epsilon=0
+- genera tres figuras
+- genera video
+- muestra video inline
+- presenta reporte final
+```
+
+**Resultado real:** COMPLETADO. Una segunda ejecución `Run All` con los artefactos persistidos resolvió `AUTO -> DELIVERY` y `TRAINING_SKIPPED=True`, sin repetir el entrenamiento full.
+
+La retención de checkpoints evita acumular múltiples Replay Buffers completos de varios GiB en Google Drive durante la corrida full. La capacidad de resume se mantiene porque la poda ocurre solo después de confirmar que el nuevo checkpoint existe y queda disponible como checkpoint más reciente.

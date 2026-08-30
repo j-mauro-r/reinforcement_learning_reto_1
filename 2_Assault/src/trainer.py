@@ -115,6 +115,7 @@ class Trainer:
         checkpoint_manager: Any = None,
         checkpoint_interval_steps: Optional[int] = None,
         checkpoint_save_replay_buffer: bool = True,
+        checkpoint_keep_last: Optional[int] = None,
         metrics_logger: Any = None,
     ) -> None:
         """Initializes the trainer.
@@ -132,6 +133,7 @@ class Trainer:
             checkpoint_interval_steps: Optional periodic checkpoint interval.
             checkpoint_save_replay_buffer: Whether automatic checkpoints include
                 Replay Buffer state.
+            checkpoint_keep_last: Optional checkpoint retention count.
             metrics_logger: Optional observability callback exposing
                 ``log_step``, ``log_update``, ``log_episode`` and flush hooks.
         """
@@ -144,6 +146,7 @@ class Trainer:
         self.checkpoint_manager = checkpoint_manager
         self.checkpoint_interval_steps = checkpoint_interval_steps
         self.checkpoint_save_replay_buffer = bool(checkpoint_save_replay_buffer)
+        self.checkpoint_keep_last = checkpoint_keep_last
         self.metrics_logger = metrics_logger
 
     def train(self, total_timesteps: Optional[int] = None) -> TrainingSummary:
@@ -294,6 +297,7 @@ class Trainer:
                     global_step=global_step,
                     training_metrics=metrics,
                     save_replay_buffer=self.checkpoint_save_replay_buffer,
+                    keep_last=self.checkpoint_keep_last,
                 )
                 checkpoints_saved.append(str(saved.path))
 

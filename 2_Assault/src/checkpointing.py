@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional
 
 import torch
 
@@ -117,6 +117,7 @@ class CheckpointManager:
         training_metrics: Mapping[str, Any] | TrainingSummary,
         save_replay_buffer: bool = True,
         overwrite: bool = False,
+        keep_last: Optional[int] = None,
     ) -> CheckpointMetadata:
         """Atomically saves a DDQN training checkpoint.
 
@@ -128,6 +129,7 @@ class CheckpointManager:
             training_metrics: Serializable metrics or ``TrainingSummary``.
             save_replay_buffer: Whether to include replay buffer state.
             overwrite: Explicit opt-in to overwrite an existing checkpoint.
+            keep_last: Optional retention count for this run directory.
 
         Returns:
             Metadata about the saved checkpoint.
@@ -159,13 +161,42 @@ class CheckpointManager:
             if tmp_path.exists():
                 tmp_path.unlink()
 
-        return CheckpointMetadata(
+        metadata = CheckpointMetadata(
             path=path,
             run_id=self.run_id,
             checkpoint_step=step,
             size_bytes=path.stat().st_size,
             save_replay_buffer=save_replay_buffer,
         )
+        if metadata.size_bytes <= 0:
+            raise RuntimeError(f"Checkpoint save produced an empty file: {path}")
+        if keep_last is not None:
+            self.prune_old_checkpoints(keep_last=keep_last, protected_paths=[metadata.path])
+        return metadata
+
+    def prune_old_checkpoints(self, keep_last: int = 1, protected_paths: Optional[Iterable[str | Path]] = None) -> list[Path]:
+        """Deletes older checkpoints in this run directory after a successful save.
+
+        Only files matching ``checkpoint_step_*.pt`` under ``self.run_dir`` are
+        eligible. Non-checkpoint files, temporary files and other run ids are
+        ignored.
+        """
+        keep = int(keep_last)
+        if keep <= 0:
+            raise ValueError("keep_last must be positive.")
+        if not self.run_dir.exists():
+            return []
+
+        protected = {Path(path).resolve() for path in protected_paths or []}
+        checkpoints = sorted(_checkpoint_files(self.run_dir), key=_checkpoint_sort_key)
+        retained = set(checkpoints[-keep:])
+        deleted: list[Path] = []
+        for path in checkpoints:
+            if path in retained or path.resolve() in protected:
+                continue
+            path.unlink()
+            deleted.append(path)
+        return deleted
 
     def load(
         self,
@@ -318,3 +349,19 @@ def reconstruct_epsilon(global_step: int, config: Mapping[str, Any]) -> float:
         float(config["agent"]["epsilon_final"]),
         int(config["training"]["epsilon_decay_steps"]),
     )
+
+
+def _checkpoint_sort_key(path: Path) -> tuple[int, str]:
+    step = _checkpoint_step(path)
+    return -1 if step is None else step, path.name
+
+
+def _checkpoint_files(run_dir: Path) -> list[Path]:
+    return [path for path in run_dir.glob("checkpoint_step_*.pt") if path.is_file() and _checkpoint_step(path) is not None]
+
+
+def _checkpoint_step(path: Path) -> Optional[int]:
+    try:
+        return int(path.stem.rsplit("_", maxsplit=1)[-1])
+    except ValueError:
+        return None
