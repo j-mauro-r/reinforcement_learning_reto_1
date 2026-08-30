@@ -56,7 +56,7 @@ HU008B Automatización de reanudación de experimentos [IMPLEMENTADA - VALIDACIO
   ↓
 HU009  Entrenamiento DDQN completo                   [COMPLETADA]
   ↓
-HU009C Artefactos de entrega: modelo, gráficas, video y reporte [PENDIENTE]
+HU009C Artefactos de entrega: modelo, gráficas, video y reporte [COMPLETADA]
   ↓
 HU010  Optimización controlada de hiperparámetros
   ↓
@@ -845,11 +845,11 @@ La corrida full demuestra entrenamiento real: hubo `60001` updates, los pesos ca
 
 ### HU009C — Artefactos de entrega: modelo compacto, gráficas, video y reporte técnico
 
-**Estado:** PENDIENTE.
+**Estado:** [COMPLETADA].
 
 **Propósito:** convertir la corrida full ya validada en artefactos académicos de entrega reproducibles sin repetir el entrenamiento prolongado.
 
-Debe implementar:
+Implementado y validado:
 
 - modelo compacto de inferencia derivado del checkpoint final, sin Replay Buffer ni optimizer, conservando metadata y trazabilidad;
 - carga y validación del modelo compacto desde un agente/runtime nuevo;
@@ -857,23 +857,17 @@ Debe implementar:
   1. recompensa por episodio + media móvil;
   2. loss DDQN;
   3. `q_mean` + epsilon en una visualización conjunta y legible;
-- video MP4 reproducible que combine evidencia breve del proceso de entrenamiento con gameplay del agente usando `epsilon=0.0`;
-- reporte técnico profesional dentro de `2_Assault/assault_ddqn.ipynb`, con algoritmo, entorno/preprocessing, hiperparámetros, librerías/versiones, hardware, tiempo, entrenamiento, evaluación de al menos 10 episodios, comparación con baseline, comportamiento aprendido, limitaciones, conclusión y referencias a artefactos.
+- video MP4 reproducible que combina evidencia breve del proceso de entrenamiento con gameplay del agente usando `epsilon=0.0`;
+- reporte técnico dentro de `2_Assault/assault_ddqn.ipynb`;
+- ejecución real desde Colab limpio + Drive vacío con `AUTO -> NEW -> 250000 -> artefactos`;
+- segunda ejecución `Run All` con `AUTO -> DELIVERY` y `TRAINING_SKIPPED=True`.
 
-**Fuente de verdad / DWP ejecutable:**
+**Fuente de verdad / DWP:**
 
 - `2_Assault/docs/hu009c_artefactos_entrega_modelo_tensorboard_video_reporte.md`
+- `2_Assault/docs/hu009c_cierre_validacion_real.md`
 
-**Restricciones principales:**
-
-- no repetir automáticamente el entrenamiento full;
-- no modificar el checkpoint original;
-- no subir binarios grandes a Git;
-- notebook como orquestador/reporte, lógica reutilizable en `src/`;
-- no inventar métricas si faltan artifacts;
-- máximo tres figuras de entrenamiento.
-
-**Resultado esperado:** modelo compacto + evidencia TensorBoard + video + reporte alineados al mismo `project_run_id` y checkpoint fuente.
+**Validación final:** suite local reportada sobre el HEAD previo al cierre documental: `147 passed, 2 skipped, 1 warning`; `git diff --check` PASS; sin binarios grandes versionados accidentalmente.
 
 **Habilita:** HU010 y contribuye directamente a HU011/HU012.
 
@@ -1104,144 +1098,28 @@ Si una autovalidación obligatoria depende de Google Colab y todavía no fue eje
 
 ## 8. Evidencia de implementación HU009C
 
-**Estado:** [IMPLEMENTADA - VALIDACIÓN COLAB PENDIENTE].
+**Estado actual:** [COMPLETADA].
 
-**Fecha local:** 2026-08-30.
+**Fecha de cierre:** 2026-08-30.
 
 **Rama:** `feature/hu009c-delivery-artifacts`.
 
-**Alcance implementado:**
+Las subsecciones históricas de esta sección registran el estado que tuvo el PR durante su evolución. Las menciones de “validación Colab pendiente” corresponden a estados intermedios y quedan superadas por el cierre real documentado en `2_Assault/docs/hu009c_cierre_validacion_real.md`.
 
-- `2_Assault/src/model_artifact.py` agrega `export_inference_model(...)`, `load_inference_model(...)` y `compute_sha256(...)`.
-- El artefacto compacto guarda solo `online_network`, schema, arquitectura `QNetwork`, contrato de entorno/preprocessing y metadata de lineage.
-- El artefacto compacto excluye Replay Buffer, optimizer, Target Network e históricos de entrenamiento.
-- La exportación calcula SHA-256 del checkpoint fuente y del modelo compacto, escribe sidecars `.sha256` y `.metadata.json`, y aplica guardrail `<100 MiB`.
-- `2_Assault/src/reporting.py` prepara exactamente tres figuras de entrenamiento desde TensorBoard real: recompensa + media móvil, loss DDQN, y `q_mean` + `epsilon`.
-- `2_Assault/src/video.py` genera MP4 con intro de evidencia de entrenamiento y gameplay desde un agente cargado para inferencia, usando frames RGB y `epsilon` explícito.
-- `2_Assault/assault_ddqn.ipynb` queda como reporte/orquestador HU009C; el entrenamiento HU009 queda protegido por `ASSAULT_RUN_TRAINING=1` y no corre por defecto.
-- `2_Assault/requirements.txt` declara `imageio[ffmpeg]>=2.34` para MP4 portable en Colab.
+**Cierre real confirmado:**
 
-**Tests agregados:**
+- Clean Colab + Empty Drive -> `AUTO -> NEW`.
+- entrenamiento full hasta `250000` timesteps.
+- checkpoint final persistido con retención `keep_last=1`.
+- modelo compacto generado, cargado y validado para inferencia.
+- exactamente tres figuras TensorBoard reales.
+- evaluación de 10 episodios con `epsilon=0.0`.
+- `VIDEO_READY=True` y reproducción inline del gameplay.
+- segunda ejecución `Run All` -> `AUTO -> DELIVERY`, `TRAINING_SKIPPED=True`.
+- suite completa local final previa al cierre documental: `147 passed, 2 skipped, 1 warning`.
+- `git diff --check` PASS.
+- sin `.mp4`, `.pt`, `.pth`, event files, `.bin` o `.tmp` versionados accidentalmente.
 
-- `2_Assault/tests/test_model_artifact.py`
-- `2_Assault/tests/test_reporting.py`
-- `2_Assault/tests/test_video.py`
-- `2_Assault/tests/test_notebook_hu009c.py`
+**Estado de HU008B:** permanece independiente y no se marca completada por arrastre; su validación Colab multisesión automática específica continúa pendiente.
 
-**Validaciones locales ejecutadas y observadas:**
-
-- `python -m compileall -q 2_Assault/src` -> PASS sin salida.
-- `python -m pytest 2_Assault/tests/test_model_artifact.py -q` -> `4 passed`.
-- `python -m pytest 2_Assault/tests/test_reporting.py 2_Assault/tests/test_video.py -q` -> `5 passed`.
-- `python -m pytest 2_Assault/tests/test_notebook_hu009c.py -q` -> `3 passed`.
-
-**Validaciones pendientes por artefactos reales Colab/Drive:**
-
-- AV06: exportar modelo compacto real desde `/content/drive/MyDrive/reinforcement_learning_reto_1/checkpoints/assault_ddqn_full_001/checkpoint_step_250000.pt`, imprimir tamaño y SHA-256, validar `<100 MiB` y smoke.
-- AV07: evaluar al menos 10 episodios desde el modelo compacto cargado desde disco con `epsilon=0.0`.
-- AV08: generar las tres figuras desde event files TensorBoard reales de `assault_ddqn_full_001`.
-- AV09: generar y reproducir MP4 real desde `render_mode="rgb_array"`.
-- AV10: confirmar consistencia `checkpoint source -> compact model + checksum -> evaluation >=10 episodes -> TensorBoard figures -> video -> notebook report`.
-
-No se ejecutó ni se repitió entrenamiento full de `250000` timesteps durante HU009C local.
-
-### Corrección PR #15 - blocker de bootstrap HU009C
-
-**Fecha local:** 2026-08-30.
-
-**Estado:** [IMPLEMENTADA - VALIDACIÓN COLAB PENDIENTE].
-
-**Causa corregida:**
-
-- `2_Assault/assault_ddqn.ipynb` ejecutaba `prepare_training_session(...)` antes de decidir si `ASSAULT_RUN_TRAINING=0`.
-- Para una corrida full ya terminada, con `target_timesteps` igual al `latest_global_step`, ese bootstrap podía fallar correctamente con `target_timesteps must be greater than the restored global_step`.
-- La validación de `session_bootstrap.py` se mantiene intacta; la corrección vive en la orquestación HU009C.
-
-**Cambio implementado:**
-
-- `2_Assault/src/hu009c_delivery.py` agrega `resolve_hu009c_execution_mode(...)`.
-- En `ASSAULT_RUN_TRAINING=0`, el notebook entra en modo post-training, no llama `prepare_training_session(...)`, no crea nueva sesión MLflow, no modifica manifest y continúa hacia export/modelo/TensorBoard/evaluación/video.
-- En `ASSAULT_RUN_TRAINING=1`, el notebook conserva el camino original: `prepare_training_session(...)`, `FULL_TRAINING_READY`, tracking, entrenamiento, checkpointing y manifest.
-
-**Validaciones locales ejecutadas y observadas para esta corrección:**
-
-- `python -m compileall -q 2_Assault/src` -> PASS sin salida.
-- `python -m pytest 2_Assault/tests/test_notebook_hu009c.py -q` -> `6 passed`.
-- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
-- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `19 passed`.
-- `python -m pytest 2_Assault/tests -q` -> `129 passed, 2 skipped, 1 warning`.
-
-AV06-AV10 reales siguen pendientes de ejecución en Colab/Drive.
-
-### Mejora PR #15 - visualizaci?n inline del MP4 HU009C
-
-**Fecha local:** 2026-08-30.
-
-**Estado:** [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE].
-
-**Cambio implementado:**
-
-- `2_Assault/assault_ddqn.ipynb` muestra inline el MP4 generado por HU009C inmediatamente despu?s de `generate_assault_demo_video(...)`.
-- La visualizaci?n usa `IPython.display.Video` y `display` cuando `VIDEO_PATH.exists()` y el archivo tiene tama?o mayor que cero.
-- La celda imprime `VIDEO_READY=True`, ruta, reward, steps, seed, epsilon, `project_run_id` y checksum del modelo.
-- Si IPython/Colab no puede renderizar inline, se imprime `VIDEO_INLINE_WARNING` y se conserva la ruta al MP4 para reproducci?n manual.
-- No se cambia entrenamiento, DDQN, checkpointing, TensorBoard, MLflow, evaluator ni `src/video.py`.
-
-HU009C contin?a como [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE] hasta ejecutar AV06-AV10 reales.
-
-### Correcci?n PR #15 - orquestaci?n AUTO para Colab limpio
-
-**Fecha local:** 2026-08-30.
-
-**Estado:** [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE].
-
-**Causa corregida:**
-
-- El notebook usaba por defecto `ASSAULT_RUN_TRAINING=0`, por lo que un Run All con Drive vac?o saltaba directamente a delivery y no entrenaba, no generaba checkpoint, TensorBoard, modelo compacto ni video.
-- Esto hac?a que la entrega dependiera de artefactos previos en un Drive personal.
-
-**Cambio implementado:**
-
-- `ASSAULT_EXECUTION_MODE=auto` es ahora el default del notebook.
-- `AUTO_RESOLUTION=NEW` cuando no existe checkpoint final ni manifest y se debe iniciar entrenamiento desde `global_step=0`.
-- `AUTO_RESOLUTION=RESUME` cuando no existe checkpoint final pero `prepare_training_session(...)` resuelve una sesi?n parcial v?lida.
-- `AUTO_RESOLUTION=DELIVERY` cuando existe el checkpoint final esperado y no debe llamarse `prepare_training_session(...)`.
-- `ASSAULT_EXECUTION_MODE=delivery` falla claramente si no existe checkpoint final.
-- `ASSAULT_EXECUTION_MODE=train` conserva el flujo de entrenamiento existente.
-- `2_Assault/src/training_session.py` ahora inyecta `CheckpointManager`, `checkpoint_interval_steps` y `checkpoint_save_replay_buffer` al `Trainer` para checkpoints peri?dicos persistentes; si el checkpoint final ya fue guardado peri?dicamente, se reutiliza y no se intenta guardarlo dos veces.
-
-**Validaciones locales ejecutadas y observadas para esta correcci?n:**
-
-- `python -m compileall -q 2_Assault/src` -> PASS sin salida.
-- `python -m pytest 2_Assault/tests/test_notebook_hu009c.py -q` -> `11 passed`.
-- `python -m pytest 2_Assault/tests/test_training_session.py -q` -> `2 passed`.
-- `python -m pytest 2_Assault/tests/test_session_bootstrap.py -q` -> `17 passed, 1 warning`.
-- `python -m pytest 2_Assault/tests/test_training_profiles.py -q` -> `19 passed`.
-- `python -m pytest 2_Assault/tests/test_checkpointing.py -q` -> `15 passed`.
-- `python -m pytest 2_Assault/tests/test_reporting.py 2_Assault/tests/test_video.py -q` -> `5 passed`.
-
-**Validaci?n real pendiente:**
-
-- `VALIDACI?N REAL CLEAN COLAB + EMPTY DRIVE PENDIENTE`: ejecutar Run All en Colab limpio con Drive vac?o y GPU disponible para demostrar `AUTO_RESOLUTION=NEW -> checkpoint final -> HU009C_ARTIFACTS_READY`.
-
-### Mejora PR #15 - retenci?n de checkpoints full
-
-**Fecha local:** 2026-08-30.
-
-**Estado:** [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE].
-
-**Cambio implementado:**
-
-- `CheckpointManager.save(...)` soporta `keep_last`.
-- `CheckpointManager.prune_old_checkpoints(keep_last=1)` elimina solo checkpoints antiguos con patr?n `checkpoint_step_*.pt` dentro del directorio del `run_id`.
-- La secuencia es segura: primero se guarda el nuevo checkpoint, se confirma que existe y tiene tama?o mayor que cero, y solo despu?s se eliminan checkpoints anteriores.
-- `training_session.py` propaga `checkpointing.keep_last` al `Trainer` y al checkpoint final cuando no fue creado por el intervalo peri?dico.
-- `ddqn_config.yaml` declara `checkpointing.keep_last=1` en configuraci?n base, perfil `smoke` y perfil `full`.
-
-**Justificaci?n:**
-
-- En el perfil full, cada checkpoint con Replay Buffer completo puede ocupar varios GiB.
-- Con checkpoint cada `25000` pasos hasta `250000`, conservar todos los archivos puede acumular m?s de 15 GiB en Drive.
-- La retenci?n `keep_last=1` evita esa acumulaci?n y mantiene capacidad de resume desde el checkpoint m?s reciente.
-
-HU009C contin?a como [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE] hasta ejecutar la corrida real Clean Colab + Empty Drive + Run All.
+**Resultado:** HU009C está cerrada y habilita el trabajo de evaluación formal/reporting final de HU011/HU012.
