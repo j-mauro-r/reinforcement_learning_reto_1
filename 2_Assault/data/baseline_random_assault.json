@@ -17,9 +17,10 @@
   "statistics": {
     "mean_reward": 262.5,
     "median_reward": 241.5,
-    "std_reward": 79.350488,
+    "std_reward": 75.27848298152666,
+    "std_reward_hu001_reported_sample": 79.35048834128244,
     "min_reward": 189.0,
     "max_reward": 399.0
   },
-  "provenance_note": "Valores transcritos de las salidas ejecutadas de HU001; este JSON permite reutilizarlos programaticamente sin reejecutar ni inventar el baseline."
+  "provenance_note": "Rewards, seeds and lengths are transcribed from the executed HU001 notebook. HU001 displayed pandas sample std (ddof=1)=79.350488; std_reward here uses population std (ddof=0) to match src.evaluator.EvaluationSummary for like-for-like reporting."
 }
