@@ -1172,3 +1172,19 @@ No se ejecutó ni se repitió entrenamiento full de `250000` timesteps durante H
 - `python -m pytest 2_Assault/tests -q` -> `129 passed, 2 skipped, 1 warning`.
 
 AV06-AV10 reales siguen pendientes de ejecución en Colab/Drive.
+
+### Mejora PR #15 - visualizaci?n inline del MP4 HU009C
+
+**Fecha local:** 2026-08-30.
+
+**Estado:** [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE].
+
+**Cambio implementado:**
+
+- `2_Assault/assault_ddqn.ipynb` muestra inline el MP4 generado por HU009C inmediatamente despu?s de `generate_assault_demo_video(...)`.
+- La visualizaci?n usa `IPython.display.Video` y `display` cuando `VIDEO_PATH.exists()` y el archivo tiene tama?o mayor que cero.
+- La celda imprime `VIDEO_READY=True`, ruta, reward, steps, seed, epsilon, `project_run_id` y checksum del modelo.
+- Si IPython/Colab no puede renderizar inline, se imprime `VIDEO_INLINE_WARNING` y se conserva la ruta al MP4 para reproducci?n manual.
+- No se cambia entrenamiento, DDQN, checkpointing, TensorBoard, MLflow, evaluator ni `src/video.py`.
+
+HU009C contin?a como [IMPLEMENTADA - VALIDACI?N COLAB PENDIENTE] hasta ejecutar AV06-AV10 reales.

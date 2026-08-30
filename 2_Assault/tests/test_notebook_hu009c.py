@@ -55,6 +55,28 @@ def test_notebook_uses_src_helpers_and_training_is_opt_in():
     assert "ASSAULT_RUN_TRAINING=0; celda omitida" in text
 
 
+def test_notebook_displays_generated_video_inline_once_after_generation():
+    text = _notebook_text()
+    video_section = text.split("## 14. Evaluacion y video desde modelo compacto", maxsplit=1)[1]
+    generation_index = video_section.index("video_summary = generate_assault_demo_video(")
+    display_index = video_section.index("display(Video(str(VIDEO_PATH), embed=True))")
+
+    assert text.count("generate_assault_demo_video(") == 1
+    assert generation_index < display_index
+    assert "from IPython.display import Video, display" in video_section
+    assert "if VIDEO_PATH.exists() and VIDEO_PATH.stat().st_size > 0:" in video_section
+    assert 'print("VIDEO_READY=True")' in video_section
+    assert 'print("video_path=", VIDEO_PATH)' in video_section
+    assert 'print("video_reward=", video_summary.reward)' in video_section
+    assert 'print("video_steps=", video_summary.steps)' in video_section
+    assert 'print("video_seed=", video_summary.seed)' in video_section
+    assert 'print("video_epsilon=", video_summary.epsilon)' in video_section
+    assert 'print("video_project_run_id=", video_summary.project_run_id)' in video_section
+    assert 'print("video_model_sha256=", video_summary.model_sha256)' in video_section
+    assert "VIDEO_INLINE_WARNING" in video_section
+    assert 'os.environ.setdefault("ASSAULT_RUN_TRAINING", "0")' in text
+
+
 def test_notebook_plans_exactly_three_training_figures():
     text = _notebook_text()
 
