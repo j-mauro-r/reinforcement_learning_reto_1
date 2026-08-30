@@ -20,7 +20,6 @@ from src.hu011_delivery import (
 )
 from src.model_artifact import ModelArtifactInfo
 
-
 ASSAULT_DIR = Path(__file__).resolve().parents[1]
 BASELINE_PATH = ASSAULT_DIR / "data" / "baseline_random_assault.json"
 
@@ -57,21 +56,19 @@ def _model_info(tmp_path: Path) -> ModelArtifactInfo:
     )
 
 
-def test_versioned_random_baseline_matches_hu001_outputs():
+def test_versioned_random_baseline_matches_hu001_rewards_and_normalized_stats():
     baseline = load_random_baseline(BASELINE_PATH)
-
     assert baseline.episodes == 10
     assert baseline.rewards == [189.0, 273.0, 273.0, 210.0, 210.0, 399.0, 315.0, 189.0, 189.0, 378.0]
     assert baseline.mean_reward == pytest.approx(262.5)
     assert baseline.median_reward == pytest.approx(241.5)
-    assert baseline.std_reward == pytest.approx(79.350488, rel=1e-6)
+    assert baseline.std_reward == pytest.approx(75.27848298152666)
     assert baseline.min_reward == 189.0
     assert baseline.max_reward == 399.0
 
 
 def test_final_evaluation_compares_above_random_baseline():
     comparison = compare_with_random_baseline(_evaluation(), load_random_baseline(BASELINE_PATH))
-
     assert comparison.agent_beats_random is True
     assert comparison.absolute_improvement == pytest.approx(283.5)
     assert comparison.relative_improvement_pct == pytest.approx(108.0)
@@ -79,7 +76,6 @@ def test_final_evaluation_compares_above_random_baseline():
 
 def test_evaluation_records_are_aligned_and_seeded():
     rows = evaluation_records(_evaluation(), base_seed=20042)
-
     assert len(rows) == 10
     assert rows[0] == {"episode": 1, "seed": 20042, "reward": 588.0, "length": 700}
     assert rows[-1]["seed"] == 20051
@@ -95,7 +91,6 @@ def test_build_evaluation_artifact_links_model_and_protocol(tmp_path):
         base_seed=20042,
         git_sha="deadbeef",
     )
-
     assert payload["model"]["sha256"] == "a" * 64
     assert payload["model"]["source_checkpoint_step"] == 250000
     assert payload["protocol"]["episodes"] == 10
@@ -109,18 +104,11 @@ def test_final_evaluation_rejects_exploration(tmp_path):
     evaluation = _evaluation()
     invalid = EvaluationSummary(**{**evaluation.__dict__, "epsilon": 0.01})
     with pytest.raises(ValueError, match="epsilon=0.0"):
-        build_evaluation_artifact(
-            invalid,
-            _model_info(tmp_path),
-            "assault_ddqn_full_001",
-            tmp_path / "checkpoint.pt",
-            20042,
-        )
+        build_evaluation_artifact(invalid, _model_info(tmp_path), "assault_ddqn_full_001", tmp_path / "checkpoint.pt", 20042)
 
 
 def test_atomic_evaluation_json_round_trip(tmp_path):
     path = write_json_atomic(tmp_path / "evaluation" / "final.json", {"ready": True, "episodes": 10})
-
     assert path.exists()
     assert '"ready": true' in path.read_text(encoding="utf-8")
     assert not path.with_name(f".{path.name}.tmp").exists()
@@ -128,16 +116,13 @@ def test_atomic_evaluation_json_round_trip(tmp_path):
 
 def test_exploitation_figure_validation_uses_exact_final_rewards():
     evaluation = _evaluation()
-
     assert validate_exploitation_figure_data(evaluation, evaluation.rewards) is True
     assert validate_exploitation_figure_data(evaluation, list(reversed(evaluation.rewards))) is False
 
 
 def test_delivery_gate_requires_all_assault_criteria_pass():
     statuses = {criterion_id: True for criterion_id in MANDATORY_ASSAULT_CRITERIA}
-    rows = criteria_from_statuses(statuses)
-    gate = build_delivery_gate(rows, global_multi_algorithm="PENDING")
-
+    gate = build_delivery_gate(criteria_from_statuses(statuses), global_multi_algorithm="PENDING")
     assert gate.assault_method_allowed is True
     assert gate.final_delivery_gate is True
     assert gate.global_multi_algorithm == "PENDING"
@@ -148,7 +133,6 @@ def test_delivery_gate_fails_when_one_mandatory_criterion_fails():
     statuses = {criterion_id: True for criterion_id in MANDATORY_ASSAULT_CRITERIA}
     statuses["CA17"] = False
     gate = build_delivery_gate(criteria_from_statuses(statuses), global_multi_algorithm="PASS")
-
     assert gate.final_delivery_gate is False
     assert gate.as_dict()["HU011_FINAL_DELIVERY_GATE"] == "FAIL"
 
