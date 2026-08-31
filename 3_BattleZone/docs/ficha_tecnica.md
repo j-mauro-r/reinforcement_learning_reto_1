@@ -591,3 +591,101 @@ Toda corrida relevante deberá registrar:
 - métricas de evaluación.
 
 BattleZone no utilizará MLflow. La trazabilidad seguirá los lineamientos de `3_BattleZone/docs/lineamientos.md` mediante Git/GitHub, configuración versionada, `run_manifest.json`, TensorBoard, checkpoints y resultados persistidos.
+
+---
+
+## 26. Evidencia empírica observada (HU002 - Experimento 0 local)
+
+Esta sección resume una corrida empírica del Experimento 0 ejecutada localmente con política estrictamente aleatoria (`env.action_space.sample()`) y **sin** clipping/shaping/normalización de reward.
+
+### 26.1 Configuración de la corrida
+
+- Environment ID: `ALE/BattleZone-v5`
+- Episodios: `10`
+- Seed base: `20260830` (seed por episodio: `base_seed + episode_id`)
+- Mode: `1`
+- Difficulty: `0`
+- `obs_type`: `rgb`
+- `frameskip`: `4`
+- `repeat_action_probability`: `0.25`
+
+### 26.2 Runtime observado
+
+- Python: `3.8.10`
+- Gymnasium: `1.1.1`
+- ALE-Py: `0.10.1`
+- NumPy: `1.24.4`
+- Plataforma: `Windows-10-10.0.19044-SP0`
+- CPU: `AMD64 Family 23 Model 17 Stepping 0, AuthenticAMD`
+- RAM total: `6.9 GB`
+- GPU disponible para la corrida: `False`
+
+### 26.3 Contrato observado del entorno
+
+- `observation_space`: `Box(0, 255, (210, 160, 3), uint8)`
+- `action_space`: `Discrete(18)`
+- Action meanings: 18 acciones Atari completas (`NOOP` ... `DOWNLEFTFIRE`)
+- Observación inicial: shape `(210, 160, 3)`, dtype `uint8`, rango observado min/max `[0, 236]`
+
+### 26.4 `info` observado
+
+Claves observadas en `reset()`:
+
+- `lives`
+- `episode_frame_number`
+- `frame_number`
+- `seeds`
+
+Claves observadas en `step()` (incluyendo eventos de reward no-cero, cambios de vida y terminación):
+
+- `lives`
+- `episode_frame_number`
+- `frame_number`
+
+En esta corrida no aparecieron claves adicionales fuera de las listadas.
+
+### 26.5 Baseline aleatorio (10 episodios)
+
+Métricas agregadas observadas:
+
+- Recompensa media: `1300.0`
+- Recompensa mediana: `1000.0`
+- Desviación estándar: `1187.43`
+- Recompensa mínima: `0.0`
+- Recompensa máxima: `4000.0`
+- Steps promedio por episodio: `1096.6`
+- Steps min/max: `687 / 1450`
+- Episodios `terminated=True`: `10`
+- Episodios `truncated=True`: `0`
+
+Densidad global de reward por step:
+
+- Positive: `0.1094%`
+- Zero: `99.8906%`
+- Negative: `0.0%`
+- Eventos no-cero promedio por episodio: `1.2`
+
+Rewards observados por step:
+
+- Valores únicos: `{0.0, 1000.0, 2000.0}`
+- Frecuencias: `0.0 -> 10954`, `1000.0 -> 11`, `2000.0 -> 1`
+
+Vidas y terminación:
+
+- Vidas iniciales observadas: `{5}`
+- Pérdidas promedio por episodio: `5.0`
+- Vidas extra detectadas: `0`
+- Episodios terminados con `lives_end == 0`: `10`
+
+### 26.6 Lectura técnica de la evidencia
+
+- En esta corrida, la recompensa fue muy escasa (casi todos los steps con reward cero).
+- No se observaron rewards negativos.
+- Se observaron valores de reward compatibles con el scoring histórico (1000 y 2000), pero esta evidencia no prueba por sí sola equivalencia completa para todos los objetivos/eventos.
+- La alta proporción de reward cero y la varianza inter-episodio apoyan evaluar cuidadosamente eficiencia muestral y estabilidad en HU004.
+- La presencia consistente de `lives`, `frame_number` y `episode_frame_number` en `info` es útil para observabilidad de HU003+.
+
+### 26.7 Alcance y límites de esta evidencia
+
+- Estos resultados corresponden a una corrida local específica de baseline aleatorio y no reemplazan futuras validaciones en Colab.
+- La decisión de preprocessing definitivo (grayscale/RGB, resize, frame stack, posibles recortes) permanece abierta para HU003 y debe basarse en evidencia visual adicional del radar.
