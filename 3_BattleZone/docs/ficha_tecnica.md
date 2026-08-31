@@ -608,6 +608,8 @@ Esta sección resume una corrida empírica del Experimento 0 ejecutada localment
 - `obs_type`: `rgb`
 - `frameskip`: `4`
 - `repeat_action_probability`: `0.25`
+- Estrategia de muestreo aleatorio reproducible: `env.reset(seed=s)` + `env.action_space.seed(s)` por episodio
+- Validación de reproducibilidad de muestreo: secuencia inicial de `32` acciones reproducida con la misma seed
 
 ### 26.2 Runtime observado
 
@@ -649,26 +651,26 @@ En esta corrida no aparecieron claves adicionales fuera de las listadas.
 Métricas agregadas observadas:
 
 - Recompensa media: `1300.0`
-- Recompensa mediana: `1000.0`
-- Desviación estándar: `1187.43`
+- Recompensa mediana: `2000.0`
+- Desviación estándar: `3065.94`
 - Recompensa mínima: `0.0`
-- Recompensa máxima: `4000.0`
-- Steps promedio por episodio: `1096.6`
-- Steps min/max: `687 / 1450`
+- Recompensa máxima: `10000.0`
+- Steps promedio por episodio: `1159.5`
+- Steps min/max: `821 / 1960`
 - Episodios `terminated=True`: `10`
 - Episodios `truncated=True`: `0`
 
 Densidad global de reward por step:
 
-- Positive: `0.1094%`
-- Zero: `99.8906%`
+- Positive: `0.1725%`
+- Zero: `99.8275%`
 - Negative: `0.0%`
-- Eventos no-cero promedio por episodio: `1.2`
+- Eventos no-cero promedio por episodio: `2.0`
 
 Rewards observados por step:
 
-- Valores únicos: `{0.0, 1000.0, 2000.0}`
-- Frecuencias: `0.0 -> 10954`, `1000.0 -> 11`, `2000.0 -> 1`
+- Valores únicos: `{0.0, 1000.0, 2000.0, 5000.0, 6000.0}`
+- Frecuencias: `0.0 -> 11575`, `1000.0 -> 17`, `2000.0 -> 1`, `5000.0 -> 1`, `6000.0 -> 1`
 
 Vidas y terminación:
 
@@ -679,11 +681,12 @@ Vidas y terminación:
 
 ### 26.6 Lectura técnica de la evidencia
 
-- En esta corrida, la recompensa fue muy escasa (casi todos los steps con reward cero).
+- En esta corrida, la recompensa fue escasa (la gran mayoría de steps con reward cero).
 - No se observaron rewards negativos.
-- Se observaron valores de reward compatibles con el scoring histórico (1000 y 2000), pero esta evidencia no prueba por sí sola equivalencia completa para todos los objetivos/eventos.
+- Se observaron valores de reward compatibles con el scoring histórico (1000, 2000, 5000 y 6000), pero esta evidencia no prueba por sí sola equivalencia completa para todos los objetivos/eventos.
 - La alta proporción de reward cero y la varianza inter-episodio apoyan evaluar cuidadosamente eficiencia muestral y estabilidad en HU004.
 - La presencia consistente de `lives`, `frame_number` y `episode_frame_number` en `info` es útil para observabilidad de HU003+.
+- La secuencia inicial de acciones muestreadas con `env.action_space.sample()` resultó reproducible al reutilizar la misma seed del action space.
 
 ### 26.7 Alcance y límites de esta evidencia
 

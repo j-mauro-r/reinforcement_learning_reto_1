@@ -16,6 +16,7 @@ Se implemento un notebook reproducible para Experimento 0 que:
 - crea `ALE/BattleZone-v5` con configuracion explicita;
 - inspecciona contrato de observacion/acciones e `info`;
 - ejecuta una politica 100% aleatoria usando solo `env.action_space.sample()`;
+- inicializa la seed del entorno y la seed del action space por episodio (`env.reset(seed=s)` y `env.action_space.seed(s)`);
 - corre al menos 10 episodios independientes con seeds explicitas;
 - produce tabla por episodio con las metricas requeridas;
 - calcula baseline agregado;
@@ -37,6 +38,7 @@ Configuracion usada:
 - obs_type: `rgb`
 - frameskip: `4`
 - repeat_action_probability: `0.25`
+- action_space_seed_strategy: `seed action_space with episode seed before sampling`
 
 Runtime observado:
 
@@ -48,16 +50,22 @@ Runtime observado:
 
 Resultado agregado:
 
-- reward mean/median/std/min/max: `1300.0 / 1000.0 / 1187.43 / 0.0 / 4000.0`
-- steps mean/min/max: `1096.6 / 687 / 1450`
+- reward mean/median/std/min/max: `3000.0 / 2000.0 / 3065.94 / 0.0 / 10000.0`
+- steps mean/min/max: `1159.5 / 821 / 1960`
 - terminated: `10`
 - truncated: `0`
-- reward density (positive/zero/negative): `0.1094% / 99.8906% / 0.0%`
-- non-zero events promedio por episodio: `1.2`
-- rewards unicos observados: `{0.0, 1000.0, 2000.0}`
+- reward density (positive/zero/negative): `0.1725% / 99.8275% / 0.0%`
+- non-zero events promedio por episodio: `2.0`
+- rewards unicos observados: `{0.0, 1000.0, 2000.0, 5000.0, 6000.0}`
 - vidas iniciales observadas: `{5}`
 - perdidas promedio por episodio: `5.0`
 - vidas extra detectadas: `0`
+
+Validacion de reproducibilidad de muestreo de acciones:
+
+- seed usada para prueba: `BASE_SEED + 12345`
+- pasos verificados: `32`
+- resultado: `sequence_a == sequence_b` -> `True`
 
 ## 4. Autovalidaciones HU002
 
@@ -89,77 +97,86 @@ Resultado agregado:
 - Estado: PASS.
 - Evidencia: `inspection.initial_obs_shape`, `inspection.initial_obs_dtype`, `inspection.initial_obs_min`, `inspection.initial_obs_max`.
 
-### AV05 - Interaccion corta
+### AV05 - Reproducibilidad de secuencia de acciones
+
+- Procedimiento: muestrear dos secuencias de 32 acciones con `env.action_space.sample()` usando la misma seed del action space.
+- Resultado: ambas secuencias fueron identicas.
+- Estado: PASS.
+- Evidencia: `action_sampling_reproducibility.reproducible = true` en `3_BattleZone/data/baseline_random_battlezone_local.json`.
+
+### AV06 - Interaccion corta
 
 - Procedimiento: sonda aleatoria de hasta 120 steps (>=100) o terminacion.
 - Resultado: loop funcional sin errores.
 - Estado: PASS.
 - Evidencia: bloque `probe` del JSON con samples y claves de info.
 
-### AV06 - Baseline completo
+### AV07 - Baseline completo
 
 - Procedimiento: ejecucion de 10 episodios con seeds `base_seed + episode_id`.
 - Resultado: 10 episodios completados via `terminated or truncated`.
 - Estado: PASS.
 - Evidencia: `episode_records` con 10 filas; `termination.terminated_true_count=10`, `truncated_true_count=0`.
 
-### AV07 - Integridad estadistica
+### AV08 - Integridad estadistica
 
 - Procedimiento: calculo de resumen agregado desde tabla de episodios.
 - Resultado: metricas consistentes con registros por episodio.
 - Estado: PASS.
 - Evidencia: bloque `aggregate` coherente con `episode_records`.
 
-### AV08 - Densidad de reward
+### AV09 - Densidad de reward
 
 - Procedimiento: verificacion de suma de conteos positivo/cero/negativo contra total steps.
 - Resultado: suma exacta.
 - Estado: PASS.
 - Evidencia: `consistency_checks.reward_classification_sum_equals_steps = true`.
 
-### AV09 - Frecuencia de acciones
+### AV10 - Frecuencia de acciones
 
 - Procedimiento: suma de conteos de 18 acciones y comparacion con total steps.
 - Resultado: suma exacta.
 - Estado: PASS.
 - Evidencia: `consistency_checks.action_count_sum_equals_steps = true`.
 
-### AV10 - Vidas
+### AV11 - Vidas
 
 - Procedimiento: seguimiento de `info["lives"]` por episodio.
 - Resultado: vidas disponibles en reset/step, perdidas coherentes hasta 0 en terminacion.
 - Estado: PASS.
 - Evidencia: `lives_start_values_observed=[5]`, `avg_lives_lost_per_episode=5.0`, `last_life_terminated_count=10`.
 
-### AV11 - Visualizaciones
+### AV12 - Visualizaciones
 
 - Procedimiento: implementacion de celdas de graficas en notebook.
 - Resultado: notebook incluye las 3 visualizaciones minimas requeridas.
 - Estado: PASS (implementacion); ejecucion final depende del runtime.
 - Evidencia: celdas de plotting en `3_BattleZone/experimento_0_battlezone.ipynb`.
 
-### AV12 - Coherencia documental
+### AV13 - Coherencia documental
 
 - Procedimiento: contraste de resultados locales contra actualizacion de ficha tecnica.
 - Resultado: se agrego seccion de evidencia empirica separada de hechos documentales.
 - Estado: PASS.
 - Evidencia: `3_BattleZone/docs/ficha_tecnica.md`, seccion 26.
 
-### AV13 - Independencia de Assault
-
-- Procedimiento: revision de archivos modificados y grep de imports a `2_Assault/`.
-- Resultado: sin cambios ni imports hacia Assault.
-- Estado: PASS.
-- Evidencia: diff de la rama HU002 sin archivos bajo `2_Assault/`.
-
 ### AV14 - Ejecucion Colab
 
-- Procedimiento requerido: abrir notebook en Colab limpio y ejecutar todas las celdas en orden.
+- Procedimiento requerido:
+
+1. abrir `3_BattleZone/experimento_0_battlezone.ipynb` en Colab limpio;
+2. ejecutar todas las celdas en orden;
+3. confirmar instalacion sin cambios manuales;
+4. confirmar ejecucion de al menos 10 episodios;
+5. confirmar generacion de tablas, metricas y graficas;
+6. registrar versiones reales del runtime Colab;
+7. actualizar AV14 a PASS solo despues de esa ejecucion.
+
 - Resultado actual: pendiente en este entorno.
 - Estado: PENDING_COLAB_VALIDATION.
 - Evidencia: no disponible aun por limitacion de entorno local.
 
-## 5. Estado de cierre HU002
+## 5. Estado de HU002
 
-- HU002 implementada con evidencia local.
-- Cierre final de HU002 sujeto a completar AV14 en Colab.
+- HU002 IMPLEMENTADA - pendiente unicamente de validacion AV14 en Colab.
+- No se marca como cerrada/completada hasta registrar evidencia real de AV14.
