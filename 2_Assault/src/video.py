@@ -160,7 +160,12 @@ def generate_training_process_demo_video(
         }
     )
     checkpoint_step = enriched_metadata.get("source_checkpoint_step")
-    label = f"Entrenamiento/exploracion timestep {checkpoint_step}" if checkpoint_step else "Entrenamiento/exploracion"
+    represents_intermediate = bool(enriched_metadata["represents_intermediate_checkpoint"])
+    label = (
+        f"Entrenamiento/exploracion timestep {checkpoint_step}"
+        if represents_intermediate and checkpoint_step
+        else "Demostracion exploratoria de entrenamiento"
+    )
     return generate_assault_demo_video(
         agent=agent,
         env_factory=env_factory,
@@ -184,13 +189,24 @@ def _open_writer(path: Path, fps: int) -> Any:
 
 
 def _intro_frames(metadata: Mapping[str, Any], count: int, size: tuple[int, int]) -> Iterable[np.ndarray]:
-    lines = [
-        "Assault DDQN - evidencia de entrenamiento",
-        f"run: {metadata.get('project_run_id', '<unknown>')}",
-        f"checkpoint step: {metadata.get('source_checkpoint_step', '<unknown>')}",
-        f"model sha256: {str(metadata.get('model_sha256', '<unknown>'))[:16]}...",
-        f"evaluation epsilon: {metadata.get('epsilon', 0.0)}",
-    ]
+    is_exploration_demo = metadata.get("video_kind") == "training_process_exploration"
+    represents_intermediate = bool(metadata.get("represents_intermediate_checkpoint"))
+    if is_exploration_demo and not represents_intermediate:
+        lines = [
+            "Assault DDQN - demostracion exploratoria",
+            f"run: {metadata.get('project_run_id', '<unknown>')}",
+            "checkpoint intermedio: no disponible",
+            f"model sha256: {str(metadata.get('model_sha256', '<unknown>'))[:16]}...",
+            f"exploration epsilon: {metadata.get('exploration_epsilon', metadata.get('epsilon', 0.0))}",
+        ]
+    else:
+        lines = [
+            "Assault DDQN - evidencia de entrenamiento",
+            f"run: {metadata.get('project_run_id', '<unknown>')}",
+            f"checkpoint step: {metadata.get('source_checkpoint_step', '<unknown>')}",
+            f"model sha256: {str(metadata.get('model_sha256', '<unknown>'))[:16]}...",
+            f"evaluation epsilon: {metadata.get('epsilon', 0.0)}",
+        ]
     training = metadata.get("training_summary")
     if isinstance(training, Mapping):
         lines.append(f"timesteps: {training.get('final_global_step', training.get('global_step', '<unknown>'))}")
