@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "source": "HU009 real Google Colab full run; values documented in 2_Assault/docs/implementacion.md",
+  "project_run_id": "assault_ddqn_full_001",
+  "training_profile": "full",
+  "runtime": "Google Colab",
+  "hardware": {
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "gpu_required": true
+  },
+  "training": {
+    "initial_global_step": 0,
+    "final_global_step": 250000,
+    "episodes_completed": 417,
+    "transitions_stored": 250000,
+    "updates_count": 60001,
+    "online_weights_changed": true,
+    "epsilon_final": 0.01,
+    "last_loss": 0.6625979542732239,
+    "mean_loss": 0.8943741276802306,
+    "last_q_mean": 22.840946197509766,
+    "mean_q_mean": 11.862329530789939,
+    "duration_seconds": 656.916490947,
+    "final_replay_buffer_size": 50000
+  },
+  "historical_checkpoint_evaluation": {
+    "episodes": 10,
+    "epsilon": 0.0,
+    "mean_reward": 569.1,
+    "median_reward": 556.5,
+    "std_reward": 76.55644976094437,
+    "min_reward": 462.0,
+    "max_reward": 735.0,
+    "note": "Evidencia histórica desde la corrida full; HU011 usa como resultado principal una evaluación del modelo compacto entregable."
+  },
+  "checkpoint": {
+    "step": 250000,
+    "size_bytes": 2881543669
+  },
+  "provenance_note": "Snapshot liviano de evidencia observada. No sustituye TensorBoard, MLflow, checkpoint ni la evaluación final del modelo compacto."
+}

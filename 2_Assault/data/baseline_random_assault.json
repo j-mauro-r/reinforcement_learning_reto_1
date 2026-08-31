@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source": "2_Assault/experimento_0_assault.ipynb",
+  "policy": "uniform_random",
+  "environment": {
+    "id": "ALE/Assault-v5",
+    "obs_type": "rgb",
+    "frame_skip": 4,
+    "repeat_action_probability": 0.25,
+    "action_space": "Discrete(7)"
+  },
+  "episodes": 10,
+  "base_seed": 42,
+  "seeds": [42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
+  "rewards": [189.0, 273.0, 273.0, 210.0, 210.0, 399.0, 315.0, 189.0, 189.0, 378.0],
+  "episode_lengths": [577, 670, 694, 454, 480, 766, 640, 385, 622, 662],
+  "statistics": {
+    "mean_reward": 262.5,
+    "median_reward": 241.5,
+    "std_reward": 75.27848298152666,
+    "std_reward_hu001_reported_sample": 79.35048834128244,
+    "min_reward": 189.0,
+    "max_reward": 399.0
+  },
+  "provenance_note": "Rewards, seeds and lengths are transcribed from the executed HU001 notebook. HU001 displayed pandas sample std (ddof=1)=79.350488; std_reward here uses population std (ddof=0) to match src.evaluator.EvaluationSummary for like-for-like reporting."
+}
