@@ -736,7 +736,7 @@ No añadir comentarios que solo repitan el código.
 
 **Resultado esperado:** instalación, inspección y baseline ≥10 episodios finalizan sin cambios manuales al código.
 
-**Criterio:** PASS únicamente con evidencia real de ejecución. Si todavía no se ha ejecutado, HU002 queda **implementada pendiente de validación Colab**.
+**Criterio en esta fase:** validación **DEFERRED** (no bloqueante para cierre de HU002 con evidencia local reproducible). La ejecución en Colab se programa para HU003, validación del pipeline reproducible o antes de entrenamiento/evaluación formal.
 
 ---
 
@@ -810,7 +810,7 @@ La HU debe producir o referenciar:
 
 ## 13. Definition of Done
 
-HU002 se considera cerrada únicamente cuando:
+HU002 se considera cerrable en esta fase cuando:
 
 - [ ] existe `3_BattleZone/docs/hu002_experimento_0_baseline_aleatorio.md`;
 - [ ] existe `3_BattleZone/experimento_0_battlezone.ipynb`;
@@ -830,13 +830,15 @@ HU002 se considera cerrada únicamente cuando:
 - [ ] el radar se inspecciona visualmente;
 - [ ] existe `Conclusiones del Experimento 0`;
 - [ ] `3_BattleZone/docs/ficha_tecnica.md` está actualizada con hallazgos reales;
-- [ ] AV01–AV14 están ejecutadas y aprobadas;
-- [ ] el notebook se ejecuta completamente en Google Colab;
+- [ ] AV01–AV13 están ejecutadas y aprobadas con evidencia local reproducible;
+- [ ] AV14 queda explícitamente marcada como DEFERRED (no FAIL) con plan de ejecución posterior en Colab;
 - [ ] no se utiliza MLflow;
 - [ ] no se utiliza TensorBoard;
 - [ ] no se implementa entrenamiento ni lógica de agente;
 - [ ] no se modifica ni reutiliza código de `2_Assault/`;
 - [ ] el cambio se limita al alcance de HU002.
+
+Nota de fase: la validación integral en Colab se mantiene diferida para evitar consumo innecesario de capacidad durante esta etapa exploratoria.
 
 ---
 

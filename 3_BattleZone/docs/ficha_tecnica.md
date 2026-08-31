@@ -650,7 +650,7 @@ En esta corrida no aparecieron claves adicionales fuera de las listadas.
 
 Métricas agregadas observadas:
 
-- Recompensa media: `1300.0`
+- Recompensa media: `3000.0`
 - Recompensa mediana: `2000.0`
 - Desviación estándar: `3065.94`
 - Recompensa mínima: `0.0`

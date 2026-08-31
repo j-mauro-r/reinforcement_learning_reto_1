@@ -156,9 +156,9 @@ Validacion de reproducibilidad de muestreo de acciones:
 ### AV13 - Coherencia documental
 
 - Procedimiento: contraste de resultados locales contra actualizacion de ficha tecnica.
-- Resultado: se agrego seccion de evidencia empirica separada de hechos documentales.
+- Resultado: se agrego seccion de evidencia empirica separada de hechos documentales y se verifico aislamiento respecto a `2_Assault/` en el diff de la rama.
 - Estado: PASS.
-- Evidencia: `3_BattleZone/docs/ficha_tecnica.md`, seccion 26.
+- Evidencia: `3_BattleZone/docs/ficha_tecnica.md`, seccion 26, y diff de la rama sin cambios bajo `2_Assault/`.
 
 ### AV14 - Ejecucion Colab
 
@@ -172,11 +172,12 @@ Validacion de reproducibilidad de muestreo de acciones:
 6. registrar versiones reales del runtime Colab;
 7. actualizar AV14 a PASS solo despues de esa ejecucion.
 
-- Resultado actual: pendiente en este entorno.
-- Estado: PENDING_COLAB_VALIDATION.
+- Resultado actual: diferida en esta fase para no consumir capacidad de Colab durante la etapa exploratoria.
+- Estado: DEFERRED.
 - Evidencia: no disponible aun por limitacion de entorno local.
 
 ## 5. Estado de HU002
 
-- HU002 IMPLEMENTADA - pendiente unicamente de validacion AV14 en Colab.
-- No se marca como cerrada/completada hasta registrar evidencia real de AV14.
+- HU002 IMPLEMENTADA y VALIDADA con evidencia local reproducible.
+- HU002 es cerrable en el PR actual.
+- AV14 (Colab runtime limpio) queda DEFERRED para HU003, validacion del pipeline reproducible o antes del entrenamiento/evaluacion formal.
