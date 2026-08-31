@@ -21,7 +21,7 @@ La selección definitiva del algoritmo para BattleZone se realizará después de
 
 El trabajo realizado previamente para Assault se utilizará únicamente como **base de conocimiento y referencia metodológica**.
 
-Se reutilizarán conceptos, prácticas y aprendizajes como:
+Se reutilizarán aprendizajes y prácticas como:
 
 - metodología incremental por HUs;
 - Deep Work Plans (DWP);
@@ -30,7 +30,6 @@ Se reutilizarán conceptos, prácticas y aprendizajes como:
 - smoke tests antes de entrenamientos largos;
 - checkpoints y reanudación;
 - TensorBoard;
-- MLflow;
 - evaluación formal contra baseline aleatorio;
 - ejecución local antes de consumir GPU cuando sea viable;
 - Google Colab como entorno principal de entrenamiento GPU;
@@ -46,22 +45,25 @@ El proyecto Assault se considera únicamente conocimiento previo del equipo.
 
 ---
 
-## 3. Principios del plan
+## 3. Decisiones técnicas transversales
 
-1. Entender primero el entorno antes de seleccionar el algoritmo.
-2. Construir un baseline aleatorio antes de entrenar.
+1. Entender el entorno antes de seleccionar algoritmo.
+2. Construir baseline aleatorio antes de entrenar.
 3. Validar barato antes de entrenar caro.
-4. Mantener el notebook como orquestador y reporte, no como repositorio de lógica duplicada.
+4. Mantener el notebook como orquestador y reporte.
 5. Separar responsabilidades técnicas.
 6. Mantener configuración, seeds y versiones explícitas.
 7. Todo entrenamiento largo debe poder reanudarse.
-8. TensorBoard se utilizará para observabilidad temporal.
-9. MLflow se utilizará para trazabilidad y comparación de experimentos.
-10. La evaluación final estará desacoplada del entrenamiento.
-11. El agente final deberá evaluarse sobre al menos 10 episodios independientes.
-12. El resultado debe compararse contra una política aleatoria bajo condiciones equivalentes.
-13. No se optimizarán hiperparámetros sin una hipótesis explícita.
-14. El código de BattleZone será independiente del código de Assault.
+8. TensorBoard será la herramienta principal de observabilidad.
+9. **BattleZone no utilizará MLflow.**
+10. La trazabilidad se resolverá con Git/GitHub, configuración versionada, `run_id`, manifiesto de ejecución, checkpoints, TensorBoard y archivos estructurados de resultados.
+11. La evaluación final estará desacoplada del entrenamiento.
+12. El agente final deberá evaluarse sobre al menos 10 episodios independientes.
+13. El resultado se comparará contra una política aleatoria bajo condiciones equivalentes.
+14. No se optimizarán hiperparámetros sin una hipótesis explícita.
+15. El código de BattleZone será independiente del código de Assault.
+
+Los lineamientos técnicos detallados se encuentran en `3_BattleZone/docs/lineamientos.md`.
 
 ---
 
@@ -86,7 +88,7 @@ HU008  Observabilidad con TensorBoard
   ↓
 HU009  Smoke test end-to-end
   ↓
-HU010  MLflow y trazabilidad de experimentos
+HU010  Trazabilidad ligera de experimentos
   ↓
 HU011  Entrenamiento completo
   ↓
@@ -126,9 +128,7 @@ Debe documentar como mínimo:
 - factores que aumentan la dificultad del aprendizaje;
 - preguntas que deberán resolverse empíricamente.
 
-**Entregable principal:**
-
-`3_BattleZone/ficha_tecnica.md`
+**Entregable principal:** `3_BattleZone/ficha_tecnica.md`.
 
 **Gate:** no comenzar diseño algorítmico definitivo antes de completar esta caracterización.
 
@@ -143,8 +143,7 @@ Debe ejecutar al menos 10 episodios independientes y registrar, cuando estén di
 - recompensa por episodio;
 - media, mediana, desviación estándar, mínimo y máximo;
 - duración por episodio;
-- lives;
-- pérdidas de vida;
+- vidas y pérdidas de vida;
 - `terminated` y `truncated`;
 - densidad de recompensas positivas, cero y negativas;
 - frecuencia de cada acción;
@@ -156,9 +155,9 @@ Debe incluir visualizaciones mínimas de recompensa, duración y frecuencia de a
 **Entregables:**
 
 - `3_BattleZone/experimento_0_battlezone.ipynb`;
-- actualización de `ficha_tecnica.md`.
+- actualización de `3_BattleZone/ficha_tecnica.md`.
 
-**Resultado:** baseline cuantitativo para evaluar posteriormente al agente entrenado.
+**Resultado:** baseline cuantitativo reutilizable en HU013.
 
 ---
 
@@ -172,7 +171,7 @@ Debe incluir:
 - seeds;
 - fábrica única del entorno;
 - preprocessing visual;
-- grayscale si se valida como apropiado;
+- grayscale si HU001/HU002 demuestran que conserva información suficiente;
 - resize;
 - frame stacking;
 - tratamiento correcto de `frameskip`;
@@ -181,13 +180,13 @@ Debe incluir:
 - detección de hardware;
 - smoke tests del entorno.
 
-El preprocessing definitivo deberá determinarse a partir de HU001 y HU002, no copiarse automáticamente de Assault.
+El preprocessing definitivo deberá determinarse a partir de BattleZone, no copiarse automáticamente de Assault.
 
 **Entregables previstos:**
 
-- `configs/`;
-- `src/environment.py`;
-- `src/utils.py`;
+- `3_BattleZone/configs/`;
+- `3_BattleZone/src/environment.py`;
+- `3_BattleZone/src/utils.py`;
 - tests focalizados;
 - esqueleto del notebook principal.
 
@@ -199,7 +198,7 @@ El preprocessing definitivo deberá determinarse a partir de HU001 y HU002, no c
 
 **Propósito:** elegir justificadamente uno de los algoritmos permitidos por el reto.
 
-La comparación deberá considerar como mínimo:
+La comparación deberá considerar:
 
 - tamaño del action space;
 - dimensionalidad visual;
@@ -208,9 +207,9 @@ La comparación deberá considerar como mínimo:
 - estabilidad esperada;
 - eficiencia muestral;
 - complejidad de implementación;
-- duración de los episodios;
+- duración de episodios;
 - baseline aleatorio;
-- posibilidad de completar entrenamiento dentro de las restricciones de Colab.
+- restricciones de Colab.
 
 Algoritmos candidatos:
 
@@ -219,9 +218,9 @@ Algoritmos candidatos:
 - DDQN;
 - REINFORCE.
 
-La decisión debe quedar documentada mediante una matriz comparativa y una justificación técnica.
+**Entregable:** decisión técnica versionada con matriz comparativa y justificación.
 
-**Entregable:** decisión técnica versionada dentro de la documentación de BattleZone.
+**Gate:** HU005 debe implementar únicamente el algoritmo seleccionado.
 
 ---
 
@@ -235,22 +234,22 @@ Para algoritmos value-based, incluir según corresponda:
 - Online Network;
 - Target Network cuando aplique;
 - Replay Buffer;
-- Prioritized Experience Replay únicamente si el algoritmo seleccionado lo exige;
+- Prioritized Experience Replay únicamente si el algoritmo seleccionado es DQN + PER;
 - política epsilon-greedy;
 - cálculo de targets;
 - optimizer;
 - actualización de pesos;
 - interfaces básicas save/load.
 
-Para REINFORCE, la HU deberá adaptarse a su arquitectura policy-based sin introducir componentes de DQN innecesarios.
+Para REINFORCE, adaptar la HU a una policy network y trayectorias completas sin introducir componentes DQN innecesarios.
 
-**Resultado:** forward pass válido y al menos una actualización del agente ejecutada sobre datos controlados.
+**Resultado:** forward pass válido y al menos una actualización del agente sobre datos controlados.
 
 ---
 
 ## HU006 — Ciclo de entrenamiento
 
-**Propósito:** integrar entorno, agente y almacenamiento de experiencia en un flujo controlado.
+**Propósito:** integrar entorno, agente y experiencia en un flujo controlado.
 
 Debe implementar según el algoritmo:
 
@@ -261,8 +260,8 @@ Debe implementar según el algoritmo:
 - inicio del aprendizaje;
 - actualizaciones del modelo;
 - actualización de Target Network cuando corresponda;
-- control por timestep o episodio según el algoritmo;
-- métricas básicas de entrenamiento;
+- control por timestep o episodio;
+- métricas básicas;
 - manejo explícito de `terminated` y `truncated`.
 
 **Resultado:** entrenamiento corto funcional con modificación verificable de parámetros.
@@ -273,9 +272,9 @@ Debe implementar según el algoritmo:
 
 **Propósito:** evitar pérdida de entrenamiento ante desconexiones o reinicios de Colab.
 
-Cada checkpoint debe guardar la información necesaria para continuar de forma consistente.
+Cada checkpoint debe guardar el estado necesario para continuar consistentemente.
 
-Según el algoritmo, esto puede incluir:
+Puede incluir, según el algoritmo:
 
 - redes;
 - optimizer;
@@ -284,7 +283,7 @@ Según el algoritmo, esto puede incluir:
 - Replay Buffer cuando sea viable;
 - configuración;
 - métricas acumuladas;
-- estado adicional requerido para reconstruir el entrenamiento.
+- estado adicional necesario.
 
 Debe soportar explícitamente:
 
@@ -308,9 +307,9 @@ Registrar como mínimo, cuando aplique:
 - loss;
 - exploración/epsilon;
 - Q-value medio o métrica equivalente;
-- timestep global;
+- timestep/episodio global;
 - learning rate;
-- métricas adicionales que ayuden a detectar estancamiento o inestabilidad.
+- métricas adicionales justificadas para detectar estancamiento o inestabilidad.
 
 **Resultado:** una corrida corta produce logs válidos y gráficas interpretables.
 
@@ -335,47 +334,55 @@ Debe verificar conjuntamente:
 - evaluación corta;
 - ausencia de errores de shapes, dispositivos o memoria.
 
-Debe ejecutarse primero localmente cuando sea viable y después en Colab GPU.
+Debe ejecutarse primero localmente cuando sea viable y luego en Colab GPU.
 
 **Gate:** HU011 no puede iniciar si HU009 no está aprobada.
 
 ---
 
-## HU010 — MLflow y trazabilidad de experimentos
+## HU010 — Trazabilidad ligera de experimentos
 
-**Propósito:** permitir comparar y reproducir las corridas relevantes.
+**Propósito:** permitir reproducir y comparar corridas sin utilizar MLflow.
 
-Cada experimento debe registrar como mínimo:
+Cada corrida relevante deberá poseer un `run_id` único y producir un manifiesto estructurado, por ejemplo:
 
-### Parámetros
+`3_BattleZone/results/<run_id>/run_manifest.json`
 
+El manifiesto debe registrar como mínimo:
+
+### Identidad
+
+- `run_id`;
 - algoritmo;
+- commit Git;
+- fecha/hora;
+- seed.
+
+### Configuración
+
 - environment ID;
 - preprocessing;
 - hiperparámetros;
-- seed;
-- versiones;
-- hardware;
-- commit Git;
-- run ID.
+- versiones de librerías;
+- hardware.
 
-### Métricas
+### Ejecución
 
 - timestep/episodio inicial y final;
-- tiempo de entrenamiento;
-- recompensa de evaluación;
-- desviación estándar;
-- mínimo y máximo;
-- mejor resultado relevante.
+- nuevo entrenamiento o resume;
+- checkpoint de entrada cuando aplique;
+- checkpoint/modelo de salida;
+- tiempo acumulado.
 
-### Artefactos
+### Resultados
 
-- configuración;
-- resumen de evaluación;
-- referencia al checkpoint/modelo;
-- gráficas finales cuando aporten valor.
+- ruta de logs TensorBoard;
+- métricas de evaluación cuando existan;
+- resumen de resultados estructurado.
 
-**Resultado:** dos experimentos pueden compararse y asociarse a código y configuración específicos.
+Debe poder generarse una tabla comparativa de corridas desde estos resultados sin depender de un servicio externo.
+
+**Resultado:** dos experimentos pueden asociarse inequívocamente a código, configuración, logs, checkpoints y métricas.
 
 ---
 
@@ -389,9 +396,9 @@ Debe:
 - producir checkpoints periódicos;
 - soportar múltiples sesiones;
 - conservar TensorBoard;
-- registrar MLflow;
+- conservar `run_manifest` y resultados estructurados;
 - persistir artefactos importantes;
-- registrar tiempo acumulado de entrenamiento;
+- registrar tiempo acumulado;
 - producir al menos un modelo candidato evaluable.
 
 **Resultado:** agente entrenado con trazabilidad completa y evidencia observable de aprendizaje o estancamiento.
@@ -404,7 +411,7 @@ Debe:
 
 Cada cambio debe partir de una hipótesis.
 
-Dependiendo del algoritmo, podrán evaluarse parámetros como:
+Dependiendo del algoritmo, podrán evaluarse:
 
 - learning rate;
 - gamma;
@@ -420,12 +427,13 @@ Dependiendo del algoritmo, podrán evaluarse parámetros como:
 
 Cada variante debe registrar:
 
+- `run_id`;
 - valor anterior;
 - valor nuevo;
 - hipótesis;
 - resultado esperado;
-- run MLflow;
-- resultado observado.
+- resultado observado;
+- comparación contra corrida anterior.
 
 **Resultado:** selección justificada de la mejor configuración candidata.
 
@@ -441,12 +449,11 @@ Debe:
 - utilizar el mismo pipeline de observaciones;
 - ejecutar al menos 10 episodios independientes;
 - usar recompensa real del entorno;
-- desactivar exploración deliberada o documentar el comportamiento de evaluación;
+- desactivar exploración deliberada o documentar la política de evaluación;
 - calcular media, mediana, desviación estándar, mínimo y máximo;
-- registrar duración y vidas cuando sean útiles;
-- comparar directamente contra el baseline aleatorio de HU002.
-
-Además de las métricas, debe revisarse cualitativamente si existe comportamiento lógico aprendido.
+- registrar duración y vidas cuando aporten al análisis;
+- comparar directamente contra el baseline aleatorio de HU002;
+- producir evidencia cualitativa del comportamiento aprendido.
 
 **Criterio interno mínimo:** el agente debe mostrar evidencia cuantitativa y/o conductual consistente de aprendizaje frente a la política aleatoria.
 
@@ -469,7 +476,7 @@ Debe producir/verificar:
 - hardware utilizado;
 - tiempo de entrenamiento;
 - gráficas de TensorBoard;
-- información de MLflow;
+- manifiestos y tabla comparativa de experimentos;
 - evaluación formal de al menos 10 episodios;
 - comparación contra baseline aleatorio;
 - análisis del comportamiento aprendido;
@@ -491,31 +498,29 @@ Debe producir/verificar:
 11. Estrategia de entrenamiento.
 12. Checkpoints y reanudación.
 13. TensorBoard y evolución del aprendizaje.
-14. Experimentos y comparaciones MLflow.
+14. Trazabilidad y comparación de experimentos.
 15. Evaluación final ≥10 episodios.
 16. Comparación con baseline.
 17. Análisis del comportamiento aprendido.
 18. Limitaciones y amenazas a la validez.
 19. Conclusiones.
-20. Instrucciones de reproducción.
 
-**Resultado:** entrega consistente entre código, notebook, modelo, métricas, video y reporte.
+**Resultado:** entrega reproducible, consistente entre notebook, modelo, métricas, video y código.
 
 ---
 
 # 6. Reglas de transición entre HUs
 
-Una HU posterior no debe utilizarse para ocultar fallos de una HU anterior.
+Una HU posterior no debe utilizarse para ocultar una validación fallida de una HU anterior.
 
 Antes de avanzar:
 
-1. criterios de aceptación satisfechos;
-2. autovalidaciones ejecutadas;
-3. evidencia disponible;
-4. Definition of Done completada;
-5. desviaciones documentadas;
-6. PR limitado al alcance de la HU;
-7. no introducir código de Assault en BattleZone.
+1. todos los criterios de aceptación de la HU deben estar satisfechos;
+2. las autovalidaciones obligatorias deben ejecutarse correctamente;
+3. la evidencia debe quedar disponible en PR, notebook, logs o artefactos;
+4. Definition of Done debe estar completa;
+5. cualquier desviación debe documentarse explícitamente;
+6. el PR debe limitarse al alcance de la HU.
 
 Flujo esperado:
 
@@ -537,141 +542,83 @@ merge a main
 
 ---
 
-# 7. Estándar obligatorio para crear cada HU — Metodología DWP
+# 7. Estándar obligatorio para crear cada HU según DWP
 
-Cada nueva HU de BattleZone deberá redactarse como un **Deep Work Plan (DWP) ejecutable**, suficientemente preciso para que otro desarrollador o agente pueda implementarla sin reinterpretar el objetivo.
+Cada HU debe redactarse como un **Deep Work Plan (DWP) ejecutable**, de forma que otro desarrollador o agente pueda implementarla sin reinterpretar el objetivo.
 
 ## 7.1 Identificación
 
 Debe incluir:
 
-- ID;
-- nombre;
+- ID y nombre de la HU;
 - estado;
 - dependencia previa;
-- HU que habilita;
+- HUs que habilita;
 - archivos/documentos fuente de verdad.
-
----
 
 ## 7.2 Contexto y problema
 
-Explicar claramente:
+Explicar:
 
 - qué problema existe;
 - por qué debe resolverse ahora;
-- qué riesgo evita;
 - qué capacidad habilita;
-- qué decisiones previas condicionan la solución.
-
-La sección debe distinguir hechos conocidos de supuestos aún pendientes de validar.
-
----
+- qué decisiones anteriores condicionan la solución.
 
 ## 7.3 Historia de usuario
 
 Formato recomendado:
 
-> **Como** [actor], **quiero** [capacidad], **para** [resultado o valor].
-
-Debe describir valor técnico o académico, no únicamente una tarea de programación.
-
----
+> **Como** [actor], **quiero** [capacidad], **para** [resultado/valor].
 
 ## 7.4 Objetivo verificable
 
-Definir el resultado técnico concreto que debe existir al finalizar.
+Definir un resultado técnico concreto, observable y verificable.
 
-Debe ser observable y comprobable.
-
-Evitar formulaciones ambiguas como:
-
-- “mejorar el código”;
-- “hacer que funcione”;
-- “optimizar el agente”.
-
----
+Evitar objetivos ambiguos como “mejorar el agente” o “hacer que funcione”.
 
 ## 7.5 Alcance
 
 Listar explícitamente:
 
-- archivos que deben crearse o modificarse;
-- componentes involucrados;
+- componentes que deben crearse/modificarse;
 - comportamientos requeridos;
-- configuraciones;
 - integraciones;
-- datos o artefactos afectados.
-
----
+- configuración/datos implicados.
 
 ## 7.6 Fuera de alcance
 
-Definir qué **no** debe implementarse.
-
-Su objetivo es prevenir:
-
-- scope creep;
-- sobreingeniería;
-- implementación anticipada de HUs posteriores;
-- duplicación;
-- cambios accidentales en otros agentes del reto.
-
-Toda HU de BattleZone debe recordar, cuando sea relevante, que no debe modificar archivos de Assault.
-
----
+Indicar qué **no** debe implementarse para prevenir scope creep, sobreingeniería y adelanto de historias posteriores.
 
 ## 7.7 Decisiones y restricciones técnicas
 
-Documentar las decisiones necesarias para implementar la HU, por ejemplo:
+Documentar únicamente lo necesario para implementar la HU:
 
+- interfaces esperadas;
 - módulos responsables;
-- interfaces;
-- separación de responsabilidades;
-- configuración centralizada;
-- compatibilidad local/Colab;
-- GPU;
+- reglas de arquitectura;
+- compatibilidad local/Colab/GPU;
 - idempotencia;
 - persistencia;
-- reproducibilidad;
-- SOLID;
-- DRY;
-- restricciones del algoritmo seleccionado;
-- restricciones académicas del enunciado.
+- SOLID/DRY;
+- restricciones específicas del algoritmo.
 
-No deben crearse abstracciones sin una necesidad concreta.
-
----
+Debe respetar `3_BattleZone/docs/lineamientos.md`.
 
 ## 7.8 Plan de implementación / tareas
 
-Dividir la HU en tareas pequeñas y ordenadas.
+Dividir el trabajo en tareas pequeñas y ordenadas.
 
 Cada tarea debe indicar:
 
-- identificador;
-- archivo o componente afectado;
-- cambio esperado;
+- qué cambia;
+- dónde cambia;
 - resultado esperado;
 - dependencias con tareas anteriores.
 
-Formato sugerido:
-
-```text
-T01 — Nombre de la tarea
-Archivo: ...
-Cambio: ...
-Resultado esperado: ...
-Depende de: ...
-```
-
----
-
 ## 7.9 Criterios de aceptación
 
-Deben ser objetivos y verificables.
-
-Se recomienda Given/When/Then:
+Preferir formato Given/When/Then:
 
 ```text
 CA01
@@ -680,133 +627,94 @@ Cuando ...
 Entonces ...
 ```
 
-Deben cubrir según corresponda:
+Deben cubrir:
 
 - comportamiento funcional;
 - integración;
-- errores y casos borde;
-- reproducibilidad;
-- shapes y dtypes;
-- persistencia;
-- restricciones arquitectónicas;
-- compatibilidad local/Colab;
-- condiciones específicas del algoritmo.
+- errores/casos borde relevantes;
+- reproducibilidad cuando aplique;
+- restricciones arquitectónicas.
 
----
+## 7.10 Definition of Done
 
-## 7.10 Autovalidaciones obligatorias
-
-Cada HU debe definir cómo demostrar que funciona.
-
-Cada autovalidación debe especificar:
-
-1. identificador;
-2. comando o procedimiento;
-3. resultado esperado;
-4. criterio de PASS/FAIL;
-5. ambiente donde debe ejecutarse.
-
-Ejemplos:
-
-- imports;
-- pytest;
-- shapes/dtypes;
-- ejecución de steps;
-- forward pass;
-- actualización de pesos;
-- save/load;
-- checkpoint/resume;
-- TensorBoard;
-- MLflow;
-- evaluación corta;
-- ejecución E2E;
-- validación local;
-- validación Colab GPU.
-
-Cuando una prueba únicamente pueda ejecutarse en Colab, debe marcarse explícitamente como:
-
-**Validación Colab pendiente de ejecución por el usuario.**
-
-No deben inventarse resultados.
-
----
-
-## 7.11 Evidencias esperadas
-
-Definir qué evidencia demuestra el cumplimiento de la HU.
-
-Puede incluir:
-
-- salida de tests;
-- logs;
-- métricas;
-- tablas;
-- screenshots;
-- TensorBoard;
-- MLflow;
-- checkpoint restaurado;
-- notebook ejecutado;
-- modelo generado;
-- resultados de evaluación.
-
----
-
-## 7.12 Definition of Done
-
-Toda HU debe incluir una checklist explícita.
-
-Formato base:
+Checklist mínima:
 
 ```text
 - [ ] implementación completada;
 - [ ] criterios de aceptación satisfechos;
 - [ ] autovalidaciones ejecutadas;
+- [ ] no existen bloqueantes conocidos;
+- [ ] documentación/configuración actualizada cuando aplica;
 - [ ] evidencia disponible;
-- [ ] documentación/configuración actualizada;
-- [ ] no existen errores conocidos bloqueantes;
-- [ ] no se modificaron componentes fuera del alcance;
-- [ ] PR limitado al alcance de la HU;
-- [ ] validaciones Colab ejecutadas cuando apliquen.
+- [ ] PR limitado al alcance de la HU.
 ```
 
-Una HU no está cerrada únicamente porque exista código.
+## 7.11 Autovalidaciones obligatorias
 
----
+Cada HU debe especificar cómo demostrar que funciona.
+
+Pueden incluir:
+
+- imports;
+- tests unitarios focalizados;
+- smoke tests;
+- shapes/dtypes;
+- steps del entorno;
+- forward pass;
+- actualización real de pesos;
+- Replay Buffer/PER;
+- Target Network sync;
+- save/load;
+- checkpoint/resume;
+- TensorBoard;
+- `run_manifest`;
+- evaluación corta;
+- ejecución E2E;
+- validación local;
+- validación Colab GPU.
+
+Cada autovalidación debe definir:
+
+1. comando o procedimiento;
+2. resultado esperado;
+3. criterio PASS/FAIL.
+
+Si una validación solo puede ejecutarse en Colab/GPU, debe marcarse explícitamente como **validación Colab pendiente de ejecución por el usuario** hasta obtener evidencia real.
+
+## 7.12 Evidencias esperadas
+
+La HU debe definir qué evidencia demuestra su éxito, por ejemplo:
+
+- salida de tests;
+- métricas;
+- tabla;
+- screenshot o gráfica TensorBoard;
+- manifiesto de ejecución;
+- checkpoint restaurado;
+- notebook ejecutado;
+- modelo generado;
+- resultados de evaluación.
 
 ## 7.13 Riesgos y consideraciones
 
-Registrar únicamente riesgos materiales, como:
+Registrar únicamente riesgos materiales, especialmente:
 
 - RAM/VRAM;
-- duración de Colab;
+- duración de sesión Colab;
 - pérdida de checkpoints;
-- incompatibilidad de versiones;
-- bugs de shapes;
-- action space incorrecto;
-- `frameskip` duplicado;
-- preprocessing inconsistente;
-- diferencias train/eval;
-- desviaciones frente al baseline;
-- experimentos no comparables;
-- contaminación accidental entre BattleZone y Assault.
-
----
-
-## 7.14 Resultado esperado y gate
-
-Cada HU debe finalizar indicando:
-
-- qué capacidad nueva existe;
-- qué evidencia demuestra su funcionamiento;
-- qué condición debe cumplirse antes de iniciar la HU siguiente.
+- versiones incompatibles;
+- errores de shapes;
+- duplicación de frameskip;
+- degradación de información visual por preprocessing;
+- cambios que invaliden comparación con baseline.
 
 ---
 
 # 8. Regla de cierre de una HU
 
-Una HU se considera **implementada** cuando el código o artefacto existe.
+Una HU se considera **implementada** cuando el código existe.
 
-Una HU se considera **terminada** únicamente cuando:
+Una HU se considera **cerrada** únicamente cuando:
 
 ```text
 Implementación
@@ -822,28 +730,18 @@ Definition of Done completa
 HU CERRADA
 ```
 
-Si una autovalidación obligatoria depende de Colab/GPU y aún no fue ejecutada, la HU debe permanecer como:
-
-**IMPLEMENTADA — PENDIENTE DE VALIDACIÓN**
+Si una autovalidación obligatoria depende de Colab y todavía no fue ejecutada, la HU debe mantenerse como **implementada pendiente de validación**.
 
 ---
 
-# 9. Criterio global de éxito del proyecto BattleZone
+# 9. Regla de precedencia documental
 
-El proyecto se considerará técnicamente completo cuando sea posible:
+Ante contradicciones:
 
-1. partir desde `main`;
-2. ejecutar el notebook en un runtime limpio de Google Colab;
-3. reproducir la configuración del entorno;
-4. iniciar o reanudar el entrenamiento;
-5. observar la evolución mediante TensorBoard;
-6. identificar la corrida en MLflow;
-7. recuperar checkpoints después de interrupciones;
-8. evaluar el modelo sobre al menos 10 episodios independientes;
-9. compararlo con el baseline aleatorio;
-10. demostrar comportamiento aprendido razonablemente lógico;
-11. generar modelo, métricas, video y reporte;
-12. relacionar todos los artefactos con una configuración y commit Git;
-13. mantener completa independencia de código entre BattleZone y Assault.
+1. `enunciado_reto_1.txt` — restricciones académicas;
+2. `3_BattleZone/ficha_tecnica.md` — decisiones específicas del entorno;
+3. `3_BattleZone/docs/implementacion.md` — secuencia de implementación;
+4. `3_BattleZone/docs/lineamientos.md` — políticas técnicas transversales;
+5. HU/DWP puntual — alcance específico.
 
-La prioridad no es construir una plataforma MLOps empresarial. La prioridad es producir un agente BattleZone reproducible, observable, recuperable, evaluable y defendible académicamente.
+Ninguna HU puede invalidar silenciosamente una restricción de nivel superior.
