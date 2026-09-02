@@ -72,7 +72,7 @@ Los lineamientos técnicos detallados se encuentran en `3_BattleZone/docs/lineam
 ```text
 HU001  Caracterización técnica y ficha inicial de BattleZone
   ↓
-HU002  Experimento 0 y baseline aleatorio
+HU002  Experimento 0 y baseline aleatorio - [COMPLETADA]
   ↓
 HU003  Pipeline reproducible del entorno
   ↓
