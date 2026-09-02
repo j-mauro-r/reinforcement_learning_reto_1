@@ -88,3 +88,14 @@ dqn:
     name: "smooth_l1"
   epsilon:
     api_default: 0.1
+
+training:
+  baseline_note: "baseline de implementacion por validar"
+  total_timesteps: 256
+  learning_starts: 32
+  train_frequency: 4
+  target_sync_interval: 64
+  epsilon:
+    start: 1.0
+    end: 0.05
+    decay_steps: 1024
