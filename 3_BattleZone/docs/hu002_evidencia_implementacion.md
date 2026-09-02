@@ -172,12 +172,13 @@ Validacion de reproducibilidad de muestreo de acciones:
 6. registrar versiones reales del runtime Colab;
 7. actualizar AV14 a PASS solo despues de esa ejecucion.
 
-- Resultado actual: diferida en esta fase para no consumir capacidad de Colab durante la etapa exploratoria.
-- Estado: DEFERRED.
-- Evidencia: no disponible aun por limitacion de entorno local.
+- Resultado actual: pendiente de validacion real en Google Colab por parte del usuario.
+- Estado: PENDING_COLAB_VALIDATION.
+- Evidencia: no disponible aun; no se marca PASS hasta ejecutar el notebook en un runtime Colab limpio.
 
 ## 5. Estado de HU002
 
-- HU002 IMPLEMENTADA y VALIDADA con evidencia local reproducible.
-- HU002 es cerrable en el PR actual.
-- AV14 (Colab runtime limpio) queda DEFERRED para HU003, validacion del pipeline reproducible o antes del entrenamiento/evaluacion formal.
+- HU002 IMPLEMENTADA con evidencia local reproducible.
+- HU002 queda pendiente unicamente de validacion AV14 en Google Colab.
+- HU002 no se marca como CERRADA ni COMPLETADA.
+- AV14 (Colab runtime limpio) queda PENDING_COLAB_VALIDATION hasta que el usuario ejecute el notebook en Colab y registre las versiones reales del runtime.

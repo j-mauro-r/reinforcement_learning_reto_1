@@ -4,7 +4,7 @@
 
 - **ID:** HU002
 - **Nombre:** Experimento 0 y baseline aleatorio de BattleZone
-- **Estado:** Lista para implementación
+- **Estado:** IMPLEMENTADA - pendiente únicamente de validación AV14 en Google Colab
 - **Dependencia previa:** HU001 — Caracterización técnica y ficha inicial de BattleZone
 - **Habilita:** HU003 — Pipeline reproducible del entorno
 - **Fuentes de verdad:**
@@ -736,7 +736,17 @@ No añadir comentarios que solo repitan el código.
 
 **Resultado esperado:** instalación, inspección y baseline ≥10 episodios finalizan sin cambios manuales al código.
 
-**Criterio en esta fase:** validación **DEFERRED** (no bloqueante para cierre de HU002 con evidencia local reproducible). La ejecución en Colab se programa para HU003, validación del pipeline reproducible o antes de entrenamiento/evaluación formal.
+**Criterio en esta fase:** validación **PENDING_COLAB_VALIDATION**. No marcar AV14 como PASS hasta ejecutar el notebook en un runtime limpio de Google Colab y registrar evidencia real.
+
+Instrucciones mínimas para validar AV14:
+
+1. abrir `3_BattleZone/experimento_0_battlezone.ipynb` en Colab limpio;
+2. ejecutar todas las celdas en orden;
+3. confirmar instalación sin cambios manuales;
+4. confirmar ejecución de ≥10 episodios;
+5. confirmar generación de tablas, métricas y gráficas;
+6. registrar versiones reales del runtime Colab;
+7. actualizar evidencia AV14 a PASS solo después de esa ejecución.
 
 ---
 
@@ -810,7 +820,7 @@ La HU debe producir o referenciar:
 
 ## 13. Definition of Done
 
-HU002 se considera cerrable en esta fase cuando:
+HU002 se considera implementada, pendiente únicamente de AV14 en Google Colab, cuando:
 
 - [ ] existe `3_BattleZone/docs/hu002_experimento_0_baseline_aleatorio.md`;
 - [ ] existe `3_BattleZone/experimento_0_battlezone.ipynb`;
@@ -831,7 +841,7 @@ HU002 se considera cerrable en esta fase cuando:
 - [ ] existe `Conclusiones del Experimento 0`;
 - [ ] `3_BattleZone/docs/ficha_tecnica.md` está actualizada con hallazgos reales;
 - [ ] AV01–AV13 están ejecutadas y aprobadas con evidencia local reproducible;
-- [ ] AV14 queda explícitamente marcada como DEFERRED (no FAIL) con plan de ejecución posterior en Colab;
+- [ ] AV14 queda explícitamente marcada como PENDING_COLAB_VALIDATION con instrucciones mínimas de ejecución posterior en Colab;
 - [ ] no se utiliza MLflow;
 - [ ] no se utiliza TensorBoard;
 - [ ] no se implementa entrenamiento ni lógica de agente;

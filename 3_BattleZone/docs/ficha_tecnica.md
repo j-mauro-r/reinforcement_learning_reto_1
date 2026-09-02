@@ -692,3 +692,5 @@ Vidas y terminación:
 
 - Estos resultados corresponden a una corrida local específica de baseline aleatorio y no reemplazan futuras validaciones en Colab.
 - La decisión de preprocessing definitivo (grayscale/RGB, resize, frame stack, posibles recortes) permanece abierta para HU003 y debe basarse en evidencia visual adicional del radar.
+- Estado HU002: IMPLEMENTADA, pendiente únicamente de AV14 en Google Colab.
+- Estado AV14: `PENDING_COLAB_VALIDATION`; solo debe actualizarse a PASS después de ejecutar `3_BattleZone/experimento_0_battlezone.ipynb` en un Colab limpio, confirmar instalación sin cambios manuales, ejecutar ≥10 episodios, generar tablas/métricas/gráficas y registrar las versiones reales del runtime Colab.
