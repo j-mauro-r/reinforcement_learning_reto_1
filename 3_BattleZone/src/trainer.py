@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Mapping, Optional, Protocol
+from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol
 
 import numpy as np
 
@@ -194,6 +194,7 @@ class DQNTrainer:
         initial_state: Optional[TrainingState] = None,
         mode: TrainingMode | str | None = None,
         replay_restored: Optional[bool] = None,
+        step_callback: Optional[Callable[[int, "DQNTrainer"], None]] = None,
     ) -> TrainingSummary:
         """Runs one bounded DQN training cycle and returns a summary.
 
@@ -316,6 +317,9 @@ class DQNTrainer:
                     observation, _ = self.env.reset(seed=self.seed + state.episode_index)
                 else:
                     observation = next_observation
+
+                if step_callback is not None:
+                    step_callback(state.global_step, self)
         finally:
             if self.logger is not None:
                 self.logger.on_training_end()

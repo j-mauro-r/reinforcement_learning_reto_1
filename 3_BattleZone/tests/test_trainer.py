@@ -198,6 +198,39 @@ def test_no_update_before_learning_starts():
     assert agent.update_calls == 0
 
 
+def test_step_callback_preserves_episode_replay_epsilon_and_target_continuity():
+    """Checkpoint-like hooks do not create artificial training boundaries."""
+    env = FakeEnv(rewards=[1.0], terminated_steps={6})
+    agent = SpyAgent(batch_size=1)
+    logger = SpyLogger()
+    trainer = DQNTrainer(
+        env=env, agent=agent, total_timesteps=12, learning_starts=100,
+        train_frequency=1, target_sync_interval=6,
+        epsilon_schedule=LinearEpsilonSchedule(start=1.0, end=0.0, decay_steps=12),
+        seed=123, logger=logger,
+    )
+    boundaries: list[dict[str, float | int]] = []
+
+    def checkpoint_hook(step: int, active: DQNTrainer) -> None:
+        if step % 4 == 0:
+            state = active.export_training_state()
+            boundaries.append({**state, "replay_size": len(agent.replay_buffer)})
+
+    summary = trainer.train(step_callback=checkpoint_hook)
+
+    assert [item["global_step"] for item in boundaries] == [4, 8, 12]
+    assert [item["replay_size"] for item in boundaries] == [4, 8, 12]
+    assert boundaries[0]["episode_step"] == 4
+    assert boundaries[0]["episode_reward"] == pytest.approx(4.0)
+    assert env.reset_calls == 3  # initial reset plus natural episode ends at 6 and 12
+    assert summary.episode_lengths == [6, 6]
+    assert summary.episode_rewards == pytest.approx([6.0, 6.0])
+    assert agent.sync_calls == 2
+    assert summary.target_sync_steps == [6, 12]
+    assert agent.select_calls[3:6] == pytest.approx([0.75, 2 / 3, 7 / 12])
+    assert logger.training_start_calls == logger.training_end_calls == logger.closed == 1
+
+
 def test_replay_insufficient_blocks_updates_even_after_learning_starts():
     env = FakeEnv(rewards=[1.0])
     agent = SpyAgent(batch_size=8)
