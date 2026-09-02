@@ -19,6 +19,17 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 - Persistencia: raíz suministrada por el caller; artefactos aislados por `run_id` en results, checkpoints, logs y models.
 - Modelo final: `models/<run_id>/battlezone_dqn_final.pt`, enlazado desde el manifest únicamente al alcanzar el objetivo lógico.
 
+### Corrección del blocker de auditoría
+
+- Causa raíz confirmada: el orquestador fragmentaba una sesión en llamadas sucesivas a `DQNTrainer.train()`, y cada llamada hacía `env.reset()` y cerraba su logger.
+- Solución: una sesión usa un solo environment, trainer, logger y llamada continua a `train()`; un hook genérico por step informa boundaries al orquestador sin introducir persistencia en `trainer.py`.
+- Test controlado: boundaries 4/8/12 producen tres checkpoints y una sola sesión. Un episodio que cruza step 4 termina naturalmente en step 6 con `episode_length=6` y `episode_reward=6.0`.
+- Resets: 3 en 12 steps, correspondientes únicamente al reset inicial y finales naturales de episodios en 6 y 12.
+- Replay: tamaño 4/8/12 en los boundaries; no se reconstruye.
+- Epsilon y Target Network: siguen dependiendo del global step; no hay reinicio ni sync artificial.
+- TensorBoard: un writer por sesión, con steps ordenados antes y después del boundary.
+- `elapsed_seconds` usa `time.monotonic()` y persiste duración real.
+
 ## Preflight local
 
 - Device de integración: CPU con override local explícito; CUDA local no disponible.
@@ -33,19 +44,19 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 ## Integración ALE real corta
 
 - ALE-Py real: PASS.
-- Run temporal: `battlezone-dqn-20260902-214939-0813052-c848`.
-- NEW: 0→128, estado `interrupted`, checkpoint LIGHTWEIGHT.
-- RESUME_LIGHTWEIGHT: mismo `run_id`, Replay no restaurado; continuidad hasta 220 en sesiones controladas.
-- Historial: 3 sesiones preservadas.
-- TensorBoard: `train/epsilon`, `train/replay_size` y `train/learning_rate`; máximo global step observado 200, posterior al primer checkpoint en 128.
+- Run temporal: `battlezone-dqn-20260902-220412-452b569-6d14`.
+- Overrides test-only: intervalos 32 y Replay capacity 256; `reference_v1` productivo permanece 25k/250k y capacity 4096.
+- NEW: 0→96, una sesión, tres checkpoints LIGHTWEIGHT en 32/64/96, sin recrear trainer/environment/logger.
+- Duración NEW registrada: 0.12462224999762839 segundos.
+- RESUME_LIGHTWEIGHT: mismo `run_id`, nueva sesión y continuidad 96→128.
+- TensorBoard continuo: steps 16, 32, 48, 64, 80, 96, 112 y 128.
 - La integración no se presenta como corrida completa ni como evidencia de aprendizaje.
 
 ## Validación automatizada
 
 - `compileall`: PASS.
-- HU011: 17 passed tras incorporar la corrección encontrada por la integración.
-- Regresión focal previa a evidencia: 95 passed, 1 skipped.
-- Suite completa previa a evidencia: 120 passed, 1 skipped.
+- Tests focales trainer/HU011: 37 passed antes de la integración ALE.
+- Los resultados finales de HU011, regresión focal y suite completa se reportan en PR #34 después de esta actualización.
 - Se volverán a ejecutar todas las suites después de este documento y se reportará el resultado final en PR #34.
 
 ## Scope y limitaciones
