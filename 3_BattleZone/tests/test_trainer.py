@@ -57,12 +57,68 @@ class FakeEnv:
 @dataclass
 class SpyUpdateResult:
     loss: float
+    q_value_mean: float
+
+
+class SpyLogger:
+    def __init__(self) -> None:
+        self.training_start_calls = 0
+        self.training_end_calls = 0
+        self.closed = 0
+        self.step_events: list[dict[str, float | int]] = []
+        self.update_events: list[dict[str, float | int]] = []
+        self.episode_events: list[dict[str, float | int]] = []
+
+    def on_training_start(self) -> None:
+        self.training_start_calls += 1
+
+    def on_step(
+        self,
+        *,
+        global_step: int,
+        epsilon: float,
+        replay_size: int,
+        learning_rate: float,
+    ) -> None:
+        self.step_events.append(
+            {
+                "global_step": global_step,
+                "epsilon": epsilon,
+                "replay_size": replay_size,
+                "learning_rate": learning_rate,
+            }
+        )
+
+    def on_update(self, *, global_step: int, loss: float, q_value_mean: float) -> None:
+        self.update_events.append(
+            {
+                "global_step": global_step,
+                "loss": loss,
+                "q_value_mean": q_value_mean,
+            }
+        )
+
+    def on_episode_end(self, *, global_step: int, episode_reward: float, episode_length: int) -> None:
+        self.episode_events.append(
+            {
+                "global_step": global_step,
+                "episode_reward": episode_reward,
+                "episode_length": episode_length,
+            }
+        )
+
+    def on_training_end(self) -> None:
+        self.training_end_calls += 1
+
+    def close(self) -> None:
+        self.closed += 1
 
 
 class SpyAgent:
     def __init__(self, *, action_dim: int = 18, batch_size: int = 4) -> None:
         self.action_dim = action_dim
         self.batch_size = batch_size
+        self.optimizer = SimpleNamespace(param_groups=[{"lr": 0.00025}])
         self.replay_buffer: list[dict[str, Any]] = []
         self.select_calls: list[float] = []
         self.store_calls: list[dict[str, Any]] = []
@@ -103,7 +159,7 @@ class SpyAgent:
 
     def update(self, batch: Dict[str, np.ndarray]) -> SpyUpdateResult:
         self.update_calls += 1
-        return SpyUpdateResult(loss=0.25)
+        return SpyUpdateResult(loss=0.25, q_value_mean=1.5)
 
     def sync_target_network(self) -> None:
         self.sync_calls += 1
@@ -428,3 +484,51 @@ def test_resume_lightweight_keeps_replay_empty_until_rebuilt_then_updates_after_
     assert summary.first_update_step == 40
     assert summary.updates >= 1
     assert summary.run_mode == "resume_lightweight"
+
+
+def test_logger_none_keeps_training_behavior_unchanged():
+    env = FakeEnv(rewards=[1.0])
+    agent = SpyAgent(batch_size=1)
+    trainer = DQNTrainer(
+        env=env,
+        agent=agent,
+        total_timesteps=10,
+        learning_starts=1,
+        train_frequency=2,
+        target_sync_interval=5,
+        epsilon_schedule=LinearEpsilonSchedule(start=1.0, end=0.1, decay_steps=20),
+        seed=123,
+        logger=None,
+    )
+
+    summary = trainer.train()
+    assert summary.total_steps == 10
+    assert summary.updates == 5
+
+
+def test_trainer_emits_step_update_and_episode_events_to_logger():
+    env = FakeEnv(rewards=[1.0, 2.0, 3.0], terminated_steps={3})
+    agent = SpyAgent(batch_size=1)
+    logger = SpyLogger()
+    trainer = DQNTrainer(
+        env=env,
+        agent=agent,
+        total_timesteps=6,
+        learning_starts=1,
+        train_frequency=2,
+        target_sync_interval=100,
+        epsilon_schedule=LinearEpsilonSchedule(start=1.0, end=0.1, decay_steps=20),
+        seed=123,
+        logger=logger,
+    )
+
+    summary = trainer.train()
+    assert summary.total_steps == 6
+    assert logger.training_start_calls == 1
+    assert logger.training_end_calls == 1
+    assert logger.closed == 1
+    assert [e["global_step"] for e in logger.step_events] == [1, 2, 3, 4, 5, 6]
+    assert [e["global_step"] for e in logger.update_events] == [2, 4, 6]
+    assert all(float(e["loss"]) == pytest.approx(0.25) for e in logger.update_events)
+    assert all(float(e["q_value_mean"]) == pytest.approx(1.5) for e in logger.update_events)
+    assert [e["global_step"] for e in logger.episode_events] == [3, 6]

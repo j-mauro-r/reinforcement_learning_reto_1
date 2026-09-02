@@ -127,6 +127,7 @@ def test_optimizer_updates_only_online_and_target_stays_immutable(agent: DQNAgen
     target_before = [param.detach().clone() for param in agent.target_network.parameters()]
     result = agent.update(_batch())
     assert np.isfinite(result.loss)
+    assert np.isfinite(result.q_value_mean)
     assert any(
         not torch.allclose(before, after.detach())
         for before, after in zip(online_before, agent.online_network.parameters())
@@ -153,6 +154,13 @@ def test_sync_target_network_realigns_parameters(agent: DQNAgent):
             agent.online_network.parameters(), agent.target_network.parameters()
         )
     )
+
+
+def test_update_result_contains_q_value_mean_without_changing_dqn_behavior(agent: DQNAgent):
+    batch = _batch()
+    update_result = agent.update(batch)
+    assert np.isfinite(update_result.loss)
+    assert np.isfinite(update_result.q_value_mean)
 
 
 def test_state_dict_load_restores_gamma_and_parameters():
