@@ -124,6 +124,31 @@ tracking:
   schema_version: 1
   require_clean_git_for_long_run: true
 
+long_training:
+  enabled: true
+  profile: "reference_v1"
+  target_global_step: 1000000
+  require_accelerator: true
+  preferred_device: "cuda"
+  dqn:
+    batch_size: 32
+    replay_buffer_capacity: 4096
+  training:
+    learning_starts: 1024
+    train_frequency: 4
+    target_sync_interval: 10000
+    epsilon:
+      start: 1.0
+      end: 0.05
+      decay_steps: 250000
+  checkpointing:
+    periodic_mode: "lightweight"
+    interval_steps: 25000
+    full_milestone_interval_steps: 250000
+  tensorboard:
+    scalar_log_interval_steps: 100
+    flush_interval_steps: 5000
+
 smoke:
   enabled: true
   baseline_note: "baseline de implementacion por validar"
