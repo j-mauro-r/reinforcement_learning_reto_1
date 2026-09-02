@@ -1,0 +1,62 @@
+environment:
+  env_id: "ALE/BattleZone-v5"
+  seed: 20260903
+  mode: 1
+  difficulty: 0
+  obs_type: "rgb"
+  frameskip: 4
+  repeat_action_probability: 0.25
+  expected_action_space_n: 18
+  render_mode: null
+
+preprocessing:
+  pipeline_name: "battlezone_rgb_128_stack4_no_crop"
+  color_mode: "rgb"
+  resize:
+    enabled: true
+    width: 128
+    height: 128
+    interpolation: "bilinear"
+  crop:
+    enabled: false
+    top: 0
+    bottom: 210
+    left: 0
+    right: 160
+  frame_stack: 4
+  dtype: "uint8"
+  normalize: false
+  reward_transform: "none"
+
+modes:
+  train:
+    seed_offset: 0
+    render_mode: null
+  eval:
+    seed_offset: 10000
+    render_mode: null
+
+validation:
+  smoke_steps: 32
+  action_sequence_check_steps: 32
+  expected_raw_shape: [210, 160, 3]
+  expected_final_shape: [4, 128, 128, 3]
+  candidate_preprocessing:
+    - name: "rgb_84_no_crop_stack4"
+      color_mode: "rgb"
+      resize: [84, 84]
+      crop_enabled: false
+      frame_stack: 4
+      rationale: "Atari common-size comparison; not selected because radar and small objects are less readable."
+    - name: "grayscale_84_no_crop_stack4"
+      color_mode: "grayscale"
+      resize: [84, 84]
+      crop_enabled: false
+      frame_stack: 4
+      rationale: "Channel-reduced comparison; not selected because color/radar contrast may be useful."
+    - name: "rgb_128_no_crop_stack4"
+      color_mode: "rgb"
+      resize: [128, 128]
+      crop_enabled: false
+      frame_stack: 4
+      rationale: "Selected compromise: preserves radar and color while reducing raw dimensionality."
