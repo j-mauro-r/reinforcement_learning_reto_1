@@ -9,6 +9,8 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 
 from src.environment import load_config
 from src.experiment import generate_run_id, load_config_snapshot
+from src.agent import DQNAgent
+from src.persistence import CHECKPOINT_MODE_LIGHTWEIGHT, restore_training_state
 from src.training_run import (
     CheckpointDecision,
     build_artifact_paths,
@@ -138,6 +140,9 @@ def test_cuda_required_fails_and_local_override_passes(tmp_path):
         persistent_root=tmp_path / "local", ram_gib=32.0, cuda_available=False,
     )
     assert passed.ready
+    paths = build_artifact_paths(tmp_path / "local", run_id)
+    assert passed.tracking.details["results_dir"] == str(paths["results"].parent)
+    assert not (tmp_path / "local" / run_id / "results").exists()
 
 
 def test_resume_requires_explicit_run_and_checkpoint(tmp_path):
@@ -219,3 +224,36 @@ def test_multiple_internal_checkpoints_keep_one_session_and_resume_adds_one(tmp_
     assert resumed["run_id"] == first["run_id"]
     assert len(resumed["manifest"]["sessions"]) == 2
     assert resumed["manifest"]["sessions"][1]["start_global_step"] == 12
+    assert first["paths"]["manifest"] == tmp_path / "results" / first["run_id"] / "run_manifest.json"
+    assert first["paths"]["manifest"].exists()
+    assert not (tmp_path / first["run_id"] / "results").exists()
+
+
+def test_final_model_is_a_loadable_lightweight_checkpoint(tmp_path, monkeypatch):
+    config = load_config(CONFIG_PATH)
+    config["long_training"]["target_global_step"] = 4
+    config["long_training"]["dqn"]["replay_buffer_capacity"] = 8
+    config["long_training"]["dqn"]["batch_size"] = 2
+    config["long_training"]["training"]["learning_starts"] = 100
+    config["long_training"]["checkpointing"]["interval_steps"] = 4
+    config["long_training"]["checkpointing"]["full_milestone_interval_steps"] = 100
+    monkeypatch.setattr("src.training_run.capture_git_lineage", lambda root: GIT)
+    monkeypatch.setattr("src.training_run.capture_hardware", lambda: {"device": "cpu", "ram_gb": 32.0})
+    monkeypatch.setattr("src.training_run.create_battlezone_env", lambda *a, **k: ContinuousFakeEnv())
+    result = run_training_session(
+        base_config=config, config_path=CONFIG_PATH, persistent_root=tmp_path,
+        mode="new", repo_root=ROOT, require_accelerator_override=False,
+        target_global_step_override=4,
+    )
+    final_model = result["paths"]["final_model"]
+    assert result["manifest"]["status"] == "completed"
+    assert result["manifest"]["artifacts"]["model_path"] == str(final_model)
+    effective = resolve_long_training_config(config)
+    effective["dqn"]["device"] = "cpu"
+    agent = DQNAgent.from_config(effective)
+    restored = restore_training_state(
+        checkpoint_path=final_model, agent=agent, config=effective,
+        expected_mode=CHECKPOINT_MODE_LIGHTWEIGHT,
+    )
+    assert restored["global_step"] == 4
+    assert restored["replay_restored"] is False
