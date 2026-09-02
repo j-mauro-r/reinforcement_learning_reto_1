@@ -60,3 +60,31 @@ validation:
       crop_enabled: false
       frame_stack: 4
       rationale: "Selected compromise: preserves radar and color while reducing raw dimensionality."
+
+algorithm: "DQN"
+
+dqn:
+  baseline_note: "baseline de implementacion por validar"
+  device: "auto"
+  gamma: 0.99
+  learning_rate: 0.00025
+  batch_size: 8
+  replay_buffer:
+    capacity: 128
+    storage_dtype: "uint8"
+    sampling: "uniform"
+  network:
+    frame_stack: 4
+    input_channels: 3
+    conv_channels: [32, 64, 64]
+    hidden_dim: 512
+    output_actions: 18
+    pixel_scale_divisor: 255.0
+    input_layout: "(batch, frame_stack, height, width, channels)"
+    torch_layout: "NCHW with channels = frame_stack * input_channels"
+  optimizer:
+    name: "adam"
+  loss:
+    name: "smooth_l1"
+  epsilon:
+    api_default: 0.1
