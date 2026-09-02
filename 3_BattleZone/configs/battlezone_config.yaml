@@ -116,3 +116,13 @@ tensorboard:
   scalar_log_interval_steps: 4
   reward_window: 10
   flush_interval_steps: 64
+
+smoke:
+  enabled: true
+  baseline_note: "baseline de implementacion por validar"
+  total_timesteps_new: 32
+  total_timesteps_resume: 48
+  learning_starts: 8
+  train_frequency: 4
+  target_sync_interval: 16
+  checkpoint_mode: "full"
