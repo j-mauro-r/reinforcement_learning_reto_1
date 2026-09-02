@@ -4,9 +4,9 @@
 
 - **ID:** HU005
 - **Nombre:** Núcleo del agente DQN para BattleZone
-- **Estado:** Implementada y validada técnicamente — pendiente de cierre formal (PR #24 sin merge) y revisión/merge de PR #23
+- **Estado:** `[COMPLETADA]`
 - **Dependencia previa:** HU004 — Selección formal del algoritmo
-- **Dependencia correctiva:** PR #24 debe quedar mergeado antes del cierre formal de HU005.
+- **Dependencia correctiva:** PR #24 mergeado (decisión HU004 consolidada en DQN).
 - **Habilita:** HU006 — Ciclo de entrenamiento
 - **Algoritmo vigente para BattleZone:** `DQN`
 - **Fuentes de verdad:** `enunciado_reto_1.txt`, `3_BattleZone/docs/implementacion.md`, `3_BattleZone/docs/lineamientos.md`, `3_BattleZone/docs/arquitectura.md`, HU003, `3_BattleZone/docs/hu004_decision_algoritmo.md` una vez incorporada la corrección del PR #24, y `3_BattleZone/configs/battlezone_config.yaml`.
@@ -171,14 +171,14 @@ class DQNAgent:
 
 HU005 puede cerrarse únicamente cuando:
 
-- PR #24 esté mergeado y DQN sea la decisión vigente en `main`;
+- PR #24 esté mergeado y DQN sea la decisión vigente en `main`; `PASS`.
 - `DQNAgent` y target DQN estén implementados;
 - configuración `DQN`/`dqn` esté versionada;
 - tests focalizados y suite BattleZone sean re-ejecutados y pasen;
 - evidencia HU005 se actualice con outputs DQN reales;
 - CA01–CA16 y AV01–AV16 estén en PASS;
 - no se adelante HU006+;
-- PR #23 sea auditado y mergeado.
+- PR #23 sea auditado y mergeado; `PASS`.
 
 ## 10. Fuera de alcance
 

@@ -5,9 +5,9 @@
 - HU: HU005
 - PR: #23
 - Rama histórica del PR: `feature/battlezone-hu005-ddqn-agent-core`
-- Estado actual: **implementada y validada técnicamente; pendiente cierre formal por dependencia externa (PR #24 sin merge) y revisión/merge de PR #23**
+- Estado actual: **[COMPLETADA] — implementación y validación técnica cerradas con dependencias mergeadas**
 - Algoritmo vigente: `DQN`
-- Dependencia externa de cierre: PR #24 (corrección HU004) abierto al momento de esta evidencia.
+- Dependencia externa de cierre: PR #24 (corrección HU004) mergeado.
 
 ## 2. Fecha y entorno de ejecución
 
@@ -165,7 +165,7 @@ Resultados:
 
 | CA | Estado | Evidencia |
 |---|---|---|
-| CA01 HU004 corregida a DQN y PR #24 mergeado | PENDIENTE POR DEPENDENCIA EXTERNA | PR #24 sigue abierto. |
+| CA01 HU004 corregida a DQN y PR #24 mergeado | PASS | PR #24 mergeado y decisión DQN consolidada en `main`. |
 | CA02 Q-Network compatible | PASS | Salida `(batch,18)` en tests y evidencia controlada. |
 | CA03 dtype/layout | PASS | Conversión explícita `uint8->float32`, `/255`, NCHW. |
 | CA04 Online/Target independientes | PASS | Igualdad inicial con objetos distintos. |
@@ -186,7 +186,7 @@ Resultados:
 
 | AV | Estado | Evidencia |
 |---|---|---|
-| AV01 Dependencias | PENDIENTE POR DEPENDENCIA EXTERNA | PR #24 no mergeado. |
+| AV01 Dependencias | PASS | HU003 intacta y PR #24 mergeado con decisión DQN vigente. |
 | AV02 Forward | PASS | `FORWARD_SHAPE (2, 18)`, finito. |
 | AV03 Entrada individual | PASS | Test de forward individual. |
 | AV04 Sincronización inicial | PASS | Online/Target iguales y distintos objetos. |
@@ -214,10 +214,10 @@ Resultados:
 
 HU005 queda en estado:
 
-**IMPLEMENTADA Y VALIDADA TÉCNICAMENTE**
+**[COMPLETADA]**
 
-con cierre formal **pendiente** por dependencia externa:
+Condiciones de cierre verificadas:
 
-- PR #24 abierto/sin merge al momento de esta evidencia.
-
-No marcar `[COMPLETADA]` hasta resolver la dependencia y mergear PR #23.
+- PR #24 mergeado.
+- PR #23 mergeado.
+- Validación técnica DQN en verde.

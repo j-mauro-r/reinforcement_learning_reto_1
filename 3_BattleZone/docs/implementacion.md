@@ -58,7 +58,7 @@ HU003  Pipeline reproducible del entorno - [COMPLETADA]
   ↓
 HU004  Selección formal del algoritmo - [COMPLETADA — DQN]
   ↓
-HU005  Núcleo del agente DQN
+HU005  Núcleo del agente DQN - [COMPLETADA]
   ↓
 HU006  Ciclo de entrenamiento
   ↓
@@ -163,6 +163,6 @@ Consolidar notebook, modelo, video, métricas, hardware, configuración y conclu
 - HU002: `[COMPLETADA]`.
 - HU003: `[COMPLETADA]`.
 - HU004: `[COMPLETADA — decisión revisada a DQN]`.
-- HU005: requiere alineación de su implementación a `DQN` antes de poder cerrarse.
+- HU005: `[COMPLETADA]` con núcleo DQN implementado y validado técnicamente.
 
-Esta revisión de HU004 es documental. No modifica código, preprocessing, resultados empíricos ni el proyecto Assault.
+HU006 queda habilitada para integrar el ciclo de entrenamiento E2E sobre el núcleo DQN ya aprobado.
