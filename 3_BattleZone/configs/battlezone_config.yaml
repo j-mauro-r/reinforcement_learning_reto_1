@@ -117,6 +117,13 @@ tensorboard:
   reward_window: 10
   flush_interval_steps: 64
 
+tracking:
+  enabled: true
+  results_dir: "3_BattleZone/results"
+  manifest_filename: "run_manifest.json"
+  schema_version: 1
+  require_clean_git_for_long_run: true
+
 smoke:
   enabled: true
   baseline_note: "baseline de implementacion por validar"
