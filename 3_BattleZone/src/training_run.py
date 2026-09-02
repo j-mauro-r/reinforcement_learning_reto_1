@@ -433,10 +433,12 @@ def run_training_session(
         if trainer is not None:
             initial_state = TrainingState(**trainer.export_training_state())
         if trainer is not None and initial_state.global_step > manifest["sessions"][-1]["start_global_step"]:
-            output_checkpoint = paths["checkpoints"] / checkpoint_filename(
+            interrupt_checkpoint = paths["checkpoints"] / checkpoint_filename(
                 global_step=initial_state.global_step, checkpoint_mode=CHECKPOINT_MODE_LIGHTWEIGHT,
             )
-            _save_training_checkpoint(path=output_checkpoint, mode=CheckpointDecision.LIGHTWEIGHT, agent=agent, trainer=trainer, config=effective, seed=int(effective["environment"]["seed"]))
+            if not interrupt_checkpoint.exists():
+                _save_training_checkpoint(path=interrupt_checkpoint, mode=CheckpointDecision.LIGHTWEIGHT, agent=agent, trainer=trainer, config=effective, seed=int(effective["environment"]["seed"]))
+            output_checkpoint = interrupt_checkpoint
             finish_session(manifest, end_global_step=initial_state.global_step, episode_index=initial_state.episode_index, elapsed_seconds=time.monotonic() - started_at, output_checkpoint=str(output_checkpoint), completed=False, manifest_path=manifest_path)
         raise
     except Exception as exc:
