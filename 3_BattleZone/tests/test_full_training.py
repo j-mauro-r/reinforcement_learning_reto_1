@@ -173,7 +173,7 @@ def test_scope_remains_dqn_only_without_external_tracking():
     assert config["algorithm"] == "DQN"
 
 
-def test_multiple_internal_checkpoints_keep_one_session_and_resume_adds_one(tmp_path, monkeypatch):
+def test_multiple_internal_checkpoints_keep_one_session_and_resume_adds_one(tmp_path, monkeypatch, capsys):
     config = load_config(CONFIG_PATH)
     config["long_training"]["dqn"]["replay_buffer_capacity"] = 16
     config["long_training"]["dqn"]["batch_size"] = 2
@@ -197,8 +197,12 @@ def test_multiple_internal_checkpoints_keep_one_session_and_resume_adds_one(tmp_
     first = run_training_session(
         base_config=config, config_path=CONFIG_PATH, persistent_root=tmp_path,
         mode="new", repo_root=ROOT, require_accelerator_override=False,
-        target_global_step_override=12,
+        target_global_step_override=12, progress_interval_steps=4,
     )
+    output = capsys.readouterr().out
+    assert "TRAINING_PROGRESS global_step=4" in output
+    assert "CHECKPOINT_SAVED" in output
+    assert "TRAINING_ACTIVE=True GLOBAL_STEP=12" in output
     assert [path.name for path in first["checkpoints"]] == [
         "battlezone_dqn_step_00000004_lightweight.pt",
         "battlezone_dqn_step_00000008_lightweight.pt",

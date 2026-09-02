@@ -197,7 +197,7 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     bootstrap_index = next(i for i, source in enumerate(sources) if "prepare_execution_environment(" in source)
     environment_index = next(i for i, source in enumerate(sources) if "from src.environment import" in source)
     drive_index = next(i for i, source in enumerate(sources) if "drive.mount(" in source)
-    assert bootstrap_index < environment_index < drive_index
+    assert bootstrap_index < environment_index <= drive_index
     assert "/content/reinforcement_learning_reto_1" in sources[bootstrap_index]
     assert "REQUESTED_REF" in sources[bootstrap_index]
     assert "REQUESTED_COMMIT" in sources[bootstrap_index]
@@ -211,3 +211,58 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     assert "git\", \"clone\"" in sources[bootstrap_index]
     assert "MyDrive/reinforcement_learning_reto_1" not in sources[bootstrap_index]
     assert "PERSISTENT_ROOT" in sources[drive_index]
+
+
+def test_notebook_hard_gates_cuda_and_arms_real_hu011_training_explicitly():
+    notebook = json.loads((PROJECT / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+    sources = ["".join(cell.get("source", [])) for cell in notebook["cells"]]
+    combined = "\n".join(sources)
+    cuda_index = next(i for i, source in enumerate(sources) if "validate_cuda_runtime(" in source)
+    drive_index = next(i for i, source in enumerate(sources) if "drive.mount(" in source)
+    training_index = next(i for i, source in enumerate(sources) if "RUN_LONG_TRAINING = False" in source)
+
+    assert cuda_index <= drive_index < training_index
+    assert "torch.cuda.is_available()" in sources[cuda_index]
+    assert "torch.version.cuda" in sources[cuda_index]
+    assert "torch.cuda.get_device_name(0)" in sources[cuda_index]
+    assert "PERSISTENT_ROOT_WRITABLE" in sources[drive_index]
+    assert "ENVIRONMENT_SMOKE_TEST — THIS IS NOT HU011 TRAINING" in combined
+    assert "if not RUN_LONG_TRAINING:" in sources[training_index]
+    assert "elif not preflight.ready:" in sources[training_index]
+    assert "result = run_training_session(" in sources[training_index]
+    assert "target_global_step_override" not in sources[training_index]
+    assert "HU011_PREFLIGHT_READY" in sources[training_index]
+    assert 'print("ARTIFACT CHECK")' in sources[training_index]
+    assert 'print("manifest:"' in sources[training_index]
+    assert 'print("checkpoints:"' in sources[training_index]
+    assert 'print("tensorboard logs:"' in sources[training_index]
+
+
+def test_colab_requirements_do_not_replace_runtime_pytorch():
+    requirements = (PROJECT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    active = [line.strip().lower() for line in requirements if line.strip() and not line.lstrip().startswith("#")]
+    assert not any(line == "torch" or line.startswith(("torch=", "torch<", "torch>")) for line in active)
+
+
+@pytest.mark.parametrize(
+    ("torch_version", "cuda_available", "cuda_version", "gpu_name"),
+    [
+        ("2.11.0+cpu", False, None, None),
+        ("2.11.0+cpu", True, "12.8", "Fake GPU"),
+    ],
+)
+def test_required_cuda_runtime_rejects_cpu_only_pytorch(
+    torch_version, cuda_available, cuda_version, gpu_name,
+):
+    with pytest.raises(RuntimeError, match="CUDA_REQUIRED_FOR_HU011"):
+        bootstrap.validate_cuda_runtime(
+            torch_version=torch_version, cuda_available=cuda_available,
+            cuda_version=cuda_version, gpu_name=gpu_name, required=True,
+        )
+
+
+def test_required_cuda_runtime_accepts_complete_cuda_build():
+    bootstrap.validate_cuda_runtime(
+        torch_version="2.11.0+cu128", cuda_available=True,
+        cuda_version="12.8", gpu_name="Fake GPU", required=True,
+    )
