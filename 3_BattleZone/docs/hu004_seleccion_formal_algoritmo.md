@@ -18,7 +18,7 @@
   - `3_BattleZone/docs/hu003_pipeline_reproducible_entorno.md`;
   - `3_BattleZone/docs/hu003_evidencia_implementacion.md`;
   - `3_BattleZone/configs/battlezone_config.yaml`;
-  - `3_BattleZone/docs/hu004_evidencia_seleccion_algoritmo.md`.
+  - `3_BattleZone/docs/hu004_decision_algoritmo.md`.
 
 ---
 
@@ -850,7 +850,7 @@ HU005 no debe reconsiderar el algoritmo salvo que aparezca evidencia nueva que i
 
 La evidencia consolidada y auditable de la selección quedó registrada en:
 
-- `3_BattleZone/docs/hu004_evidencia_seleccion_algoritmo.md`
+- `3_BattleZone/docs/hu004_decision_algoritmo.md`
 
 Resultado final de la matriz ponderada:
 
@@ -907,4 +907,4 @@ Sensibilidad:
 
 ### Definition of Done
 
-La checklist de DoD de HU004 queda cumplida mediante la evidencia versionada de la sección 15 y el documento `3_BattleZone/docs/hu004_evidencia_seleccion_algoritmo.md`.
+La checklist de DoD de HU004 queda cumplida mediante la evidencia versionada de la sección 15 y el documento `3_BattleZone/docs/hu004_decision_algoritmo.md`.

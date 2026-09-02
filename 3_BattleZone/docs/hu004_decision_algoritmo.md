@@ -220,35 +220,40 @@ La selección es robusta dentro de los escenarios evaluados: el ganador se manti
 - Hipótesis: Replay uniforme será suficiente en primera iteración sin PER.
 - Hipótesis: costos de RAM/VRAM en Colab serán viables con configuración inicial.
 
-## 17. Autovalidaciones de HU004
+## 17. Autovalidaciones oficiales HU004
 
 | AV | Estado | Evidencia |
 |---|---|---|
-| AV01 Cuatro algoritmos incluidos | PASS | Matriz incluye DQN, DQN+PER, DDQN, REINFORCE |
-| AV02 Ningún algoritmo permitido omitido | PASS | Se cubren exactamente los cuatro del enunciado |
-| AV03 Pesos suman 100 % | PASS | Tabla de pesos suma 100 |
-| AV04 Fórmula documentada | PASS | Sección de fórmula |
-| AV05 Scores recalculables | PASS | Tabla de cálculo reproducible |
-| AV06 Ranking matemáticamente consistente | PASS | Orden consistente con scores |
-| AV07 Sensibilidad calculada | PASS | Escenarios S1 y S2 |
-| AV08 Datos empíricos con fuente | PASS | Secciones 3 y 4 con trazabilidad |
-| AV09 Teoría vs inferencia diferenciadas | PASS | Sección 4 |
-| AV10 Sin resultados inventados de entrenamiento | PASS | No se reportan entrenamientos |
-| AV11 Sin cambios en `2_Assault/` | PASS | Alcance documental en `3_BattleZone/` |
-| AV12 Sin imports desde `2_Assault/` en cambios HU004 | PASS | Sin código nuevo de agente |
-| AV13 Sin implementación de agente/entrenamiento | PASS | Cambios documentales |
-| AV14 Sin MLflow | PASS | Sin referencias nuevas de MLflow |
-| AV15 Preprocessing HU003 intacto | PASS | No hay cambios de contrato |
-| AV16 HU005 restringida a algoritmo seleccionado | PASS | Sección 16 |
-| AV17 Diff limitado a HU004 | PASS | Cambios acotados a docs HU004 y plan |
+| AV01 Estado de dependencia | PASS | HU003 consta como `[COMPLETADA]` en `3_BattleZone/docs/implementacion.md` y su contrato quedó congelado en `3_BattleZone/docs/hu003_evidencia_implementacion.md`. |
+| AV02 Candidatos permitidos | PASS | Matriz incluye exactamente DQN, DQN+PER, DDQN y REINFORCE. |
+| AV03 Suma de pesos | PASS | Tabla de pesos: suma exacta `100 %`. |
+| AV04 Escala válida | PASS | Escala única documentada (`1` a `5`) y todas las puntuaciones dentro de rango. |
+| AV05 Recalcular scores | PASS | Fórmula y tabla de cálculo reproducible mantienen DQN `3.34`, DQN+PER `3.30`, DDQN `3.72`, REINFORCE `2.14`. |
+| AV06 Trazabilidad de evidencia | PASS | Cada criterio y justificación rastreable a fuentes HU001-HU003/enunciado/lineamientos o teoría marcada explícitamente. |
+| AV07 Evidencia BattleZone | PASS | La decisión incorpora sparse rewards, variabilidad, `Discrete(18)`, contrato visual HU003 y restricciones de Colab. |
+| AV08 Sensibilidad | PASS | Escenarios S1 y S2 calculados y reportados, con ganador invariante. |
+| AV09 Selección única | PASS | Algoritmo seleccionado único: `DDQN`. |
+| AV10 Componentes posteriores coherentes | PASS | Sección 16 define componentes obligatorios y no aplicables para HU005 de acuerdo con DDQN. |
+| AV11 Sin implementación del agente | PASS | Este artefacto HU004 es documental; no agrega `agent.py`, `network.py`, `replay_buffer.py` ni `trainer.py`. |
+| AV12 Contrato HU003 intacto | PASS | No se alteró preprocessing ni configuración de contrato HU003 en esta corrección HU004. |
+| AV13 Independencia de Assault | PASS | Sin cambios ni imports desde `2_Assault/`. |
+| AV14 Ausencia de MLflow | PASS | No se introdujeron referencias ni integración MLflow en BattleZone HU004. |
+| AV15 Alcance del PR | PASS | Cambios limitados al cierre documental de HU004 en `3_BattleZone/docs/`. |
 
-## 18. Limitaciones
+## 18. Controles complementarios de auditoría
+
+- HU005 restringida al algoritmo seleccionado (`DDQN`) para la primera implementación.
+- Diff de esta corrección limitado al alcance documental de HU004.
+- Control anti-alucinación mantenido: separación explícita entre evidencia empírica, teoría e hipótesis.
+- Verificación de datos empíricos: cada cifra usada en matriz se rastrea a HU002/HU003.
+
+## 19. Limitaciones
 
 - HU004 no ejecuta entrenamiento; por diseño, los scores son una decisión de arquitectura y no una prueba empírica de performance.
 - No existe evidencia empírica disponible en HU001-HU003 para cuantificar consumo exacto de VRAM por algoritmo en Colab.
 - No existe evidencia empírica disponible en HU001-HU003 para comparar throughput real entre DQN, DQN+PER, DDQN y REINFORCE en BattleZone.
 
-## 19. Datos no disponibles que no pudieron verificarse
+## 20. Datos no disponibles que no pudieron verificarse
 
 - Consumo exacto de RAM/VRAM por algoritmo durante entrenamiento real en Colab.
 - Tiempo por actualización y tiempo total por target de timesteps para cada algoritmo candidato.
