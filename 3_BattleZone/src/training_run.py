@@ -276,18 +276,20 @@ def run_training_session(
 ) -> dict[str, Any]:
     """Runs one explicit NEW/FULL/LIGHTWEIGHT HU011 training session.
 
-    Local callers must use a small target override and explicitly disable the
-    accelerator gate. The reference profile target remains one million.
+    Local callers must use a small session-stop override and explicitly disable
+    the accelerator gate. The logical reference target remains one million, so
+    a preflight session is recorded as interrupted rather than completed.
     """
     if mode not in {item.value for item in TrainingMode}:
         raise ValueError(f"Unsupported mode={mode!r}.")
     if mode != TrainingMode.NEW.value and (not run_id or not checkpoint_path):
         raise ValueError("Resume requires explicit run_id and checkpoint_path.")
     effective = resolve_long_training_config(base_config)
-    target = int(
+    logical_target = int(base_config["long_training"]["target_global_step"])
+    session_target = int(
         target_global_step_override
         if target_global_step_override is not None
-        else base_config["long_training"]["target_global_step"]
+        else logical_target
     )
     require_accelerator = (
         bool(base_config["long_training"]["require_accelerator"])
@@ -295,7 +297,7 @@ def run_training_session(
     )
     if not require_accelerator:
         effective["dqn"]["device"] = "auto"
-    if target_global_step_override is not None and target > 4096:
+    if target_global_step_override is not None and session_target > 4096:
         raise ValueError("Local target override is limited to 4096 steps.")
     git = capture_git_lineage(repo_root)
     hardware = capture_hardware()
@@ -352,9 +354,9 @@ def run_training_session(
     trainer: Optional[DQNTrainer] = None
     output_checkpoint: Optional[Path] = None
     try:
-        while initial_state.global_step < target:
+        while initial_state.global_step < session_target:
             interval = int(base_config["long_training"]["checkpointing"]["interval_steps"])
-            segment_target = min(target, ((initial_state.global_step // interval) + 1) * interval)
+            segment_target = min(session_target, ((initial_state.global_step // interval) + 1) * interval)
             tb = effective["tensorboard"]
             logger = TensorBoardTrainingLogger(
                 log_dir=paths["logs"], reward_window=int(tb["reward_window"]),
@@ -375,7 +377,7 @@ def run_training_session(
                 initial_state.global_step, base_config,
                 full_checkpoint_ready=preflight.memory.full_checkpoint_ready,
             )
-            if initial_state.global_step >= target and decision is CheckpointDecision.NONE:
+            if initial_state.global_step >= session_target and decision is CheckpointDecision.NONE:
                 decision = CheckpointDecision.LIGHTWEIGHT
             if decision is not CheckpointDecision.NONE:
                 cp_mode = decision.value
@@ -386,7 +388,7 @@ def run_training_session(
                     path=output_checkpoint, mode=decision, agent=agent,
                     trainer=trainer, config=effective, seed=int(effective["environment"]["seed"]),
                 )
-        completed = is_training_complete(initial_state.global_step, target)
+        completed = is_training_complete(initial_state.global_step, logical_target)
         if completed:
             assert trainer is not None
             output_checkpoint = _save_training_checkpoint(

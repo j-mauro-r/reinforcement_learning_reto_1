@@ -84,6 +84,12 @@ def test_global_target_completion_semantics():
     assert is_training_complete(1_000_001, 1_000_000)
 
 
+def test_local_session_limit_does_not_change_reference_target():
+    config = load_config(CONFIG_PATH)
+    assert config["long_training"]["target_global_step"] == 1_000_000
+    assert not is_training_complete(160, config["long_training"]["target_global_step"])
+
+
 def test_explicit_run_paths_are_isolated(tmp_path):
     run_id = generate_run_id(git_sha=GIT["commit"])
     paths = build_artifact_paths(tmp_path, run_id)
