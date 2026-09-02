@@ -163,6 +163,11 @@ def test_previous_bootstrap_commit_is_guarded(monkeypatch):
         bootstrap._guard_stale_imports(SHA, SHA, PROJECT)
 
 
+def test_same_sha_and_same_project_copy_allow_idempotent_bootstrap(monkeypatch):
+    monkeypatch.setattr(builtins, bootstrap._STATE_ATTR, {"resolved_sha": SHA}, raising=False)
+    bootstrap._guard_stale_imports(SHA, SHA, PROJECT)
+
+
 def test_missing_requirements_and_install_failure(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="not found"):
         bootstrap.install_project_requirements(tmp_path / "missing.txt")
@@ -196,6 +201,12 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     assert "/content/reinforcement_learning_reto_1" in sources[bootstrap_index]
     assert "REQUESTED_REF" in sources[bootstrap_index]
     assert "REQUESTED_COMMIT" in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "feature/battlezone-colab-execution-bootstrap"' in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "main"' not in sources[bootstrap_index]
+    assert sources[bootstrap_index].index("rev-parse") < sources[bootstrap_index].index("import src.execution_bootstrap")
+    assert "bootstrap_source" in sources[bootstrap_index]
+    assert "Unexpected bootstrap source" in sources[bootstrap_index]
+    assert "Restart the Colab runtime and execute from the first cell" in sources[bootstrap_index]
     assert "sys.path.append(" not in combined
     assert "git\", \"clone\"" in sources[bootstrap_index]
     assert "MyDrive/reinforcement_learning_reto_1" not in sources[bootstrap_index]
