@@ -1,0 +1,32 @@
+environment:
+  id: "LunarLander-v3"
+  obs_dim: 8
+  n_actions: 4
+  reward_threshold: 200.0
+
+network:
+  hidden_layers: [256, 256, 256]
+  activation: "ReLU"
+
+hyperparameters:
+  learning_rate: 0.0005
+  gamma: 0.99
+  batch_size: 64
+  buffer_capacity: 100000
+  target_update_freq: 4
+  tau: 0.001
+  eps_start: 1.0
+  eps_end: 0.01
+  eps_decay: 0.995
+
+training:
+  max_episodes: 800
+  max_steps_per_episode: 1000
+  solved_window: 100
+  solved_threshold: 200.0
+  seed: 42
+  device: "cpu"
+
+evaluation:
+  n_eval_episodes: 10
+  eval_seed_base: 1000
