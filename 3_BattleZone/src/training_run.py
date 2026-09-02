@@ -227,9 +227,11 @@ def run_hu011_preflight(
     )
     memory = validate_memory_readiness(estimate)
     root = Path(persistent_root)
+    paths = build_artifact_paths(root, run_id)
     tracking = validate_long_training_readiness(
         config=effective, config_path=config_path, run_id=run_id, git=git,
-        results_dir=root / run_id / "results",
+        # create_run_manifest appends run_id to this canonical results root.
+        results_dir=paths["results"].parent,
     )
     errors = list(memory.errors) + list(tracking.errors)
     if long.get("require_accelerator") is True and not cuda:
