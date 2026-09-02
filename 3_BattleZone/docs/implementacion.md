@@ -166,3 +166,7 @@ Consolidar notebook, modelo, video, métricas, hardware, configuración y conclu
 - HU005: requiere alineación de su implementación a `DQN` antes de poder cerrarse.
 
 Esta revisión de HU004 es documental. No modifica código, preprocessing, resultados empíricos ni el proyecto Assault.
+
+## Bootstrap de ejecución Colab
+
+El código ejecutable de BattleZone proviene de GitHub y se resuelve a un SHA explícito. En Colab, el repositorio se clona únicamente en `/content/reinforcement_learning_reto_1`; Google Drive se monta después y se utiliza solo para checkpoints, logs, manifests, resultados y modelos persistentes. El bootstrap valida el origen de los imports y evita mezclar módulos cargados desde commits o copias diferentes.
