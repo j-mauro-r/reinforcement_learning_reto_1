@@ -11,7 +11,7 @@ import pytest
 
 from src.agent import DQNAgent
 from src.environment import create_battlezone_env, load_config
-from src.trainer import DQNTrainer, LinearEpsilonSchedule
+from src.trainer import DQNTrainer, LinearEpsilonSchedule, TrainingMode, TrainingState
 
 
 STATE_SHAPE = (4, 128, 128, 3)
@@ -371,3 +371,60 @@ def test_real_integration_short_run_with_dqn_agent_and_hu003_factory():
     assert summary.last_loss is not None
     assert np.isfinite(summary.last_loss)
     assert summary.target_syncs >= 1
+
+
+def test_resume_continues_global_step_without_reset_and_preserves_epsilon_continuity():
+    env = FakeEnv(rewards=[1.0])
+    agent = SpyAgent(batch_size=1)
+    schedule = LinearEpsilonSchedule(start=1.0, end=0.1, decay_steps=100)
+    trainer = DQNTrainer(
+        env=env,
+        agent=agent,
+        total_timesteps=64,
+        learning_starts=1,
+        train_frequency=1,
+        target_sync_interval=100,
+        epsilon_schedule=schedule,
+        seed=123,
+    )
+
+    initial_state = TrainingState(global_step=32, episode_index=5, episode_step=3, episode_reward=7.0)
+    summary = trainer.train(
+        total_timesteps=48,
+        initial_state=initial_state,
+        mode=TrainingMode.RESUME_FULL,
+        replay_restored=True,
+    )
+
+    assert summary.start_global_step == 32
+    assert summary.total_steps == 48
+    assert summary.initial_epsilon == pytest.approx(schedule.value(32))
+    assert summary.run_mode == "resume_full"
+    assert summary.replay_restored is True
+
+
+def test_resume_lightweight_keeps_replay_empty_until_rebuilt_then_updates_after_gate():
+    env = FakeEnv(rewards=[1.0])
+    agent = SpyAgent(batch_size=8)
+    trainer = DQNTrainer(
+        env=env,
+        agent=agent,
+        total_timesteps=256,
+        learning_starts=1,
+        train_frequency=4,
+        target_sync_interval=100,
+        epsilon_schedule=LinearEpsilonSchedule(start=1.0, end=0.1, decay_steps=200),
+        seed=123,
+    )
+
+    summary = trainer.train(
+        total_timesteps=45,
+        initial_state=TrainingState(global_step=32, episode_index=0),
+        mode=TrainingMode.RESUME_LIGHTWEIGHT,
+        replay_restored=False,
+    )
+
+    assert summary.start_global_step == 32
+    assert summary.first_update_step == 40
+    assert summary.updates >= 1
+    assert summary.run_mode == "resume_lightweight"
