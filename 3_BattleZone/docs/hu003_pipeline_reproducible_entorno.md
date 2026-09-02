@@ -4,10 +4,11 @@
 
 - **ID:** HU003
 - **Nombre:** Pipeline reproducible del entorno BattleZone
-- **Estado:** Lista para implementación
+- **Estado:** `[COMPLETADA]`
 - **Dependencia previa:** HU002 — Experimento 0 y baseline aleatorio `[COMPLETADA]`
 - **Habilita:** HU004 — Selección formal del algoritmo
 - **Gate posterior:** el contrato de observación y acciones debe quedar estable antes de implementar el agente en HU005.
+- **Cierre:** PR #21 mergeado a `main`; merge commit `beffdacf0e3e5d8b656bfee3f11e88eacc3b7228`.
 - **Fuentes de verdad:**
   - `enunciado_reto_1.txt`;
   - `3_BattleZone/docs/implementacion.md`;
@@ -793,28 +794,28 @@ El PR no debe modificar Assault ni mezclar trabajo de otras HUs.
 
 HU003 se considera `[COMPLETADA]` únicamente cuando:
 
-- [ ] existe configuración centralizada bajo `3_BattleZone/configs/`;
-- [ ] existe fábrica única en `3_BattleZone/src/environment.py`;
-- [ ] utilidades transversales están separadas solo cuando aportan valor;
-- [ ] existe `3_BattleZone/pipeline_battlezone.ipynb` independiente;
-- [ ] se compararon alternativas de preprocessing sobre BattleZone;
-- [ ] se documentó la decisión final;
-- [ ] radar e información crítica permanecen preservados;
-- [ ] se fijó el contrato final de observación;
-- [ ] frame stack está explícitamente definido;
-- [ ] frameskip efectivo se aplica una única vez;
-- [ ] train y eval comparten el mismo contrato perceptual;
-- [ ] action space continúa siendo `Discrete(18)`;
-- [ ] rewards permanecen sin transformación;
-- [ ] seeds están implementadas explícitamente;
-- [ ] smoke tests focalizados pasan;
-- [ ] validación local barata fue ejecutada cuando fue viable;
-- [ ] existe evidencia versionada de implementación;
-- [ ] no se modificó ni reutilizó `experimento_0_battlezone.ipynb`;
-- [ ] no existen cambios/imports desde `2_Assault/`;
-- [ ] no se adelantó selección ni implementación del algoritmo de HU004/HU005;
-- [ ] todas las autovalidaciones aplicables están en `PASS` o cualquier excepción aprobada queda explícitamente documentada;
-- [ ] el PR es focalizado, revisable y listo para merge.
+- [x] existe configuración centralizada bajo `3_BattleZone/configs/`;
+- [x] existe fábrica única en `3_BattleZone/src/environment.py`;
+- [x] utilidades transversales están separadas solo cuando aportan valor;
+- [x] existe `3_BattleZone/pipeline_battlezone.ipynb` independiente;
+- [x] se compararon alternativas de preprocessing sobre BattleZone;
+- [x] se documentó la decisión final;
+- [x] radar e información crítica permanecen preservados;
+- [x] se fijó el contrato final de observación;
+- [x] frame stack está explícitamente definido;
+- [x] frameskip efectivo se aplica una única vez;
+- [x] train y eval comparten el mismo contrato perceptual;
+- [x] action space continúa siendo `Discrete(18)`;
+- [x] rewards permanecen sin transformación;
+- [x] seeds están implementadas explícitamente;
+- [x] smoke tests focalizados pasan;
+- [x] validación local barata fue ejecutada cuando fue viable;
+- [x] existe evidencia versionada de implementación;
+- [x] no se modificó ni reutilizó `experimento_0_battlezone.ipynb`;
+- [x] no existen cambios/imports desde `2_Assault/`;
+- [x] no se adelantó selección ni implementación del algoritmo de HU004/HU005;
+- [x] todas las autovalidaciones aplicables están en `PASS` o cualquier excepción aprobada queda explícitamente documentada;
+- [x] el PR fue focalizado, revisado y mergeado a `main`.
 
 ---
 
@@ -898,3 +899,17 @@ Como mínimo HU004 debe conocer:
 - evidencia de que radar e información relevante fueron preservados.
 
 Con este gate cumplido, la selección algorítmica de HU004 podrá concentrarse en sparse rewards, alta variabilidad, eficiencia muestral, estabilidad y costo computacional sin reabrir decisiones básicas del entorno.
+
+---
+
+## 15. Evidencia de cierre
+
+HU003 fue auditada después de su integración y se considera cerrada porque:
+
+- PR #21 fue mergeado a `main`;
+- merge commit: `beffdacf0e3e5d8b656bfee3f11e88eacc3b7228`;
+- el pipeline final es `battlezone_rgb_128_stack4_no_crop`;
+- la suite focalizada reportó `9 passed`;
+- AV01–AV17 están documentadas como `PASS` en `hu003_evidencia_implementacion.md`;
+- el diff de la HU se mantuvo bajo `3_BattleZone/`, sin dependencia o modificación de `2_Assault/`;
+- no se seleccionó ni implementó algoritmo de agente dentro de HU003.
