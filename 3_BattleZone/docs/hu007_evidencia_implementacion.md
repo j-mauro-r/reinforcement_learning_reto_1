@@ -224,3 +224,76 @@ Nota de trazabilidad: la cadena "2_Assault" aparece en un test preexistente de e
 - no se introduce run_manifest
 - no se realiza evaluacion formal
 - no se ejecuta entrenamiento largo
+
+## 12. Correccion posterior a auditoria
+
+### 12.1 Bloqueante detectado
+
+La auditoria detecto que el checkpoint ya guardaba `config_snapshot` critico, pero la validacion previa de compatibilidad no comparaba todos los campos criticos contra la configuracion activa antes de restaurar.
+
+### 12.2 Causa
+
+`validate_checkpoint_compatibility(...)` validaba estructura principal (schema, modo, dimensiones, batch), pero no realizaba comparacion campo por campo de:
+
+- contrato de entorno;
+- contrato de shape final;
+- gamma y capacidad de replay;
+- schedule de epsilon.
+
+### 12.3 Correccion aplicada
+
+Se actualizo `3_BattleZone/src/persistence.py` para comparar explicitamente el snapshot del checkpoint contra el snapshot activo generado por la misma funcion `checkpoint_config_snapshot(config)`.
+
+Campos validados:
+
+- environment.env_id
+- environment.expected_action_space_n
+- environment.frameskip
+- environment.repeat_action_probability
+- validation.expected_final_shape
+- dqn.batch_size
+- dqn.gamma
+- dqn.replay_buffer.capacity
+- training.epsilon.start
+- training.epsilon.end
+- training.epsilon.decay_steps
+
+La comparacion de floats usa `math.isclose` con tolerancias pequenas (`rel_tol=1e-9`, `abs_tol=1e-9`).
+
+Los errores son explicitos por campo, por ejemplo:
+
+`Checkpoint config mismatch for dqn.gamma: checkpoint=0.99, active=0.95.`
+
+### 12.4 Tests nuevos agregados
+
+Se ampliaron pruebas en `3_BattleZone/tests/test_persistence.py` para incompatibilidad de snapshot critico:
+
+- mismatch de gamma;
+- mismatch de frameskip;
+- mismatch de sticky actions (`repeat_action_probability`);
+- mismatch de replay capacity;
+- mismatch de epsilon.start;
+- mismatch de epsilon.end;
+- mismatch de epsilon.decay_steps;
+- mismatch de env_id;
+- mismatch de expected_final_shape;
+- test positivo de compatibilidad exacta (restore PASS).
+
+### 12.5 Revalidacion tras correccion
+
+- `test_persistence.py`: PASS (22 passed)
+- regresion HU005-HU007 (`test_replay_buffer.py`, `test_trainer.py`, `test_persistence.py`): PASS (48 passed)
+- suite BattleZone completa: PASS (76 passed)
+
+### 12.6 Validacion controlada manual de incompatibilidad
+
+Casos ejecutados con checkpoint FULL real y restore controlado:
+
+- `dqn.gamma` cambiado en config activa -> `ValueError` explicito.
+- `environment.frameskip` cambiado en config activa -> `ValueError` explicito.
+
+### 12.7 Actualizacion puntual de criterios
+
+- CA08 (schema/version/config compatibility): PASS reforzado con comparacion de snapshot critico.
+- AV08 (schema validation): PASS mantenido.
+- AV09 (structural/config incompatibility rejection): PASS reforzado con validaciones por campo.

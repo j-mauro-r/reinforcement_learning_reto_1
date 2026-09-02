@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import math
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, Mapping, Optional
@@ -261,8 +262,11 @@ def validate_checkpoint_compatibility(
     snapshot = payload.get("config_snapshot")
     if not isinstance(snapshot, dict):
         raise ValueError("config_snapshot must be a dict.")
-    if snapshot.get("algorithm") != "DQN":
-        raise ValueError("Checkpoint config_snapshot algorithm must be DQN.")
+    active_snapshot = checkpoint_config_snapshot(config)
+    _validate_critical_snapshot_fields(
+        checkpoint_snapshot=snapshot,
+        active_snapshot=active_snapshot,
+    )
 
     replay_state = payload.get("replay_buffer_state")
     if expected_mode == CHECKPOINT_MODE_FULL and replay_state is None:
@@ -320,3 +324,67 @@ def checkpoint_filename(*, global_step: int, checkpoint_mode: str) -> str:
     if checkpoint_mode not in _ALLOWED_MODES:
         raise ValueError(f"Unsupported checkpoint_mode={checkpoint_mode!r}.")
     return f"battlezone_dqn_step_{int(global_step):08d}_{checkpoint_mode}.pt"
+
+
+def _get_nested_value(snapshot: Mapping[str, Any], path: tuple[str, ...]) -> Any:
+    value: Any = snapshot
+    for key in path:
+        if not isinstance(value, Mapping) or key not in value:
+            dotted = ".".join(path)
+            raise ValueError(f"Missing checkpoint config field: {dotted}")
+        value = value[key]
+    return value
+
+
+def _validate_critical_snapshot_fields(
+    *,
+    checkpoint_snapshot: Mapping[str, Any],
+    active_snapshot: Mapping[str, Any],
+) -> None:
+    float_paths = {
+        ("environment", "repeat_action_probability"),
+        ("dqn", "gamma"),
+        ("training", "epsilon", "start"),
+        ("training", "epsilon", "end"),
+    }
+    shape_paths = {
+        ("validation", "expected_final_shape"),
+    }
+    critical_paths = [
+        ("algorithm",),
+        ("environment", "env_id"),
+        ("environment", "expected_action_space_n"),
+        ("environment", "frameskip"),
+        ("environment", "repeat_action_probability"),
+        ("validation", "expected_final_shape"),
+        ("dqn", "batch_size"),
+        ("dqn", "gamma"),
+        ("dqn", "replay_buffer", "capacity"),
+        ("training", "epsilon", "start"),
+        ("training", "epsilon", "end"),
+        ("training", "epsilon", "decay_steps"),
+    ]
+
+    for path in critical_paths:
+        checkpoint_value = _get_nested_value(checkpoint_snapshot, path)
+        active_value = _get_nested_value(active_snapshot, path)
+
+        equal = False
+        if path in float_paths:
+            equal = math.isclose(
+                float(checkpoint_value),
+                float(active_value),
+                rel_tol=1e-9,
+                abs_tol=1e-9,
+            )
+        elif path in shape_paths:
+            equal = tuple(checkpoint_value) == tuple(active_value)
+        else:
+            equal = checkpoint_value == active_value
+
+        if not equal:
+            dotted = ".".join(path)
+            raise ValueError(
+                f"Checkpoint config mismatch for {dotted}: "
+                f"checkpoint={checkpoint_value!r}, active={active_value!r}."
+            )

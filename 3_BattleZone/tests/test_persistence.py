@@ -322,3 +322,169 @@ def test_checkpoint_source_unchanged_after_load(tmp_path: Path):
     after_size = path.stat().st_size
     assert before_hash == after_hash
     assert before_size == after_size
+
+
+def test_config_snapshot_compatible_restore_passes(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "compatible.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    restored = DQNAgent.from_config(base_config)
+    resume_info = restore_training_state(
+        checkpoint_path=checkpoint,
+        agent=restored,
+        config=base_config,
+        expected_mode=CHECKPOINT_MODE_FULL,
+    )
+    assert resume_info["global_step"] == 16
+
+
+def test_config_snapshot_mismatch_gamma_raises_error(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "gamma_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    active_config["dqn"]["gamma"] = 0.95
+
+    with pytest.raises(ValueError, match="dqn.gamma"):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
+
+
+def test_config_snapshot_mismatch_frameskip_raises_error(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "frameskip_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    active_config["environment"]["frameskip"] = 5
+
+    with pytest.raises(ValueError, match="environment.frameskip"):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
+
+
+def test_config_snapshot_mismatch_sticky_actions_raises_error(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "sticky_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    active_config["environment"]["repeat_action_probability"] = 0.10
+
+    with pytest.raises(ValueError, match="environment.repeat_action_probability"):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
+
+
+def test_config_snapshot_mismatch_replay_capacity_raises_error(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "capacity_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    active_config["dqn"]["replay_buffer"]["capacity"] = 256
+
+    with pytest.raises(ValueError, match="dqn.replay_buffer.capacity"):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
+
+
+@pytest.mark.parametrize(
+    "field_path,new_value,expected_match",
+    [
+        (("training", "epsilon", "start"), 0.8, "training.epsilon.start"),
+        (("training", "epsilon", "end"), 0.01, "training.epsilon.end"),
+        (("training", "epsilon", "decay_steps"), 2048, "training.epsilon.decay_steps"),
+    ],
+)
+def test_config_snapshot_mismatch_epsilon_fields_raise_error(
+    tmp_path: Path,
+    field_path: tuple[str, ...],
+    new_value: float | int,
+    expected_match: str,
+):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "epsilon_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    node = active_config
+    for key in field_path[:-1]:
+        node = node[key]
+    node[field_path[-1]] = new_value
+
+    with pytest.raises(ValueError, match=expected_match):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
+
+
+def test_config_snapshot_mismatch_env_id_raises_error(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "env_id_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    active_config["environment"]["env_id"] = "ALE/Pong-v5"
+
+    with pytest.raises(ValueError, match="environment.env_id"):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
+
+
+def test_config_snapshot_mismatch_expected_shape_raises_error(tmp_path: Path):
+    base_config = load_config()
+    trainer, agent = _trainer_and_agent(base_config)
+    trainer.train(total_timesteps=16)
+    checkpoint = tmp_path / "shape_mismatch.pt"
+    _save_mode_checkpoint(checkpoint, trainer, agent, base_config, CHECKPOINT_MODE_FULL)
+
+    active_config = copy.deepcopy(base_config)
+    active_config["validation"]["expected_final_shape"] = [4, 84, 84, 3]
+
+    with pytest.raises(ValueError, match="validation.expected_final_shape"):
+        restore_training_state(
+            checkpoint_path=checkpoint,
+            agent=DQNAgent.from_config(base_config),
+            config=active_config,
+            expected_mode=CHECKPOINT_MODE_FULL,
+        )
