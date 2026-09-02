@@ -40,14 +40,18 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 - El gate de memoria autoriza Replay y FULL en esta máquina; en Colab debe recalcularse con la RAM real.
 - El gate CUDA bloquea `reference_v1` cuando CUDA no está disponible. Solo tests/integración corta permiten desactivarlo explícitamente.
 - `READY_FOR_LONG_TRAINING=True` durante la integración con checkout limpio y override local controlado.
+- Contrato de paths: el preflight valida `<PERSISTENT_ROOT>/results` y NEW crea exactamente `<PERSISTENT_ROOT>/results/<run_id>/run_manifest.json`.
+- No se crea el directorio alternativo `<PERSISTENT_ROOT>/<run_id>/results`.
 
 ## Integración ALE real corta
 
 - ALE-Py real: PASS.
-- Run temporal: `battlezone-dqn-20260902-220412-452b569-6d14`.
+- Run temporal final: `battlezone-dqn-20260902-222314-a06071f-3639`.
 - Overrides test-only: intervalos 32 y Replay capacity 256; `reference_v1` productivo permanece 25k/250k y capacity 4096.
 - NEW: 0→96, una sesión, tres checkpoints LIGHTWEIGHT en 32/64/96, sin recrear trainer/environment/logger.
-- Duración NEW registrada: 0.12462224999762839 segundos.
+- Manifest canónico: `/tmp/battlezone-hu011-path.kf1lBF/results/battlezone-dqn-20260902-222314-a06071f-3639/run_manifest.json`.
+- El preflight validó `/tmp/battlezone-hu011-path.kf1lBF/results`; no existió ruta fantasma.
+- Duración NEW registrada: 0.12400049999996554 segundos.
 - RESUME_LIGHTWEIGHT: mismo `run_id`, nueva sesión y continuidad 96→128.
 - TensorBoard continuo: steps 16, 32, 48, 64, 80, 96, 112 y 128.
 - La integración no se presenta como corrida completa ni como evidencia de aprendizaje.
@@ -55,8 +59,12 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 ## Validación automatizada
 
 - `compileall`: PASS.
-- Tests focales trainer/HU011: 37 passed antes de la integración ALE.
-- Los resultados finales de HU011, regresión focal y suite completa se reportan en PR #34 después de esta actualización.
+- `compileall`: PASS.
+- HU011 + trainer: 38 passed.
+- Regresión focal: 99 passed, 1 skipped.
+- Suite BattleZone completa: 124 passed, 1 skipped.
+- Fallos: 0.
+- El artefacto final controlado fue cargado mediante `restore_training_state()`: step 4 y `replay_restored=false`.
 - Se volverán a ejecutar todas las suites después de este documento y se reportará el resultado final en PR #34.
 
 ## Scope y limitaciones
