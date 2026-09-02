@@ -193,14 +193,17 @@ def test_resolve_delivery_model_path_prefers_local_assault_model_then_drive_fall
 
     resolved, source = resolve_delivery_model_path(base=drive_base, assault_dir=assault_dir, project_run_id=project_run_id)
     assert resolved == local_path
-    assert source == "LOCAL"
+    assert source == "DELIVERY"
 
     local_path.unlink()
     resolved, source = resolve_delivery_model_path(base=drive_base, assault_dir=assault_dir, project_run_id=project_run_id)
     assert resolved == drive_path
-    assert source == "DRIVE"
+    assert source == "DRIVE_FALLBACK"
 
     drive_path.unlink()
-    with pytest.raises(FileNotFoundError, match="assault_ddqn_model.pt"):
+    with pytest.raises(FileNotFoundError) as exc_info:
         resolve_delivery_model_path(base=drive_base, assault_dir=assault_dir, project_run_id=project_run_id)
+    message = str(exc_info.value)
+    assert str(local_path) in message
+    assert str(drive_path) in message
 
