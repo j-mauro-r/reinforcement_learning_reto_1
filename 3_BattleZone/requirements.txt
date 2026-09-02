@@ -6,7 +6,7 @@ Pillow>=9.0
 PyYAML>=6.0
 psutil>=5.9
 pytest>=8.0
-torch>=2.0
+# PyTorch is provided by the Colab runtime; do not replace its CUDA build.
 tensorboard>=2.14
 matplotlib>=3.7
 pandas>=2.0

@@ -54,6 +54,26 @@ def running_in_colab() -> bool:
     return True
 
 
+def validate_cuda_runtime(
+    *, torch_version: str, cuda_available: bool,
+    cuda_version: Optional[str], gpu_name: Optional[str], required: bool,
+) -> None:
+    """Fails fast when a required CUDA runtime is absent or CPU-only."""
+    invalid = (
+        not cuda_available
+        or not cuda_version
+        or not gpu_name
+        or "+cpu" in torch_version.lower()
+    )
+    if required and invalid:
+        raise RuntimeError(
+            "CUDA_REQUIRED_FOR_HU011\n\n"
+            "This runtime is CPU-only or PyTorch has no usable CUDA build.\n"
+            "Select a GPU runtime in Google Colab and restart the session.\n"
+            "HU011 reference_v1 training was NOT started."
+        )
+
+
 def prepare_execution_environment(
     requested_ref: str,
     requested_commit: Optional[str] = None,
