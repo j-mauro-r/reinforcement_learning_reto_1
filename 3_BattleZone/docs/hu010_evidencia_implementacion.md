@@ -2,7 +2,7 @@
 
 ## 1. Estado
 
-La capa técnica de trazabilidad ligera está implementada y validada. El PR #32 ya aparecía como `MERGED` al iniciar la implementación, por lo que no puede quedar abierto sin crear otro PR (acción expresamente prohibida).
+La capa técnica de trazabilidad ligera está implementada y validada. PR #32 corresponde a la definición HU010 ya mergeada; un PR de seguimiento integra exclusivamente la implementación técnica HU010.
 
 ## 2. Rama y commit de base
 
@@ -18,7 +18,7 @@ La capa técnica de trazabilidad ligera está implementada y validada. El PR #32
 - `3_BattleZone/tests/test_experiment_tracking.py`.
 - `3_BattleZone/docs/hu010_evidencia_implementacion.md`.
 
-El cambio local preexistente en `3_BattleZone/pipeline_battlezone.ipynb` no fue tocado ni agregado.
+La reejecución del notebook quedó identificada en el commit `1c4421b` y se retiró del delta del PR de seguimiento; `3_BattleZone/pipeline_battlezone.ipynb` es idéntico a `origin/main`.
 
 ## 4. Tracking config
 
@@ -89,7 +89,7 @@ Con un checkout limpio inyectado, el gate dio `True`: tracking, results writable
 
 ## 18. CA01–CA18
 
-CA01–CA17: PASS técnico. CA18: PASS; no se añadió lógica Assault, servicios externos, entrenamiento largo, tuning ni evaluación formal. El estado previo `MERGED` de PR #32 impide cumplir la condición administrativa de dejar ese PR abierto.
+CA01–CA18: PASS; no se añadió lógica Assault, servicios externos, entrenamiento largo, tuning ni evaluación formal.
 
 ## 19. AV01–AV18
 
@@ -103,6 +103,6 @@ BattleZone mantiene DQN clásico. No se modificaron `2_Assault/`, `trainer.py`, 
 
 El manifest vincula rutas de checkpoints/logs; no duplica artefactos. RAM puede ser `null` si `psutil` no está instalado. La continuidad del estado interno ALE entre procesos sigue el contrato HU007: se preserva progreso y el entorno se resetea.
 
-## 22. Bloqueo administrativo
+## 22. Linaje administrativo
 
-PR #32 (`https://github.com/j-mauro-r/reinforcement_learning_reto_1/pull/32`) fue encontrado ya fusionado. GitHub no permite reabrir un PR fusionado y el alcance prohíbe crear otro; la rama sí recibe la implementación para una auditoría posterior.
+PR #32 (`https://github.com/j-mauro-r/reinforcement_learning_reto_1/pull/32`) mergeó la definición documental. El PR de seguimiento autorizado contiene la implementación HU010 y debe permanecer abierto hasta su auditoría final.
