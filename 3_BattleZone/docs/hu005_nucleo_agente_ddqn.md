@@ -4,7 +4,7 @@
 
 - **ID:** HU005
 - **Nombre:** Núcleo del agente DDQN para BattleZone
-- **Estado:** Lista para implementación
+- **Estado:** Implementada — pendiente de revisión/merge
 - **Dependencia previa:** HU004 — Selección formal del algoritmo `[COMPLETADA]`
 - **Habilita:** HU006 — Ciclo de entrenamiento
 - **Algoritmo fijado por HU004:** `DDQN`
