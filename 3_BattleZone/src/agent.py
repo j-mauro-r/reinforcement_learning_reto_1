@@ -18,6 +18,7 @@ class DQNUpdateResult:
     """Result of one controlled DQN optimizer step."""
 
     loss: float
+    q_value_mean: float
 
 
 class DQNAgent:
@@ -136,6 +137,7 @@ class DQNAgent:
         """Runs one optimizer update over a controlled batch."""
         states, actions, rewards, next_states, dones = self._prepare_batch(batch)
         predicted_q = self.online_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+        q_value_mean = float(predicted_q.detach().mean().item())
         with torch.no_grad():
             next_q_values = self.target_network(next_states).max(dim=1).values
             targets = rewards + self.gamma * (1.0 - dones) * next_q_values
@@ -144,7 +146,10 @@ class DQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        return DQNUpdateResult(loss=float(loss.detach().item()))
+        return DQNUpdateResult(
+            loss=float(loss.detach().item()),
+            q_value_mean=q_value_mean,
+        )
 
     def sync_target_network(self) -> None:
         """Synchronizes target-network parameters from online network."""

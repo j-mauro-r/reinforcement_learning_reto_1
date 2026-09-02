@@ -108,3 +108,11 @@ checkpointing:
   default_mode: "full"
   schema_version: 1
   allow_overwrite: false
+
+tensorboard:
+  enabled: true
+  baseline_note: "baseline de implementacion por validar"
+  log_dir: "3_BattleZone/logs"
+  scalar_log_interval_steps: 4
+  reward_window: 10
+  flush_interval_steps: 64

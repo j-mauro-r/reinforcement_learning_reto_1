@@ -4,12 +4,35 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Protocol
 
 import numpy as np
 
 from src.agent import DQNAgent
 from src.environment import create_battlezone_env, load_config
+
+
+class TrainingLogger(Protocol):
+    """Small logger contract used by trainer without hard dependency on TensorBoard."""
+
+    def on_training_start(self) -> None: ...
+
+    def on_step(
+        self,
+        *,
+        global_step: int,
+        epsilon: float,
+        replay_size: int,
+        learning_rate: float,
+    ) -> None: ...
+
+    def on_update(self, *, global_step: int, loss: float, q_value_mean: float) -> None: ...
+
+    def on_episode_end(self, *, global_step: int, episode_reward: float, episode_length: int) -> None: ...
+
+    def on_training_end(self) -> None: ...
+
+    def close(self) -> None: ...
 
 
 @dataclass
@@ -93,6 +116,7 @@ class DQNTrainer:
         target_sync_interval: int,
         epsilon_schedule: LinearEpsilonSchedule,
         seed: int,
+        logger: Optional[TrainingLogger] = None,
     ) -> None:
         if total_timesteps <= 0:
             raise ValueError("total_timesteps must be positive.")
@@ -111,6 +135,7 @@ class DQNTrainer:
         self.target_sync_interval = int(target_sync_interval)
         self.epsilon_schedule = epsilon_schedule
         self.seed = int(seed)
+        self.logger = logger
         self.training_state = TrainingState()
         self.mode = TrainingMode.NEW
         self.replay_restored = False
@@ -127,6 +152,7 @@ class DQNTrainer:
         learning_starts: Optional[int] = None,
         train_frequency: Optional[int] = None,
         target_sync_interval: Optional[int] = None,
+        logger: Optional[TrainingLogger] = None,
     ) -> "DQNTrainer":
         """Builds trainer from versioned BattleZone configuration."""
         cfg = dict(config) if config is not None else load_config()
@@ -158,6 +184,7 @@ class DQNTrainer:
             ),
             epsilon_schedule=schedule,
             seed=resolved_seed,
+            logger=logger,
         )
 
     def train(
@@ -216,54 +243,83 @@ class DQNTrainer:
         if hasattr(self.env, "action_space") and hasattr(self.env.action_space, "seed"):
             self.env.action_space.seed(self.seed + state.episode_index)
 
-        while state.global_step < target_global_step:
-            epsilon = self.epsilon_schedule.value(state.global_step)
-            last_epsilon = epsilon
-            action = int(self.agent.select_action(observation, epsilon))
-            if action < 0 or action >= int(self.agent.action_dim):
-                raise ValueError(
-                    f"Action {action} out of bounds for action_dim={self.agent.action_dim}."
+        if self.logger is not None:
+            self.logger.on_training_start()
+
+        try:
+            while state.global_step < target_global_step:
+                epsilon = self.epsilon_schedule.value(state.global_step)
+                last_epsilon = epsilon
+                action = int(self.agent.select_action(observation, epsilon))
+                if action < 0 or action >= int(self.agent.action_dim):
+                    raise ValueError(
+                        f"Action {action} out of bounds for action_dim={self.agent.action_dim}."
+                    )
+
+                next_observation, reward, terminated, truncated, _ = self.env.step(action)
+                episode_done = bool(terminated or truncated)
+                # DQN bootstrap is blocked only by MDP terminal transitions.
+                done_for_bootstrap = bool(terminated)
+                self.agent.store_transition(
+                    np.asarray(observation),
+                    action,
+                    float(reward),
+                    np.asarray(next_observation),
+                    done_for_bootstrap,
                 )
 
-            next_observation, reward, terminated, truncated, _ = self.env.step(action)
-            episode_done = bool(terminated or truncated)
-            # DQN bootstrap is blocked only by MDP terminal transitions.
-            done_for_bootstrap = bool(terminated)
-            self.agent.store_transition(
-                np.asarray(observation),
-                action,
-                float(reward),
-                np.asarray(next_observation),
-                done_for_bootstrap,
-            )
+                state.global_step += 1
+                state.episode_step += 1
+                state.episode_reward += float(reward)
 
-            state.global_step += 1
-            state.episode_step += 1
-            state.episode_reward += float(reward)
+                if self._should_update(state.global_step):
+                    batch = self.agent.sample_batch(self.agent.batch_size)
+                    update_result = self.agent.update(batch)
+                    last_loss = float(update_result.loss)
+                    updates += 1
+                    update_steps.append(state.global_step)
+                    if self.logger is not None:
+                        self.logger.on_update(
+                            global_step=state.global_step,
+                            loss=float(update_result.loss),
+                            q_value_mean=float(update_result.q_value_mean),
+                        )
 
-            if self._should_update(state.global_step):
-                batch = self.agent.sample_batch(self.agent.batch_size)
-                update_result = self.agent.update(batch)
-                last_loss = float(update_result.loss)
-                updates += 1
-                update_steps.append(state.global_step)
+                if state.global_step % self.target_sync_interval == 0:
+                    self.agent.sync_target_network()
+                    target_syncs += 1
+                    target_sync_steps.append(state.global_step)
 
-            if state.global_step % self.target_sync_interval == 0:
-                self.agent.sync_target_network()
-                target_syncs += 1
-                target_sync_steps.append(state.global_step)
+                if self.logger is not None:
+                    current_epsilon = self.epsilon_schedule.value(state.global_step)
+                    self.logger.on_step(
+                        global_step=state.global_step,
+                        epsilon=current_epsilon,
+                        replay_size=len(self.agent.replay_buffer),
+                        learning_rate=float(self.agent.optimizer.param_groups[0]["lr"]),
+                    )
 
-            if episode_done:
-                episode_rewards.append(float(state.episode_reward))
-                episode_lengths.append(int(state.episode_step))
-                terminated_episodes += int(bool(terminated))
-                truncated_episodes += int(bool(truncated))
-                state.episode_index += 1
-                state.episode_step = 0
-                state.episode_reward = 0.0
-                observation, _ = self.env.reset(seed=self.seed + state.episode_index)
-            else:
-                observation = next_observation
+                if episode_done:
+                    episode_rewards.append(float(state.episode_reward))
+                    episode_lengths.append(int(state.episode_step))
+                    terminated_episodes += int(bool(terminated))
+                    truncated_episodes += int(bool(truncated))
+                    if self.logger is not None:
+                        self.logger.on_episode_end(
+                            global_step=state.global_step,
+                            episode_reward=float(state.episode_reward),
+                            episode_length=int(state.episode_step),
+                        )
+                    state.episode_index += 1
+                    state.episode_step = 0
+                    state.episode_reward = 0.0
+                    observation, _ = self.env.reset(seed=self.seed + state.episode_index)
+                else:
+                    observation = next_observation
+        finally:
+            if self.logger is not None:
+                self.logger.on_training_end()
+                self.logger.close()
 
         self.training_state = state
 
