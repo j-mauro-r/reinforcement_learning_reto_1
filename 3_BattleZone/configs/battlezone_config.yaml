@@ -61,9 +61,9 @@ validation:
       frame_stack: 4
       rationale: "Selected compromise: preserves radar and color while reducing raw dimensionality."
 
-algorithm: "DDQN"
+algorithm: "DQN"
 
-ddqn:
+dqn:
   baseline_note: "baseline de implementacion por validar"
   device: "auto"
   gamma: 0.99
