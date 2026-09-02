@@ -179,18 +179,18 @@ def resolve_delivery_model_path(
       2. BASE / "models" / PROJECT_RUN_ID / "assault_ddqn_model.pt"
 
     Returns:
-        (resolved_path, source) where source is either LOCAL or DRIVE.
+        (resolved_path, source) where source is either DELIVERY or DRIVE_FALLBACK.
     """
     if not str(project_run_id).strip():
         raise ValueError("project_run_id must be explicit and non-empty.")
 
     local_path = Path(assault_dir) / "assault_ddqn_model.pt"
     if local_path.exists():
-        return local_path, "LOCAL"
+        return local_path, "DELIVERY"
 
     drive_path = Path(base) / "models" / str(project_run_id) / "assault_ddqn_model.pt"
     if drive_path.exists():
-        return drive_path, "DRIVE"
+        return drive_path, "DRIVE_FALLBACK"
 
     searched = [
         str(local_path),

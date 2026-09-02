@@ -104,6 +104,12 @@ def test_hu011_notebook_keeps_domain_logic_in_src_modules():
     assert "class ReplayBuffer" not in text
 
 
+def test_hu012_bootstrap_default_ref_is_main():
+    text = _text()
+    assert 'os.environ.setdefault("ASSAULT_BOOTSTRAP_REF", "main")' in text
+    assert 'os.environ.setdefault("ASSAULT_BOOTSTRAP_REF", "feature/hu011-entregable-final-assault")' not in text
+
+
 def test_hu012_delivery_model_section_has_autonomous_resolution_markers():
     text = _text()
     required_markers = [
@@ -111,15 +117,48 @@ def test_hu012_delivery_model_section_has_autonomous_resolution_markers():
         "DELIVERY_MODEL_SOURCE=",
         "DELIVERY_MODEL_PATH=",
         "DELIVERY_MODEL_LOAD_PASS=True",
-        "DELIVERY_MODEL_EXECUTION_PASS=True",
+        "ASSAULT_DELIVERY_MODEL_EXECUTION_PASS=True",
+        "HU012_DELIVERY_MODEL_GATE=PASS",
+        "DELIVERY_MODEL_SOURCE in {\"DELIVERY\", \"DRIVE_FALLBACK\"}",
         "ASSAULT_DIR / \"assault_ddqn_model.pt\"",
         "BASE / \"models\" / PROJECT_RUN_ID / \"assault_ddqn_model.pt\"",
+        "resolve_delivery_model_path(",
         "load_inference_model(",
+        "create_assault_env(",
+        "evaluate_agent(",
         "epsilon=0.0",
         "No entrenamos ni actualizamos pesos en esta seccion",
     ]
     for marker in required_markers:
         assert marker in text
+
+
+def test_hu012_delivery_model_section_avoids_training_calls():
+    text = _text()
+    start = text.index("## 15. Modelo entregable autonomo")
+    end = text.index("## **16. Reporte tecnico academico**")
+    section = text[start:end]
+    forbidden = [
+        "run_training_session(",
+        "update_experiment_state_after_success(",
+        "agent.update(",
+        "optimizer.step(",
+        "replay_buffer.add(",
+        "prepare_training_session(",
+        "resolve_hu009c_execution_mode(",
+        "export_inference_model(",
+        "TRAINING_COMPLETE=True",
+    ]
+    for token in forbidden:
+        assert token not in section
+
+
+def test_hu012_section_does_not_redeclare_hu011_gate():
+    text = _text()
+    start = text.index("## 15. Modelo entregable autonomo")
+    end = text.index("## **16. Reporte tecnico academico**")
+    section = text[start:end]
+    assert "HU011_FINAL_DELIVERY_GATE=PASS" not in section
 
 
 def test_hu011_report_presents_values_tables_analysis_and_evidence_based_conclusion():
