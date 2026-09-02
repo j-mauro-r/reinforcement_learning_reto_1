@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional
 
 import numpy as np
@@ -39,6 +40,18 @@ class TrainingSummary:
     target_sync_steps: List[int] = field(default_factory=list)
     terminated_episodes: int = 0
     truncated_episodes: int = 0
+    start_global_step: int = 0
+    run_mode: str = "new"
+    replay_restored: bool = False
+    first_update_step: Optional[int] = None
+
+
+class TrainingMode(str, Enum):
+    """Explicit training modes for idempotent NEW/RESUME behavior."""
+
+    NEW = "new"
+    RESUME_FULL = "resume_full"
+    RESUME_LIGHTWEIGHT = "resume_lightweight"
 
 
 @dataclass(frozen=True)
@@ -98,6 +111,9 @@ class DQNTrainer:
         self.target_sync_interval = int(target_sync_interval)
         self.epsilon_schedule = epsilon_schedule
         self.seed = int(seed)
+        self.training_state = TrainingState()
+        self.mode = TrainingMode.NEW
+        self.replay_restored = False
 
     @classmethod
     def from_config(
@@ -144,9 +160,38 @@ class DQNTrainer:
             seed=resolved_seed,
         )
 
-    def train(self) -> TrainingSummary:
-        """Runs one bounded DQN training cycle and returns a summary."""
-        state = TrainingState()
+    def train(
+        self,
+        *,
+        total_timesteps: Optional[int] = None,
+        initial_state: Optional[TrainingState] = None,
+        mode: TrainingMode | str | None = None,
+        replay_restored: Optional[bool] = None,
+    ) -> TrainingSummary:
+        """Runs one bounded DQN training cycle and returns a summary.
+
+        Semantics: ``total_timesteps`` is a global final target. If the restored
+        state has ``global_step=N`` and ``total_timesteps=M``, this call executes
+        exactly ``M-N`` additional steps when ``M > N``.
+        """
+        if initial_state is not None:
+            self.training_state = TrainingState(
+                global_step=int(initial_state.global_step),
+                episode_index=int(initial_state.episode_index),
+                episode_step=int(initial_state.episode_step),
+                episode_reward=float(initial_state.episode_reward),
+            )
+        state = self.training_state
+
+        if mode is not None:
+            self.mode = mode if isinstance(mode, TrainingMode) else TrainingMode(str(mode))
+        if replay_restored is not None:
+            self.replay_restored = bool(replay_restored)
+
+        target_global_step = int(self.total_timesteps if total_timesteps is None else total_timesteps)
+        if target_global_step <= 0:
+            raise ValueError("total_timesteps must be positive.")
+
         episode_rewards: List[float] = []
         episode_lengths: List[int] = []
         update_steps: List[int] = []
@@ -157,14 +202,21 @@ class DQNTrainer:
         truncated_episodes = 0
         last_loss: Optional[float] = None
 
-        initial_epsilon = self.epsilon_schedule.value(0)
+        initial_epsilon = self.epsilon_schedule.value(state.global_step)
         last_epsilon = initial_epsilon
 
-        observation, _ = self.env.reset(seed=self.seed)
-        if hasattr(self.env, "action_space") and hasattr(self.env.action_space, "seed"):
-            self.env.action_space.seed(self.seed)
+        if self.mode is not TrainingMode.NEW:
+            # We do not serialize ALE internals in HU007, so resumed processes
+            # restart from a fresh reset while preserving global progress.
+            state.episode_step = 0
+            state.episode_reward = 0.0
 
-        while state.global_step < self.total_timesteps:
+        start_global_step = int(state.global_step)
+        observation, _ = self.env.reset(seed=self.seed + state.episode_index)
+        if hasattr(self.env, "action_space") and hasattr(self.env.action_space, "seed"):
+            self.env.action_space.seed(self.seed + state.episode_index)
+
+        while state.global_step < target_global_step:
             epsilon = self.epsilon_schedule.value(state.global_step)
             last_epsilon = epsilon
             action = int(self.agent.select_action(observation, epsilon))
@@ -213,6 +265,8 @@ class DQNTrainer:
             else:
                 observation = next_observation
 
+        self.training_state = state
+
         return TrainingSummary(
             total_steps=state.global_step,
             completed_episodes=state.episode_index,
@@ -228,7 +282,20 @@ class DQNTrainer:
             target_sync_steps=target_sync_steps,
             terminated_episodes=terminated_episodes,
             truncated_episodes=truncated_episodes,
+            start_global_step=start_global_step,
+            run_mode=self.mode.value,
+            replay_restored=self.replay_restored,
+            first_update_step=(update_steps[0] if update_steps else None),
         )
+
+    def export_training_state(self) -> Dict[str, float | int]:
+        """Returns the trainer progress state suitable for checkpoint payloads."""
+        return {
+            "global_step": int(self.training_state.global_step),
+            "episode_index": int(self.training_state.episode_index),
+            "episode_step": int(self.training_state.episode_step),
+            "episode_reward": float(self.training_state.episode_reward),
+        }
 
     def _should_update(self, global_step: int) -> bool:
         if global_step < self.learning_starts:

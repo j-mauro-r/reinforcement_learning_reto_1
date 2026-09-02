@@ -80,3 +80,51 @@ def test_invalid_state_dtype_raises_error():
 
     with pytest.raises(TypeError, match="dtype"):
         buffer.add(bad_state, 0, 0.0, _state(2), False)
+
+
+def test_state_dict_and_load_state_dict_restore_full_content():
+    source = ReplayBuffer(capacity=4, state_shape=STATE_SHAPE)
+    source.add(_state(11), 3, 1.25, _state(12), False)
+    source.add(_state(21), 4, -0.75, _state(22), True)
+    payload = source.state_dict()
+
+    target = ReplayBuffer(capacity=4, state_shape=STATE_SHAPE)
+    target.load_state_dict(payload)
+
+    assert len(target) == len(source)
+    assert np.array_equal(target.states, source.states)
+    assert np.array_equal(target.next_states, source.next_states)
+    assert np.array_equal(target.actions, source.actions)
+    assert np.array_equal(target.rewards, source.rewards)
+    assert np.array_equal(target.dones, source.dones)
+
+
+def test_load_state_dict_rejects_incompatible_capacity():
+    source = ReplayBuffer(capacity=3, state_shape=STATE_SHAPE)
+    source.add(_state(1), 0, 0.0, _state(2), False)
+    payload = source.state_dict()
+
+    incompatible = ReplayBuffer(capacity=4, state_shape=STATE_SHAPE)
+    with pytest.raises(ValueError, match="capacity"):
+        incompatible.load_state_dict(payload)
+
+
+def test_load_state_dict_rejects_incompatible_dtype():
+    source = ReplayBuffer(capacity=3, state_shape=STATE_SHAPE)
+    source.add(_state(1), 0, 0.0, _state(2), False)
+    payload = source.state_dict()
+    payload["states"] = payload["states"].astype(np.float32)
+
+    target = ReplayBuffer(capacity=3, state_shape=STATE_SHAPE)
+    with pytest.raises(TypeError, match="states dtype"):
+        target.load_state_dict(payload)
+
+
+def test_load_state_dict_rejects_corrupt_payload_keys():
+    source = ReplayBuffer(capacity=3, state_shape=STATE_SHAPE)
+    payload = source.state_dict()
+    payload.pop("dones")
+
+    target = ReplayBuffer(capacity=3, state_shape=STATE_SHAPE)
+    with pytest.raises(ValueError, match="Invalid replay state keys"):
+        target.load_state_dict(payload)

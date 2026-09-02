@@ -99,3 +99,12 @@ training:
     start: 1.0
     end: 0.05
     decay_steps: 1024
+
+checkpointing:
+  enabled: true
+  baseline_note: "baseline de implementacion por validar"
+  directory: "3_BattleZone/checkpoints"
+  interval_steps: 64
+  default_mode: "full"
+  schema_version: 1
+  allow_overwrite: false
