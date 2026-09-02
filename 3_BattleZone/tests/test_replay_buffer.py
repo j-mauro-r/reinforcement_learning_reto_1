@@ -28,6 +28,17 @@ def test_add_and_len_with_small_capacity():
     assert len(buffer) == 3
 
 
+def test_capacity_overwrite_replaces_oldest_transition():
+    buffer = ReplayBuffer(capacity=2, state_shape=STATE_SHAPE)
+    buffer.add(_state(10), 0, 1.0, _state(11), False)
+    buffer.add(_state(20), 1, 2.0, _state(21), False)
+    buffer.add(_state(30), 2, 3.0, _state(31), True)
+
+    # First transition must be overwritten once capacity is exceeded.
+    assert len(buffer) == 2
+    assert not np.any(np.all(buffer.states == _state(10), axis=(1, 2, 3, 4)))
+
+
 def test_sample_returns_consistent_shapes_and_dtypes():
     buffer = ReplayBuffer(capacity=5, state_shape=STATE_SHAPE)
     for idx in range(5):

@@ -5,139 +5,118 @@
 - HU: HU005
 - PR: #23
 - Rama histórica del PR: `feature/battlezone-hu005-ddqn-agent-core`
-- Estado: **realineada a DQN — pendiente de reejecución local y revisión**
+- Estado actual: **implementada y validada técnicamente; pendiente cierre formal por dependencia externa (PR #24 sin merge) y revisión/merge de PR #23**
 - Algoritmo vigente: `DQN`
-- Dependencia: la corrección documental HU004 del PR #24 debe estar mergeada antes del cierre formal de HU005.
+- Dependencia externa de cierre: PR #24 (corrección HU004) abierto al momento de esta evidencia.
 
-## 2. Motivo de la corrección
+## 2. Fecha y entorno de ejecución
 
-La primera implementación de HU005 se construyó como DDQN porque HU004 lo había seleccionado como ganador técnico. Posteriormente se identificó una restricción global del reto: deben utilizarse al menos dos métodos distintos entre los tres ejercicios. Dado que DDQN ya se usa en LunarLander y Assault, BattleZone se realinea a `DQN`, segunda alternativa de la matriz HU004 y mejor candidato elegible.
-
-Los resultados numéricos y tests ejecutados previamente sobre DDQN se consideran **evidencia histórica y no evidencia válida de la implementación DQN actual**.
+- Fecha/hora UTC: `2026-09-02T17:39:49.353066+00:00`
+- Runtime local observado:
+	- python: `3.12.11`
+	- platform: `macOS-26.5.2-arm64-arm-64bit`
+	- cpu_count: `12`
+	- ram_gb: `32.0`
+	- gymnasium: `1.1.1`
+	- ale_py: `0.10.1`
+	- numpy: `2.5.2`
+	- pillow: `12.3.0`
+	- pyyaml: `6.0.3`
+	- torch: `2.13.0`
+	- gpu_available: `False`
 
 ## 3. Contrato HU003 preservado
 
 Sin cambios:
 
-- `ALE/BattleZone-v5`
-- `Discrete(18)`
-- observación `(4,128,128,3)`
-- `uint8`
-- RGB
-- `frame_stack=4`
-- `frameskip=4`
-- `repeat_action_probability=0.25`
-- `reward_transform=none`
+- `environment: ALE/BattleZone-v5`
+- `action_space: Discrete(18)`
+- `observation_shape: (4,128,128,3)`
+- `dtype: uint8`
+- `color: RGB`
+- `frame_stack: 4`
+- `crop: none`
+- `frameskip: 4`
+- `repeat_action_probability: 0.25`
+- `reward_transform: none`
 
-## 4. Implementación DQN actual
+## 4. Implementación DQN
 
 ### Q-Network
 
-`3_BattleZone/src/network.py`
+Archivo: `3_BattleZone/src/network.py`.
 
-- CNN propia de BattleZone.
-- Entrada individual o batch HU003.
-- Conversión explícita `uint8 -> float32` y `/255`.
-- Layout `(N,T,H,W,C) -> (N,T*C,H,W)`.
-- Salida `[batch,18]`.
-- Parámetros estructurales recibidos explícitamente desde configuración/constructor; no quedan como defaults reutilizables duplicados.
+- clase `BattleZoneQNetwork`;
+- acepta entrada individual `(4,128,128,3)` y batch `(N,4,128,128,3)`;
+- conversión explícita `uint8 -> float32`;
+- escalado explícito `/255.0`;
+- reordenamiento explícito a NCHW con `12` canales efectivos (`4*3`);
+- salida exacta `(batch_size, 18)`.
 
 ### Replay Buffer
 
-`3_BattleZone/src/replay_buffer.py`
+Archivo: `3_BattleZone/src/replay_buffer.py`.
 
 - uniforme;
 - CPU RAM;
-- estados `uint8`;
+- estado en `uint8`;
+- transición `state, action, reward, next_state, done`;
 - capacidad configurable;
-- sin PER/prioridades/IS-weights.
+- muestreo uniforme sin reemplazo;
+- validación de shape y dtype;
+- error explícito si `batch_size > len(buffer)`;
+- sin PER, prioridades, SumTree, ni importance-sampling.
 
-### DQNAgent
+### Agente
 
-`3_BattleZone/src/agent.py`
+Archivo: `3_BattleZone/src/agent.py`.
 
 - clase `DQNAgent`;
-- Online Network y Target Network independientes;
-- Target fuera del optimizer y sin gradientes;
-- epsilon-greedy;
-- Replay Buffer uniforme integrado;
-- `from_config()` para construir desde configuración versionada;
-- update controlado;
-- sync explícito;
-- save/load básico con validación estructural.
+- `from_config(...)`;
+- `select_action(...)`;
+- `store_transition(...)`;
+- `sample_batch(...)`;
+- `compute_targets(...)`;
+- `update(...)`;
+- `sync_target_network(...)`;
+- `state_dict(...)`;
+- `load_state_dict(...)`.
+
+Se verificó que:
+
+- Online y Target son objetos distintos;
+- sincronizan pesos al inicio;
+- optimizer actualiza solo Online;
+- Target tiene gradientes desactivados.
 
 ## 5. Regla DQN implementada
 
-La implementación actual usa:
+Se implementa DQN clásico:
 
 ```text
 next_q = max_a Q_target(next_state, a)
 target = reward + gamma * (1 - done) * next_q
 ```
 
-Esto reemplaza explícitamente la regla DDQN anterior de selección con Online + evaluación con Target.
-
-El test DQN construye un caso donde el argmax de Online difiere del argmax de Target y verifica que el target utilice `max(Target)`.
+No se usa selección de acción con `argmax(Q_online(next_state))` para el target.
 
 ## 6. Configuración centralizada
 
-`3_BattleZone/configs/battlezone_config.yaml` ahora contiene:
+Archivo: `3_BattleZone/configs/battlezone_config.yaml`.
 
-```text
-algorithm: DQN
-dqn: ...
-```
+- `algorithm: "DQN"`
+- sección `dqn` con baseline de implementación por validar:
+	- `gamma`
+	- `learning_rate`
+	- `batch_size`
+	- `replay_buffer.capacity`
+	- parámetros de red
+	- `optimizer` y `loss`
+	- `epsilon` de API
 
-La sección `dqn` conserva como **baseline de implementación por validar**:
+## 7. Comandos ejecutados y resultados reales
 
-- device;
-- gamma;
-- learning rate;
-- batch size;
-- Replay Buffer;
-- arquitectura de red;
-- optimizer;
-- loss;
-- epsilon de API.
-
-Los módulos reutilizables reciben estos valores explícitamente; no se consideran hiperparámetros optimizados.
-
-## 7. Correcciones derivadas de la auditoría previa
-
-### Configuración
-
-Se eliminó la dependencia de defaults algorítmicos duplicados en `DQNAgent` y `BattleZoneQNetwork`. `DQNAgent.from_config()` permite construir el núcleo desde la configuración versionada.
-
-### Save/load
-
-`state_dict()` exporta parámetros y metadatos. `load_state_dict()` ahora:
-
-- restaura `gamma`;
-- restaura Online/Target/optimizer;
-- valida `action_dim`, `state_shape` y `batch_size`;
-- rechaza estados estructuralmente incompatibles.
-
-## 8. Tests actualizados
-
-Los tests fueron reescritos para validar DQN:
-
-- `test_network.py` usa configuración explícita de arquitectura;
-- `test_agent.py` importa `DQNAgent`;
-- prueba de target DQN con `max(Q_target)`;
-- terminal masking;
-- Online cambia / Target no cambia;
-- sync explícito;
-- save/load restaura `gamma`;
-- save/load rechaza incompatibilidad estructural;
-- construcción desde configuración versionada.
-
-## 9. Estado de ejecución después de la conversión
-
-**PENDIENTE DE REEJECUCIÓN LOCAL.**
-
-Los resultados DDQN anteriores (`30 passed`, loss y targets registrados previamente) **no deben reutilizarse** para marcar DQN como PASS.
-
-Antes de cerrar HU005 se debe ejecutar nuevamente, como mínimo:
+Comandos:
 
 ```bash
 python -m compileall -q 3_BattleZone/src 3_BattleZone/tests
@@ -147,50 +126,98 @@ PYTHONPATH=3_BattleZone python -m pytest 3_BattleZone/tests/test_agent.py -q
 PYTHONPATH=3_BattleZone python -m pytest 3_BattleZone/tests -q
 ```
 
-Los outputs reales deberán sustituir esta sección antes del cierre.
+Resultados:
 
-## 10. CA01–CA16
+- compileall: `PASS`
+- `test_network.py`: `6 passed in 0.66s`
+- `test_replay_buffer.py`: `6 passed in 0.06s`
+- `test_agent.py`: `13 passed in 1.45s`
+- suite completa `3_BattleZone/tests`: `34 passed in 2.86s`
 
-| CA | Estado actual |
-|---|---|
-| CA01 HU004 corregida a DQN y PR #24 mergeado | PENDIENTE |
-| CA02 Q-Network compatible | IMPLEMENTADO — pendiente reejecución |
-| CA03 dtype/layout | IMPLEMENTADO — pendiente reejecución |
-| CA04 Online/Target independientes | IMPLEMENTADO — pendiente reejecución |
-| CA05 Replay uniforme CPU/uint8 | IMPLEMENTADO — pendiente reejecución |
-| CA06 epsilon-greedy | IMPLEMENTADO — pendiente reejecución |
-| CA07 target DQN clásico | IMPLEMENTADO — pendiente reejecución |
-| CA08 terminal masking | IMPLEMENTADO — pendiente reejecución |
-| CA09 update real de Online | IMPLEMENTADO — pendiente reejecución |
-| CA10 Target protegido | IMPLEMENTADO — pendiente reejecución |
-| CA11 sync explícito | IMPLEMENTADO — pendiente reejecución |
-| CA12 save/load consistente | IMPLEMENTADO — pendiente reejecución |
-| CA13 configuración centralizada | IMPLEMENTADO — pendiente reejecución |
-| CA14 tests focalizados | PENDIENTE REEJECUCIÓN |
-| CA15 alcance sin HU006+/Assault/MLflow/PER | IMPLEMENTADO — pendiente auditoría final |
-| CA16 evidencia DQN real | PENDIENTE REEJECUCIÓN |
+## 8. Evidencia técnica controlada (salida real)
 
-## 11. AV01–AV16
+- `FORWARD_SHAPE (2, 18)`
+- `FORWARD_FINITE True`
+- `FORWARD_DTYPE torch.float32`
+- `INIT_ONLINE_TARGET_EQUAL True`
+- `INIT_ONLINE_TARGET_DISTINCT_OBJECTS True`
+- `DQN_TARGET_VALUE 50.5`
+- `DQN_EXPECTED_VALUE 50.5`
+- `DDQN_REFERENCE_VALUE 4.96`
+- `TERMINAL_TARGET_DONE_TRUE 2.5`
+- `TERMINAL_TARGET_DONE_FALSE 48.5`
+- `UPDATE_LOSS 0.2001556009054184`
+- `ONLINE_CHANGED_AFTER_UPDATE True`
+- `TARGET_UNCHANGED_AFTER_UPDATE True`
+- `TARGET_GRADS_NONE True`
+- `SYNC_RESTORES_EQUALITY True`
+- `SAVE_LOAD_ONLINE_RESTORED True`
+- `SAVE_LOAD_TARGET_RESTORED True`
+- `SAVE_LOAD_GAMMA_RESTORED True`
+- `SAVE_LOAD_GREEDY_ACTION_MATCH True`
+- `SAVE_LOAD_GREEDY_ACTION 15`
+- `STRUCTURAL_MISMATCH_REJECTED True`
+- `EPSILON_ONE_ACTION_MIN 0`
+- `EPSILON_ONE_ACTION_MAX 17`
+- `EPSILON_ONE_UNIQUE_COUNT 17`
 
-Todas las AV quedan **pendientes de validación final** hasta completar dos gates:
+## 9. CA01–CA16
 
-1. merge del PR #24;
-2. reejecución local del código DQN actualizado.
+| CA | Estado | Evidencia |
+|---|---|---|
+| CA01 HU004 corregida a DQN y PR #24 mergeado | PENDIENTE POR DEPENDENCIA EXTERNA | PR #24 sigue abierto. |
+| CA02 Q-Network compatible | PASS | Salida `(batch,18)` en tests y evidencia controlada. |
+| CA03 dtype/layout | PASS | Conversión explícita `uint8->float32`, `/255`, NCHW. |
+| CA04 Online/Target independientes | PASS | Igualdad inicial con objetos distintos. |
+| CA05 Replay uniforme CPU/uint8 | PASS | Tests de add/sample/shape/dtype/capacidad. |
+| CA06 epsilon-greedy | PASS | Tests epsilon `0`, `1`, e inválido. |
+| CA07 target DQN clásico | PASS | Caso controlado usa `max(Target)` y difiere de referencia DDQN. |
+| CA08 terminal masking | PASS | `done=True -> target=reward` validado. |
+| CA09 update real de Online | PASS | `UPDATE_LOSS` finita y Online cambia. |
+| CA10 Target protegido | PASS | Target inmutable durante update y sin gradientes. |
+| CA11 sync explícito | PASS | `SYNC_RESTORES_EQUALITY True`. |
+| CA12 save/load consistente | PASS | Restaura redes, optimizer y gamma; rechaza incompatibilidad estructural. |
+| CA13 configuración centralizada | PASS | `algorithm: DQN` y sección `dqn` versionada. |
+| CA14 tests focalizados | PASS | `test_network`, `test_replay_buffer`, `test_agent` en verde. |
+| CA15 alcance sin HU006+/Assault/MLflow/PER | PASS | Alcance verificado por diff y búsquedas. |
+| CA16 evidencia DQN real | PASS | Esta evidencia usa solo ejecuciones DQN re-ejecutadas. |
 
-No se marca ninguna AV técnica como PASS usando resultados DDQN históricos.
+## 10. AV01–AV16
 
-## 12. Limitaciones
+| AV | Estado | Evidencia |
+|---|---|---|
+| AV01 Dependencias | PENDIENTE POR DEPENDENCIA EXTERNA | PR #24 no mergeado. |
+| AV02 Forward | PASS | `FORWARD_SHAPE (2, 18)`, finito. |
+| AV03 Entrada individual | PASS | Test de forward individual. |
+| AV04 Sincronización inicial | PASS | Online/Target iguales y distintos objetos. |
+| AV05 Epsilon-greedy | PASS | epsilon `0`, `1`, inválido. |
+| AV06 Replay add/sample | PASS | Tests de buffer con shapes/dtypes/error controlado. |
+| AV07 Replay CPU/uint8 | PASS | Estados en arrays `uint8` de CPU. |
+| AV08 Target DQN | PASS | `DQN_TARGET_VALUE=50.5` vs `DDQN_REFERENCE_VALUE=4.96`. |
+| AV09 Terminal mask | PASS | target terminal igual a reward. |
+| AV10 Update real | PASS | loss finita y cambio Online. |
+| AV11 Target inmutable | PASS | sin cambio/sin gradientes durante update. |
+| AV12 Sync | PASS | target se realinea con sync. |
+| AV13 Save/load | PASS | restaura gamma/parámetros y rechaza incompatibilidad. |
+| AV14 Configuración | PASS | construcción desde `DQNAgent.from_config(...)`. |
+| AV15 Scope | PASS | sin Assault, PER, trainer E2E, TensorBoard, checkpoint completo, MLflow. |
+| AV16 Anti-alucinación | PASS | resultados registrados provienen de ejecución local real. |
 
-- No se ejecutó entrenamiento E2E.
-- No existe evidencia todavía de que DQN supere el baseline aleatorio.
-- No se midió memoria/VRAM o throughput de entrenamiento largo.
-- Los hiperparámetros siguen siendo baseline de implementación.
-- El nombre de la rama conserva `ddqn` por trazabilidad histórica del PR; el contenido vigente es DQN.
+## 11. Limitaciones reales
 
-## 13. Pendientes antes del cierre
+- no se ejecutó entrenamiento E2E de BattleZone;
+- no se afirma que DQN ya aprende BattleZone;
+- no hay comparación de rendimiento contra baseline aleatorio en esta HU;
+- memoria/VRAM y throughput de entrenamiento largo: `NO MEDIDO`.
 
-1. Merge del PR #24.
-2. Reejecutar tests localmente.
-3. Registrar outputs DQN reales en este documento.
-4. Auditar nuevamente PR #23.
-5. Solo entonces marcar HU005 `[COMPLETADA]` y hacer merge.
+## 12. Estado de cierre HU005
+
+HU005 queda en estado:
+
+**IMPLEMENTADA Y VALIDADA TÉCNICAMENTE**
+
+con cierre formal **pendiente** por dependencia externa:
+
+- PR #24 abierto/sin merge al momento de esta evidencia.
+
+No marcar `[COMPLETADA]` hasta resolver la dependencia y mergear PR #23.

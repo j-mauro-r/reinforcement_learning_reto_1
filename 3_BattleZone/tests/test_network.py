@@ -52,6 +52,22 @@ def test_preprocess_converts_to_nchw_float32_scaled():
     assert float(processed.max()) <= 1.0
 
 
+def test_preprocess_preserves_expected_channel_order_with_scaling():
+    observation = torch.zeros((1, *STATE_SHAPE), dtype=torch.uint8)
+    # frame=0, channel=R maps to output channel 0
+    observation[0, 0, 0, 0, 0] = 255
+    # frame=2, channel=G maps to output channel 7 (2 * 3 + 1)
+    observation[0, 2, 0, 0, 1] = 128
+    processed = _network().preprocess_observations(observation)
+
+    assert processed.shape == (1, 12, 128, 128)
+    assert torch.isclose(processed[0, 0, 0, 0], torch.tensor(1.0, dtype=torch.float32))
+    assert torch.isclose(
+        processed[0, 7, 0, 0],
+        torch.tensor(128.0 / 255.0, dtype=torch.float32),
+    )
+
+
 def test_invalid_layout_raises_clear_error():
     bad_observations = torch.zeros((2, 128, 128, 3), dtype=torch.uint8)
     with pytest.raises(ValueError, match="frame_stack"):

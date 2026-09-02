@@ -4,7 +4,7 @@
 
 - **ID:** HU005
 - **Nombre:** Núcleo del agente DQN para BattleZone
-- **Estado:** Implementada — pendiente de validación/revisión/merge
+- **Estado:** Implementada y validada técnicamente — pendiente de cierre formal (PR #24 sin merge) y revisión/merge de PR #23
 - **Dependencia previa:** HU004 — Selección formal del algoritmo
 - **Dependencia correctiva:** PR #24 debe quedar mergeado antes del cierre formal de HU005.
 - **Habilita:** HU006 — Ciclo de entrenamiento
