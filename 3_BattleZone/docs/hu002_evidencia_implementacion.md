@@ -1,184 +1,229 @@
-# Evidencia de implementacion - HU002 BattleZone
+# Evidencia de implementación — HU002 BattleZone
 
-## 1. Identificacion
+## 1. Identificación
 
-- HU: HU002 - Experimento 0 y baseline aleatorio de BattleZone
-- Rama: `feature/battlezone-hu002-experimento-0`
-- Notebook principal: `3_BattleZone/experimento_0_battlezone.ipynb`
-- Artefacto de evidencia local: `3_BattleZone/data/baseline_random_battlezone_local.json`
+- **HU:** HU002 — Experimento 0 y baseline aleatorio de BattleZone
+- **Rama:** `feature/battlezone-hu002-experimento-0`
+- **PR:** #18
+- **Notebook:** `3_BattleZone/experimento_0_battlezone.ipynb`
+- **Artefacto local:** `3_BattleZone/data/baseline_random_battlezone_local.json`
+- **Ficha técnica consolidada:** `3_BattleZone/docs/ficha_tecnica.md`
 
-## 2. Implementacion realizada
+---
 
-Se implemento un notebook reproducible para Experimento 0 que:
+## 2. Implementación auditada
 
-- instala dependencias en Colab cuando corresponde;
+El PR implementa un Experimento 0 que:
+
+- instala dependencias cuando detecta Google Colab;
 - registra runtime y hardware;
-- crea `ALE/BattleZone-v5` con configuracion explicita;
-- inspecciona contrato de observacion/acciones e `info`;
-- ejecuta una politica 100% aleatoria usando solo `env.action_space.sample()`;
-- inicializa la seed del entorno y la seed del action space por episodio (`env.reset(seed=s)` y `env.action_space.seed(s)`);
-- corre al menos 10 episodios independientes con seeds explicitas;
-- produce tabla por episodio con las metricas requeridas;
-- calcula baseline agregado;
-- genera visualizaciones minimas;
-- incluye evidencia visual de radar y comparacion exploratoria grayscale/resize;
-- incorpora una seccion `Conclusiones del Experimento 0`.
+- crea `ALE/BattleZone-v5` con configuración explícita;
+- inspecciona observation/action spaces e `info`;
+- usa una política 100 % aleatoria basada exclusivamente en `env.action_space.sample()`;
+- inicializa seed del entorno y seed del action space por episodio;
+- valida reproducibilidad del muestreo de acciones;
+- ejecuta 10 episodios independientes;
+- produce tabla por episodio;
+- calcula métricas agregadas;
+- calcula densidad de rewards y distribución de acciones;
+- inspecciona vidas/terminación;
+- genera visualizaciones mínimas;
+- muestra frame original, radar y transformación exploratoria grayscale/resize.
 
-No se implemento entrenamiento, agente, replay buffer, checkpoints, TensorBoard ni MLflow.
+No se implementaron DQN, DDQN, PER, REINFORCE, CNN, Replay Buffer, entrenamiento, checkpoints, TensorBoard ni MLflow.
 
-## 3. Resumen empirico local (corrida real)
+No existen cambios bajo `2_Assault/` en el PR auditado.
 
-Configuracion usada:
+---
 
-- env_id: `ALE/BattleZone-v5`
+## 3. Ejecución observada
+
+La evidencia guardada actualmente corresponde a una ejecución **local en Windows**, no a Google Colab.
+
+### Configuración
+
+- `env_id`: `ALE/BattleZone-v5`
 - episodios: `10`
-- base_seed: `20260830`
+- `base_seed`: `20260830`
+- seeds por episodio: `20260831` a `20260840`
 - mode: `1`
 - difficulty: `0`
-- obs_type: `rgb`
-- frameskip: `4`
-- repeat_action_probability: `0.25`
-- action_space_seed_strategy: `seed action_space with episode seed before sampling`
+- `obs_type`: `rgb`
+- `frameskip`: `4`
+- `repeat_action_probability`: `0.25`
+- política: `env.action_space.sample()`
 
-Runtime observado:
+### Runtime observado
 
 - Python `3.8.10`
 - Gymnasium `1.1.1`
 - ALE-Py `0.10.1`
 - NumPy `1.24.4`
+- Windows 10
+- RAM total `6.9 GB`
 - GPU disponible: `False`
 
-Resultado agregado:
+### Contrato observado
 
-- reward mean/median/std/min/max: `3000.0 / 2000.0 / 3065.94 / 0.0 / 10000.0`
-- steps mean/min/max: `1159.5 / 821 / 1960`
-- terminated: `10`
-- truncated: `0`
-- reward density (positive/zero/negative): `0.1725% / 99.8275% / 0.0%`
-- non-zero events promedio por episodio: `2.0`
-- rewards unicos observados: `{0.0, 1000.0, 2000.0, 5000.0, 6000.0}`
-- vidas iniciales observadas: `{5}`
-- perdidas promedio por episodio: `5.0`
-- vidas extra detectadas: `0`
+- observation space: `Box(0, 255, (210,160,3), uint8)`
+- action space: `Discrete(18)`
+- 18 action meanings confirmados
+- observación inicial `(210,160,3)`, `uint8`
+- rango observado inicial `[0,236]`
 
-Validacion de reproducibilidad de muestreo de acciones:
+### `info`
 
-- seed usada para prueba: `BASE_SEED + 12345`
-- pasos verificados: `32`
-- resultado: `sequence_a == sequence_b` -> `True`
+En `reset()` se observaron:
 
-## 4. Autovalidaciones HU002
+- `lives`
+- `episode_frame_number`
+- `frame_number`
+- `seeds`
 
-### AV01 - Ejecucion de imports
+En `step()` se observaron:
 
-- Procedimiento: se ejecuto script local equivalente a las celdas de import.
-- Resultado: imports correctos de `gymnasium`, `ale_py`, `numpy`, `pandas`, `matplotlib`, `psutil`, `PIL`.
-- Estado: PASS.
-- Evidencia: `3_BattleZone/data/baseline_random_battlezone_local.json` generado sin error de imports.
+- `lives`
+- `episode_frame_number`
+- `frame_number`
 
-### AV02 - Creacion del entorno
+---
 
-- Procedimiento: `gym.make("ALE/BattleZone-v5", obs_type="rgb", frameskip=4, repeat_action_probability=0.25, mode=1, difficulty=0)` y `reset(seed=...)`.
-- Resultado: entorno inicializo correctamente.
-- Estado: PASS.
-- Evidencia: `inspection.observation_space`, `inspection.reset_info` en el JSON.
+## 4. Baseline aleatorio
 
-### AV03 - Action space
+### Recompensa
 
-- Procedimiento: inspeccion de `env.action_space` y `get_action_meanings()`.
-- Resultado: `Discrete(18)` y 18 acciones observadas.
-- Estado: PASS.
-- Evidencia: `inspection.action_space`, `inspection.num_actions`, `inspection.action_meanings`.
+- media: `3000.0`
+- mediana: `2000.0`
+- desviación estándar poblacional: `3065.94`
+- mínimo: `0.0`
+- máximo: `10000.0`
 
-### AV04 - Observacion
+Rewards por episodio:
 
-- Procedimiento: inspeccion de observacion de reset.
-- Resultado: shape `(210,160,3)`, dtype `uint8`, min/max observado `[0,236]`.
-- Estado: PASS.
-- Evidencia: `inspection.initial_obs_shape`, `inspection.initial_obs_dtype`, `inspection.initial_obs_min`, `inspection.initial_obs_max`.
+`[2000, 0, 10000, 7000, 4000, 0, 1000, 1000, 2000, 3000]`
 
-### AV05 - Reproducibilidad de secuencia de acciones
+### Duración
 
-- Procedimiento: muestrear dos secuencias de 32 acciones con `env.action_space.sample()` usando la misma seed del action space.
-- Resultado: ambas secuencias fueron identicas.
-- Estado: PASS.
-- Evidencia: `action_sampling_reproducibility.reproducible = true` en `3_BattleZone/data/baseline_random_battlezone_local.json`.
+- steps totales: `11595`
+- media: `1159.5`
+- mínimo: `821`
+- máximo: `1960`
 
-### AV06 - Interaccion corta
+### Densidad de reward
 
-- Procedimiento: sonda aleatoria de hasta 120 steps (>=100) o terminacion.
-- Resultado: loop funcional sin errores.
-- Estado: PASS.
-- Evidencia: bloque `probe` del JSON con samples y claves de info.
+- positivo: `0.1725 %`
+- cero: `99.8275 %`
+- negativo: `0.0 %`
+- eventos no-cero promedio/episodio: `2.0`
 
-### AV07 - Baseline completo
+Rewards únicos por step:
 
-- Procedimiento: ejecucion de 10 episodios con seeds `base_seed + episode_id`.
-- Resultado: 10 episodios completados via `terminated or truncated`.
-- Estado: PASS.
-- Evidencia: `episode_records` con 10 filas; `termination.terminated_true_count=10`, `truncated_true_count=0`.
+`{0.0, 1000.0, 2000.0, 5000.0, 6000.0}`
 
-### AV08 - Integridad estadistica
+Frecuencias:
 
-- Procedimiento: calculo de resumen agregado desde tabla de episodios.
-- Resultado: metricas consistentes con registros por episodio.
-- Estado: PASS.
-- Evidencia: bloque `aggregate` coherente con `episode_records`.
+- `0 -> 11575`
+- `1000 -> 17`
+- `2000 -> 1`
+- `5000 -> 1`
+- `6000 -> 1`
 
-### AV09 - Densidad de reward
+### Vidas y terminación
 
-- Procedimiento: verificacion de suma de conteos positivo/cero/negativo contra total steps.
-- Resultado: suma exacta.
-- Estado: PASS.
-- Evidencia: `consistency_checks.reward_classification_sum_equals_steps = true`.
+- vidas iniciales: `5` en 10/10 episodios
+- vidas finales: `0` en 10/10 episodios
+- pérdidas promedio: `5.0`
+- vidas extra observadas: `0`
+- `terminated=True`: `10/10`
+- `truncated=True`: `0/10`
 
-### AV10 - Frecuencia de acciones
+### Reproducibilidad de acciones
 
-- Procedimiento: suma de conteos de 18 acciones y comparacion con total steps.
-- Resultado: suma exacta.
-- Estado: PASS.
-- Evidencia: `consistency_checks.action_count_sum_equals_steps = true`.
+Se ejecutó una prueba con 32 muestras de `env.action_space.sample()` utilizando la misma seed del action space dos veces.
 
-### AV11 - Vidas
+- seed de prueba: `BASE_SEED + 12345`
+- resultado: `sequence_a == sequence_b -> True`
 
-- Procedimiento: seguimiento de `info["lives"]` por episodio.
-- Resultado: vidas disponibles en reset/step, perdidas coherentes hasta 0 en terminacion.
-- Estado: PASS.
-- Evidencia: `lives_start_values_observed=[5]`, `avg_lives_lost_per_episode=5.0`, `last_life_terminated_count=10`.
+Esto valida reproducibilidad del muestreo de acciones; no implica determinismo absoluto del episodio por la estocasticidad de ALE/sticky actions.
 
-### AV12 - Visualizaciones
+---
 
-- Procedimiento: implementacion de celdas de graficas en notebook.
-- Resultado: notebook incluye las 3 visualizaciones minimas requeridas.
-- Estado: PASS (implementacion); ejecucion final depende del runtime.
-- Evidencia: celdas de plotting en `3_BattleZone/experimento_0_battlezone.ipynb`.
+## 5. Autovalidaciones auditadas
 
-### AV13 - Coherencia documental
+| AV | Resultado | Estado auditado |
+|---|---|---|
+| AV01 Imports | Dependencias locales cargan | PASS |
+| AV02 Entorno | `ALE/BattleZone-v5` inicializa | PASS |
+| AV03 Action space | `Discrete(18)` | PASS |
+| AV04 Observación | `(210,160,3)`, `uint8` | PASS |
+| AV05 Reproducibilidad acciones | 32/32 secuencia reproducida | PASS |
+| AV06 Interacción corta | Loop funcional | PASS |
+| AV07 Baseline | 10 episodios completos | PASS |
+| AV08 Estadísticas | Consistentes con registros | PASS |
+| AV09 Densidad reward | Conteos suman total steps | PASS |
+| AV10 Acciones | Conteos suman total steps | PASS |
+| AV11 Vidas | Consistentes con `info` | PASS |
+| AV12 Visualizaciones | Ejecutadas y guardadas en notebook | PASS |
+| AV13 Coherencia documental | Revisada manualmente en auditoría PR #18 y ficha actualizada | PASS |
+| AV14 Colab limpio | Sin evidencia Colab todavía | `PENDING_COLAB_VALIDATION` |
 
-- Procedimiento: contraste de resultados locales contra actualizacion de ficha tecnica.
-- Resultado: se agrego seccion de evidencia empirica separada de hechos documentales y se verifico aislamiento respecto a `2_Assault/` en el diff de la rama.
-- Estado: PASS.
-- Evidencia: `3_BattleZone/docs/ficha_tecnica.md`, seccion 26, y diff de la rama sin cambios bajo `2_Assault/`.
+---
 
-### AV14 - Ejecucion Colab
+## 6. Hallazgos de auditoría
 
-- Procedimiento requerido:
+### H01 — Implementación funcional
 
-1. abrir `3_BattleZone/experimento_0_battlezone.ipynb` en Colab limpio;
-2. ejecutar todas las celdas en orden;
-3. confirmar instalacion sin cambios manuales;
-4. confirmar ejecucion de al menos 10 episodios;
-5. confirmar generacion de tablas, metricas y graficas;
-6. registrar versiones reales del runtime Colab;
-7. actualizar AV14 a PASS solo despues de esa ejecucion.
+El código satisface el propósito central de HU002: construir un baseline aleatorio reproducible y obtener evidencia empírica del entorno sin introducir entrenamiento ni heurísticas.
 
-- Resultado actual: pendiente de validacion real en Google Colab por parte del usuario.
-- Estado: PENDING_COLAB_VALIDATION.
-- Evidencia: no disponible aun; no se marca PASS hasta ejecutar el notebook en un runtime Colab limpio.
+### H02 — Reward muy escaso
 
-## 5. Estado de HU002
+Solo `0.1725 %` de los steps produjo reward positivo. Esta evidencia debe alimentar HU004 al comparar eficiencia muestral de los algoritmos permitidos.
 
-- HU002 IMPLEMENTADA con evidencia local reproducible.
-- HU002 queda pendiente unicamente de validacion AV14 en Google Colab.
-- HU002 no se marca como CERRADA ni COMPLETADA.
-- AV14 (Colab runtime limpio) queda PENDING_COLAB_VALIDATION hasta que el usuario ejecute el notebook en Colab y registre las versiones reales del runtime.
+### H03 — Alta dispersión
+
+La desviación estándar (`3065.94`) es ligeramente mayor que la media (`3000.0`). Diez episodios cumplen el mínimo definido, pero el baseline presenta alta variabilidad.
+
+### H04 — Reward `6000`
+
+El notebook observa un reward de `6000` en un step. No existe evidencia suficiente para mapearlo a un único objetivo de la tabla histórica del juego. La ficha técnica fue corregida para evitar presentar una equivalencia no demostrada.
+
+### H05 — Ejecución guardada es local
+
+Los outputs del notebook corresponden a Windows/Python 3.8.10. AV14 exige una ejecución independiente en Google Colab limpio.
+
+### H06 — Conclusiones del notebook incompletas
+
+La celda Markdown `Conclusiones del Experimento 0` existe, pero en la versión auditada permanece como plantilla con instrucciones de qué completar. No contiene todavía conclusiones derivadas de la ejecución guardada.
+
+Esto incumple todavía el criterio/DoD que exige una sección de conclusiones completada.
+
+---
+
+## 7. Estado de HU002
+
+Después de la auditoría del PR #18:
+
+### Cumplido
+
+- implementación del baseline;
+- evidencia local real;
+- reproducibilidad del action space;
+- 10 episodios;
+- métricas requeridas;
+- visualizaciones;
+- `info`, vidas y terminación;
+- ficha técnica consolidada;
+- AV01–AV13 auditadas como PASS;
+- cero cambios/reutilización de `2_Assault/`.
+
+### Pendiente antes de cierre formal
+
+1. completar `Conclusiones del Experimento 0` dentro del notebook con los resultados reales;
+2. ejecutar AV14 en Google Colab limpio y conservar evidencia real;
+3. después de AV14, actualizar runtime Colab, evidencia y estado de HU002.
+
+**Estado actual correcto:**
+
+`HU002 IMPLEMENTADA — pendiente de conclusiones del notebook y AV14 en Google Colab.`
+
+HU002 **no debe marcarse CERRADA/COMPLETADA todavía**.
