@@ -76,7 +76,7 @@ HU002  Experimento 0 y baseline aleatorio - [COMPLETADA]
   ↓
 HU003  Pipeline reproducible del entorno - [COMPLETADA]
   ↓
-HU004  Selección formal del algoritmo
+HU004  Selección formal del algoritmo - [COMPLETADA]
   ↓
 HU005  Núcleo del agente
   ↓

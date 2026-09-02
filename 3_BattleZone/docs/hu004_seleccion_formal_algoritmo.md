@@ -4,20 +4,21 @@
 
 - **ID:** HU004
 - **Nombre:** Selección formal del algoritmo para BattleZone
-- **Estado:** Lista para implementación
+- **Estado:** [COMPLETADA]
 - **Dependencia previa:** HU003 — Pipeline reproducible del entorno `[COMPLETADA]`
 - **Habilita:** HU005 — Núcleo del agente
 - **Gate posterior:** HU005 debe implementar únicamente el algoritmo seleccionado y documentado por HU004.
 - **Fuentes de verdad:**
   - `enunciado_reto_1.txt`;
-  - `3_BattleZone/ficha_tecnica.md`;
+  - `3_BattleZone/docs/ficha_tecnica.md`;
   - `3_BattleZone/docs/implementacion.md`;
   - `3_BattleZone/docs/lineamientos.md`;
   - `3_BattleZone/docs/arquitectura.md`;
-  - `3_BattleZone/docs/hu002_experimento_0.md` y evidencia empírica equivalente de HU002;
+  - `3_BattleZone/docs/hu002_experimento_0_baseline_aleatorio.md` y evidencia empírica equivalente de HU002;
   - `3_BattleZone/docs/hu003_pipeline_reproducible_entorno.md`;
   - `3_BattleZone/docs/hu003_evidencia_implementacion.md`;
-  - `3_BattleZone/configs/battlezone_config.yaml`.
+  - `3_BattleZone/configs/battlezone_config.yaml`;
+  - `3_BattleZone/docs/hu004_evidencia_seleccion_algoritmo.md`.
 
 ---
 
@@ -842,3 +843,68 @@ HU005 debe recibir una especificación no ambigua compuesta por:
 - criterios que HU005 deberá autovalidar antes de pasar a HU006.
 
 HU005 no debe reconsiderar el algoritmo salvo que aparezca evidencia nueva que invalide materialmente una premisa de HU004. En ese caso deberá documentarse explícitamente la desviación antes de implementar una alternativa.
+
+---
+
+## 15. Resultado formal de HU004
+
+La evidencia consolidada y auditable de la selección quedó registrada en:
+
+- `3_BattleZone/docs/hu004_evidencia_seleccion_algoritmo.md`
+
+Resultado final de la matriz ponderada:
+
+1. DDQN: `3.72`
+2. DQN: `3.34`
+3. DQN + PER: `3.30`
+4. REINFORCE: `2.14`
+
+Algoritmo seleccionado para HU005:
+
+- `DDQN`
+
+Sensibilidad:
+
+- Escenario S1 (prioridad a eficiencia muestral): DDQN permanece primero.
+- Escenario S2 (prioridad a simplicidad/costo): DDQN permanece primero.
+- Conclusión: la selección es robusta dentro de los escenarios evaluados.
+
+### Estado de criterios de aceptación
+
+- CA01: PASS
+- CA02: PASS
+- CA03: PASS
+- CA04: PASS
+- CA05: PASS
+- CA06: PASS
+- CA07: PASS
+- CA08: PASS
+- CA09: PASS
+- CA10: PASS
+- CA11: PASS
+- CA12: PASS
+- CA13: PASS
+- CA14: PASS
+- CA15: PASS
+
+### Estado de autovalidaciones
+
+- AV01: PASS
+- AV02: PASS
+- AV03: PASS
+- AV04: PASS
+- AV05: PASS
+- AV06: PASS
+- AV07: PASS
+- AV08: PASS
+- AV09: PASS
+- AV10: PASS
+- AV11: PASS
+- AV12: PASS
+- AV13: PASS
+- AV14: PASS
+- AV15: PASS
+
+### Definition of Done
+
+La checklist de DoD de HU004 queda cumplida mediante la evidencia versionada de la sección 15 y el documento `3_BattleZone/docs/hu004_evidencia_seleccion_algoritmo.md`.
