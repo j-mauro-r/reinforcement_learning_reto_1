@@ -167,6 +167,41 @@ def load_inference_model(
     )
 
 
+def resolve_delivery_model_path(
+    base: str | Path,
+    assault_dir: str | Path,
+    project_run_id: str,
+) -> tuple[Path, str]:
+    """Resolves the autonomous delivery model in the required local-first order.
+
+    Priority:
+      1. ASSAULT_DIR / "assault_ddqn_model.pt"
+      2. BASE / "models" / PROJECT_RUN_ID / "assault_ddqn_model.pt"
+
+    Returns:
+        (resolved_path, source) where source is either LOCAL or DRIVE.
+    """
+    if not str(project_run_id).strip():
+        raise ValueError("project_run_id must be explicit and non-empty.")
+
+    local_path = Path(assault_dir) / "assault_ddqn_model.pt"
+    if local_path.exists():
+        return local_path, "LOCAL"
+
+    drive_path = Path(base) / "models" / str(project_run_id) / "assault_ddqn_model.pt"
+    if drive_path.exists():
+        return drive_path, "DRIVE"
+
+    searched = [
+        str(local_path),
+        str(drive_path),
+    ]
+    raise FileNotFoundError(
+        "No assault DDQN delivery model found. Searched for: "
+        + "; ".join(searched)
+    )
+
+
 def compute_sha256(path: str | Path, chunk_size: int = 1024 * 1024) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as file:

@@ -21,6 +21,7 @@ from src.model_artifact import (
     compute_sha256,
     export_inference_model,
     load_inference_model,
+    resolve_delivery_model_path,
 )
 from src.replay_buffer import ReplayBuffer
 from src.utils import load_yaml_config
@@ -176,4 +177,30 @@ def test_load_rejects_schema_metadata_checksum_and_shape_errors(tmp_path):
         load_inference_model(forbidden_path, expected_sha256=compute_sha256(forbidden_path))
 
     assert info.sha256 == compute_sha256(output_path)
+
+
+def test_resolve_delivery_model_path_prefers_local_assault_model_then_drive_fallback(tmp_path):
+    assault_dir = tmp_path / "2_Assault"
+    assault_dir.mkdir()
+    drive_base = tmp_path / "drive_root"
+    project_run_id = "assault_ddqn_delivery"
+
+    local_path = assault_dir / "assault_ddqn_model.pt"
+    local_path.write_bytes(b"local")
+    drive_path = drive_base / "models" / project_run_id / "assault_ddqn_model.pt"
+    drive_path.parent.mkdir(parents=True)
+    drive_path.write_bytes(b"drive")
+
+    resolved, source = resolve_delivery_model_path(base=drive_base, assault_dir=assault_dir, project_run_id=project_run_id)
+    assert resolved == local_path
+    assert source == "LOCAL"
+
+    local_path.unlink()
+    resolved, source = resolve_delivery_model_path(base=drive_base, assault_dir=assault_dir, project_run_id=project_run_id)
+    assert resolved == drive_path
+    assert source == "DRIVE"
+
+    drive_path.unlink()
+    with pytest.raises(FileNotFoundError, match="assault_ddqn_model.pt"):
+        resolve_delivery_model_path(base=drive_base, assault_dir=assault_dir, project_run_id=project_run_id)
 

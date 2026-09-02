@@ -104,6 +104,24 @@ def test_hu011_notebook_keeps_domain_logic_in_src_modules():
     assert "class ReplayBuffer" not in text
 
 
+def test_hu012_delivery_model_section_has_autonomous_resolution_markers():
+    text = _text()
+    required_markers = [
+        "## 15. Modelo entregable autonomo",
+        "DELIVERY_MODEL_SOURCE=",
+        "DELIVERY_MODEL_PATH=",
+        "DELIVERY_MODEL_LOAD_PASS=True",
+        "DELIVERY_MODEL_EXECUTION_PASS=True",
+        "ASSAULT_DIR / \"assault_ddqn_model.pt\"",
+        "BASE / \"models\" / PROJECT_RUN_ID / \"assault_ddqn_model.pt\"",
+        "load_inference_model(",
+        "epsilon=0.0",
+        "No entrenamos ni actualizamos pesos en esta seccion",
+    ]
+    for marker in required_markers:
+        assert marker in text
+
+
 def test_hu011_report_presents_values_tables_analysis_and_evidence_based_conclusion():
     text = _text()
     required_report_evidence = [
