@@ -74,7 +74,7 @@ HU001  Caracterización técnica y ficha inicial de BattleZone
   ↓
 HU002  Experimento 0 y baseline aleatorio - [COMPLETADA]
   ↓
-HU003  Pipeline reproducible del entorno
+HU003  Pipeline reproducible del entorno - [COMPLETADA]
   ↓
 HU004  Selección formal del algoritmo
   ↓
@@ -191,6 +191,8 @@ El preprocessing definitivo deberá determinarse a partir de BattleZone, no copi
 - esqueleto del notebook principal.
 
 **Gate:** el contrato de estado y acciones debe quedar estable antes de HU005.
+
+**Estado:** `[COMPLETADA]` mediante PR #21, merge commit `beffdacf0e3e5d8b656bfee3f11e88eacc3b7228`.
 
 ---
 
