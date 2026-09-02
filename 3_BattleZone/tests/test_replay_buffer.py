@@ -1,4 +1,4 @@
-"""Focused tests for BattleZone DDQN replay buffer HU005."""
+"""Focused tests for BattleZone DQN replay buffer HU005."""
 
 from __future__ import annotations
 
