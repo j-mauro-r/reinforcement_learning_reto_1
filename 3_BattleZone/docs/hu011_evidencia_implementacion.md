@@ -8,7 +8,7 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 
 ## Implementación
 
-- Rama: `feature/battlezone-hu011-full-training`.
+- Rama actual de ejecución Colab: `feature/battlezone-colab-execution-bootstrap` (PR #35).
 - Perfil: `reference_v1`, DQN clásico, `target_global_step=1_000_000`.
 - Batch: 32; Replay capacity: 4096.
 - Training: `learning_starts=1024`, frecuencia 4, Target sync 10.000.
@@ -59,13 +59,13 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 ## Validación automatizada
 
 - `compileall`: PASS.
-- `compileall`: PASS.
-- HU011 + trainer: 38 passed.
-- Regresión focal: 99 passed, 1 skipped.
-- Suite BattleZone completa: 124 passed, 1 skipped.
+- Bootstrap: 23 passed.
+- HU011 + trainer + bootstrap: 61 passed.
+- Regresión focal: 122 passed, 1 skipped.
+- Suite BattleZone completa: 147 passed, 1 skipped.
 - Fallos: 0.
 - El artefacto final controlado fue cargado mediante `restore_training_state()`: step 4 y `replay_restored=false`.
-- Se volverán a ejecutar todas las suites después de este documento y se reportará el resultado final en PR #34.
+- Los resultados corresponden a la validación final de la corrección Colab en PR #35.
 
 ## Scope y limitaciones
 
@@ -73,3 +73,13 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 - No se ejecutó tuning HU012, evaluación formal HU013 ni entrenamiento largo local.
 - El notebook solo recibió una sección de orquestación HU011 con MODE, RUN_ID, CHECKPOINT_PATH y PERSISTENT_ROOT explícitos; no se reejecutó ni se añadieron outputs.
 - Pendiente: Colab CUDA real, 1.000.000 steps, resume real entre sesiones, curvas completas, manifest completed, artefacto final y decisión READY_FOR_HU012.
+
+## Operación Colab desde PR #35
+
+- El notebook obtiene el código desde GitHub y ejecuta la copia efímera en `/content`; Google Drive se reserva exclusivamente para artefactos persistentes.
+- `requirements.txt` no reinstala PyTorch, para conservar el build CUDA suministrado por el runtime de Colab.
+- Antes de validar el entorno o armar HU011, el notebook imprime versión de PyTorch, disponibilidad y versión CUDA y nombre de GPU. En Colab, cualquier ausencia de CUDA detiene la ejecución con `CUDA_REQUIRED_FOR_HU011`.
+- Después del gate CUDA se monta Drive, se crea `PERSISTENT_ROOT` y se comprueba escritura, lectura y borrado de un archivo sonda.
+- El smoke test del entorno se identifica explícitamente como distinto del entrenamiento HU011.
+- La llamada real a `run_training_session()` queda detrás de `RUN_LONG_TRAINING=False`. El operador debe revisar el preflight y cambiar manualmente el flag; el notebook no ejecuta automáticamente 1.000.000 steps.
+- Durante una sesión se imprimen progreso, global step, episodios, epsilon, replay, updates, última loss, tiempo transcurrido y cada checkpoint periódico. Al retornar se comprueban manifest, checkpoints, eventos TensorBoard y modelo final.
