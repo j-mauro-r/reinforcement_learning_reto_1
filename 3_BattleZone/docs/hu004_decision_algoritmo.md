@@ -6,257 +6,142 @@ Seleccionar formalmente un único algoritmo para HU005 usando evidencia disponib
 
 ## 2. Fuentes consultadas
 
-Fuentes leídas y utilizadas:
-
 - `enunciado_reto_1.txt`
 - `3_BattleZone/docs/ficha_tecnica.md`
 - `3_BattleZone/docs/implementacion.md`
 - `3_BattleZone/docs/lineamientos.md`
 - `3_BattleZone/docs/arquitectura.md`
-- `3_BattleZone/docs/hu001_caracterizacion_tecnica_battlezone.md`
-- `3_BattleZone/docs/hu001_evidencia_implementacion.md`
-- `3_BattleZone/docs/hu002_experimento_0_baseline_aleatorio.md`
 - `3_BattleZone/docs/hu002_evidencia_implementacion.md`
-- `3_BattleZone/docs/hu003_pipeline_reproducible_entorno.md`
 - `3_BattleZone/docs/hu003_evidencia_implementacion.md`
 - `3_BattleZone/configs/battlezone_config.yaml`
 
-## 3. Evidencia HU001-HU003 utilizada
+## 3. Evidencia BattleZone conservada
 
-### 3.1 Evidencia empírica del proyecto
+- Entorno: `ALE/BattleZone-v5`.
+- Action space: `Discrete(18)`.
+- Baseline aleatorio (10 episodios): media `3000.0`, mediana `2000.0`, desviación estándar `3065.94`, mínimo `0.0`, máximo `10000.0`.
+- Reward positivo aproximado: `0.1725 %`; reward cero: `99.8275 %`.
+- Contrato HU003: `(4,128,128,3)` `uint8`, RGB, sin crop, `frame_stack=4`, `frameskip=4`, sticky actions `0.25`, reward sin transformación.
 
-- Entorno y acción: `ALE/BattleZone-v5`, `Discrete(18)`.
-  Fuente: `3_BattleZone/docs/ficha_tecnica.md`, `3_BattleZone/docs/hu002_evidencia_implementacion.md`.
-- Baseline aleatorio (10 episodios):
-  - media `3000.0`
-  - mediana `2000.0`
-  - desviación estándar `3065.94`
-  - mínimo `0.0`
-  - máximo `10000.0`
-  - steps promedio `1159.5`
-  - reward positivo `0.1725 %`
-  - reward cero `99.8275 %`
-  Fuente: `3_BattleZone/docs/hu002_evidencia_implementacion.md`, `3_BattleZone/docs/ficha_tecnica.md`.
-- Contrato de HU003:
-  - observación final `(4, 128, 128, 3)` `uint8`
-  - pipeline RGB, sin crop, `frame_stack=4`
-  - `frameskip=4` aplicado una sola vez
-  - `repeat_action_probability=0.25`
-  - reward transform `none`
-  - tamaño aproximado por estado `0.1875 MB`
-  Fuente: `3_BattleZone/docs/hu003_evidencia_implementacion.md`, `3_BattleZone/configs/battlezone_config.yaml`.
+## 4. Restricción global del reto incorporada
 
-### 3.2 Decisiones técnicas previas aprobadas
+El enunciado exige utilizar **al menos dos métodos distintos** a lo largo de los tres problemas del reto. DDQN ya fue usado por el equipo en LunarLander y Assault. Por tanto, usar también DDQN en BattleZone impediría cumplir el requisito global mínimo de diversidad algorítmica.
 
-- BattleZone no usa MLflow.
-  Fuente: `3_BattleZone/docs/lineamientos.md`, `3_BattleZone/docs/implementacion.md`.
-- HU004 es una HU de decisión, no de entrenamiento.
-  Fuente: `3_BattleZone/docs/implementacion.md`, `3_BattleZone/docs/hu004_seleccion_formal_algoritmo.md`.
-- HU005 debe implementar solo el algoritmo elegido en HU004.
-  Fuente: `3_BattleZone/docs/implementacion.md`, `3_BattleZone/docs/hu004_seleccion_formal_algoritmo.md`.
+Esta restricción no invalida la matriz original de HU004. Se incorpora como una **condición de elegibilidad transversal** que no se había considerado en la primera decisión.
 
-## 4. Clasificación de afirmaciones (anti-alucinación)
+## 5. Matriz técnica original
 
-| Afirmación | Tipo | Fuente | Verificación |
-|---|---|---|---|
-| `Discrete(18)` | Evidencia empírica | `3_BattleZone/docs/ficha_tecnica.md`, `3_BattleZone/docs/hu002_evidencia_implementacion.md` | PASS |
-| Baseline random media `3000.0` | Evidencia empírica | `3_BattleZone/docs/hu002_evidencia_implementacion.md` | PASS |
-| Reward positivo `0.1725 %` | Evidencia empírica | `3_BattleZone/docs/hu002_evidencia_implementacion.md` | PASS |
-| Estado final `(4,128,128,3)` `uint8` | Decisión técnica aprobada | `3_BattleZone/docs/hu003_evidencia_implementacion.md`, `3_BattleZone/configs/battlezone_config.yaml` | PASS |
-| DDQN reduce sobreestimación respecto a DQN | Propiedad teórica | Definición algorítmica de DDQN usada en curso | PASS |
-| DQN+PER prioriza transiciones con mayor señal de aprendizaje | Propiedad teórica | Definición algorítmica de PER usada en curso | PASS |
-| REINFORCE podría sufrir alta varianza con episodios largos y reward sparse | Inferencia/Hipótesis | Razonamiento técnico sobre HU002 + propiedad del método | PASS (como hipótesis) |
-| Consumo exacto de VRAM por algoritmo en Colab | No disponible | No hay medición HU001-HU003 | N/A |
+| Algoritmo | Score técnico |
+|---|---:|
+| DDQN | 3.72 |
+| DQN | 3.34 |
+| DQN + PER | 3.30 |
+| REINFORCE | 2.14 |
 
-## 5. Criterios de selección
+Ranking técnico original:
 
-Escala única usada para todos los criterios:
+1. DDQN — `3.72`
+2. DQN — `3.34`
+3. DQN + PER — `3.30`
+4. REINFORCE — `2.14`
 
-- `1 = muy desfavorable`
-- `2 = desfavorable`
-- `3 = aceptable`
-- `4 = favorable`
-- `5 = muy favorable`
+## 6. Elegibilidad revisada
 
-Criterios (no redundantes):
-
-1. Eficiencia muestral con reward sparse.
-2. Estabilidad de aprendizaje y control de sobreestimación/varianza.
-3. Costo computacional esperado por actualización.
-4. Costo de memoria esperado (RAM/VRAM) para entrenamiento.
-5. Complejidad de implementación y riesgo de errores en HU005-HU006.
-6. Compatibilidad con contrato BattleZone (visual + `Discrete(18)`).
-7. Compatibilidad con checkpoint/resume para sesiones Colab.
-8. Facilidad de observabilidad operativa con TensorBoard.
-9. Adecuación a episodios largos y alta variabilidad observada.
-
-## 6. Pesos y justificación
-
-| Criterio | Peso (%) | Justificación del peso | Tipo de evidencia dominante |
+| Algoritmo | Score | Elegible | Motivo |
 |---|---:|---|---|
-| Eficiencia muestral con reward sparse | 20 | HU002 observó reward positivo muy escaso (`0.1725 %`) | Evidencia empírica |
-| Estabilidad y sobreestimación/varianza | 16 | Baseline con alta varianza; estabilidad condiciona viabilidad | Evidencia + teoría |
-| Costo computacional por actualización | 10 | Colab tiene presupuesto temporal limitado | Restricción proyecto |
-| Costo de memoria esperado | 10 | Estado visual apilado y posible replay buffer | Evidencia + inferencia |
-| Complejidad de implementación/riesgo | 12 | HU005-HU006 deben cerrar sin sobre-ingeniería | Restricción proyecto |
-| Compatibilidad con contrato visual + 18 acciones | 10 | Contrato HU003 ya está fijado | Decisión aprobada |
-| Checkpoint/resume en sesiones fragmentadas | 8 | Enunciado exige continuidad entre sesiones | Enunciado |
-| Observabilidad con TensorBoard | 6 | Métricas entrenables y depuración operativa | Lineamientos |
-| Adecuación a episodios largos y varianza | 8 | HU002 mostró episodios largos y dispersión alta | Evidencia empírica |
+| DDQN | 3.72 | No | Ya utilizado en LunarLander y Assault; no aporta el segundo método requerido por el reto. |
+| DQN | 3.34 | Sí | Segundo mejor score técnico y cumple la diversidad requerida. |
+| DQN + PER | 3.30 | Sí | Elegible, pero con mayor complejidad/costo que DQN. |
+| REINFORCE | 2.14 | Sí | Elegible, pero con peor adecuación esperada a reward sparse y episodios largos. |
 
-Suma de pesos: `100 %`.
+## 7. Decisión final revisada
 
-## 7. Matriz comparativa completa
+### Algoritmo seleccionado: `DQN`
 
-| Criterio | Peso | DQN | DQN+PER | DDQN | REINFORCE | Justificación resumida |
-|---|---:|---:|---:|---:|---:|---|
-| Eficiencia muestral con reward sparse | 20 | 2 | 4 | 3 | 1 | PER mejora muestreo de eventos raros; REINFORCE usa trayectorias completas con señal tardía |
-| Estabilidad y sobreestimación/varianza | 16 | 2 | 3 | 4 | 1 | DDQN desacopla selección/evaluación; REINFORCE tiene varianza alta esperada |
-| Costo computacional por actualización | 10 | 4 | 2 | 3 | 2 | PER añade sobrecosto; DDQN costo intermedio por doble red |
-| Costo de memoria esperado | 10 | 3 | 2 | 3 | 4 | Métodos con replay exigen buffer; PER añade estructuras de prioridad |
-| Complejidad implementación/riesgo HU005 | 12 | 4 | 2 | 3 | 3 | DQN más simple; PER aumenta complejidad; DDQN intermedio |
-| Compatibilidad con contrato visual + 18 acciones | 10 | 5 | 5 | 5 | 4 | Los cuatro aplican; value-based encaja de forma directa en acción discreta |
-| Checkpoint/resume en Colab | 8 | 5 | 4 | 5 | 2 | Value-based guarda estado incremental por timestep con mayor naturalidad |
-| Observabilidad con TensorBoard | 6 | 5 | 4 | 5 | 3 | Value-based facilita loss/q-metrics directas |
-| Adecuación a episodios largos y varianza | 8 | 3 | 4 | 4 | 1 | Replay ayuda reutilización; REINFORCE acumula varianza en retornos largos |
+DQN pasa a ser la mejor alternativa **elegible** para BattleZone.
 
-## 8. Fórmula
+La decisión cambia por una restricción global del reto, no porque DDQN haya dejado de ser técnicamente competitivo.
 
-`score_total = Σ((peso_i / 100) * puntuación_i)`
+## 8. Razones principales
 
-## 9. Cálculo reproducible
+1. Segundo mejor score técnico de la matriz original (`3.34`).
+2. Cumple el requisito de usar al menos dos métodos distintos en el reto.
+3. Compatible con observación visual y `Discrete(18)`.
+4. Conserva Replay Buffer uniforme, relevante ante reward sparse.
+5. Menor complejidad que DQN + PER.
+6. Compatible con checkpoints/resume y sesiones fragmentadas de Colab.
 
-| Algoritmo | Suma ponderada | Score final (0-5) |
-|---|---:|---:|
-| DQN | 334 | 3.34 |
-| DQN + PER | 330 | 3.30 |
-| DDQN | 372 | 3.72 |
-| REINFORCE | 214 | 2.14 |
+## 9. Sensibilidad reinterpretada
 
-Donde “Suma ponderada” es `Σ(peso * score)` y `Score final = suma / 100`.
+Se conservan los escenarios originales como evidencia histórica:
 
-## 10. Ranking
+- Matriz base: DQN es el mejor algoritmo elegible.
+- Escenario simplicidad/costo: DQN sigue siendo el mejor elegible (`3.46`).
+- Escenario eficiencia muestral: DQN + PER supera a DQN (`3.44` vs `3.12`), por lo que queda como alternativa de contingencia si DQN muestra baja eficiencia muestral.
 
-1. `DDQN` — `3.72`
-2. `DQN` — `3.34`
-3. `DQN + PER` — `3.30`
-4. `REINFORCE` — `2.14`
+## 10. Implicaciones para HU005
 
-## 11. Análisis cualitativo
+HU005 debe implementar **DQN**, no DDQN.
 
-- `DDQN` queda primero por mejor equilibrio entre estabilidad teórica, costo razonable y compatibilidad con restricciones de Colab.
-- `DQN` queda segundo por simplicidad y viabilidad, pero con mayor riesgo teórico de sobreestimación.
-- `DQN + PER` mejora eficiencia muestral esperada en reward sparse, pero su complejidad/costo adicional reduce su prioridad como primera implementación.
-- `REINFORCE` queda último por riesgo esperado de varianza alta con episodios largos y señal de reward escasa.
+Componentes requeridos:
 
-## 12. Sensibilidad de la decisión
+- CNN/Q-Network;
+- Online Network;
+- Target Network;
+- Replay Buffer uniforme;
+- epsilon-greedy;
+- target DQN clásico: `reward + gamma * (1-done) * max_a Q_target(next_state,a)`;
+- optimizer y actualización de pesos;
+- save/load básico.
 
-### Escenario S1: Prioridad a eficiencia muestral
+No debe implementar:
 
-Pesos alternativos (renormalizados, suman 100):
-
-- eficiencia 30, estabilidad 16, costo cómputo 8, memoria 9, complejidad 8, compatibilidad 10, resume 7, observabilidad 4, episodios largos 8.
-
-Resultados:
-
-- DQN: `3.12`
-- DQN+PER: `3.44`
-- DDQN: `3.66`
-- REINFORCE: `1.96`
-
-### Escenario S2: Prioridad a simplicidad y costo
-
-Pesos alternativos (suman 100):
-
-- eficiencia 14, estabilidad 14, costo cómputo 16, memoria 14, complejidad 18, compatibilidad 10, resume 6, observabilidad 4, episodios largos 4.
-
-Resultados:
-
-- DQN: `3.46`
-- DQN+PER: `3.00`
-- DDQN: `3.58`
-- REINFORCE: `2.38`
-
-### Conclusión de sensibilidad
-
-La selección es robusta dentro de los escenarios evaluados: el ganador se mantiene (`DDQN`).
-
-## 13. Algoritmo seleccionado
-
-`DDQN`.
-
-## 14. Razones principales de selección
-
-1. Mejor balance ponderado en matriz base.
-2. Ventaja teórica relevante en control de sobreestimación frente a DQN.
-3. Costo y complejidad menores que DQN+PER para una primera implementación BattleZone.
-4. Mejor adecuación esperada que REINFORCE dadas recompensas extremadamente sparse y episodios largos observados.
-
-## 15. Riesgos
-
-- Hipótesis aún no validadas por entrenamiento real: que la ventaja teórica de DDQN se traduzca en mejora práctica en BattleZone.
-- Riesgo de presión de memoria al definir tamaño de replay buffer en HU005-HU006.
-- Posible necesidad futura de PER si la eficiencia muestral observada en entrenamiento resulta insuficiente.
-
-## 16. Implicaciones para HU005
-
-### Componentes que HU005 deberá implementar
-
-- Q-Network (CNN para entrada visual).
-- Online Network y Target Network.
-- Replay Buffer uniforme.
-- Política epsilon-greedy.
-- Target DDQN (selección con Online, evaluación con Target).
-
-### Componentes que HU005 no necesita implementar
-
-- Prioritized Experience Replay (PER) en la primera implementación.
-- Elementos de policy-gradient tipo REINFORCE.
+- selección Online + evaluación Target propia de DDQN;
+- PER en la primera iteración;
+- REINFORCE;
 - MLflow.
 
-### Hipótesis por validar en HU005/HU006/HU009
+## 11. Riesgos y contingencias
 
-- Hipótesis: DDQN logrará aprendizaje más estable que DQN bajo este contrato BattleZone.
-- Hipótesis: Replay uniforme será suficiente en primera iteración sin PER.
-- Hipótesis: costos de RAM/VRAM en Colab serán viables con configuración inicial.
+- DQN puede presentar sobreestimación de Q-values frente a DDQN; debe observarse durante entrenamiento.
+- Si la eficiencia muestral es insuficiente, DQN + PER es la alternativa prioritaria.
+- HU004 no demuestra performance; la selección debe validarse empíricamente en HUs posteriores.
 
-## 17. Autovalidaciones oficiales HU004
+## 12. Trazabilidad de la corrección
+
+La decisión original DDQN se conserva como antecedente técnico. La corrección cambia únicamente la **decisión final elegible** a DQN por una restricción académica global omitida inicialmente.
+
+No se modifican:
+
+- HU003;
+- preprocessing;
+- código del agente;
+- tests;
+- `2_Assault/`;
+- resultados empíricos previos.
+
+## 13. Autovalidaciones HU004 revisadas
 
 | AV | Estado | Evidencia |
 |---|---|---|
-| AV01 Estado de dependencia | PASS | HU003 consta como `[COMPLETADA]` en `3_BattleZone/docs/implementacion.md` y su contrato quedó congelado en `3_BattleZone/docs/hu003_evidencia_implementacion.md`. |
-| AV02 Candidatos permitidos | PASS | Matriz incluye exactamente DQN, DQN+PER, DDQN y REINFORCE. |
-| AV03 Suma de pesos | PASS | Tabla de pesos: suma exacta `100 %`. |
-| AV04 Escala válida | PASS | Escala única documentada (`1` a `5`) y todas las puntuaciones dentro de rango. |
-| AV05 Recalcular scores | PASS | Fórmula y tabla de cálculo reproducible mantienen DQN `3.34`, DQN+PER `3.30`, DDQN `3.72`, REINFORCE `2.14`. |
-| AV06 Trazabilidad de evidencia | PASS | Cada criterio y justificación rastreable a fuentes HU001-HU003/enunciado/lineamientos o teoría marcada explícitamente. |
-| AV07 Evidencia BattleZone | PASS | La decisión incorpora sparse rewards, variabilidad, `Discrete(18)`, contrato visual HU003 y restricciones de Colab. |
-| AV08 Sensibilidad | PASS | Escenarios S1 y S2 calculados y reportados, con ganador invariante. |
-| AV09 Selección única | PASS | Algoritmo seleccionado único: `DDQN`. |
-| AV10 Componentes posteriores coherentes | PASS | Sección 16 define componentes obligatorios y no aplicables para HU005 de acuerdo con DDQN. |
-| AV11 Sin implementación del agente | PASS | Este artefacto HU004 es documental; no agrega `agent.py`, `network.py`, `replay_buffer.py` ni `trainer.py`. |
-| AV12 Contrato HU003 intacto | PASS | No se alteró preprocessing ni configuración de contrato HU003 en esta corrección HU004. |
-| AV13 Independencia de Assault | PASS | Sin cambios ni imports desde `2_Assault/`. |
-| AV14 Ausencia de MLflow | PASS | No se introdujeron referencias ni integración MLflow en BattleZone HU004. |
-| AV15 Alcance del PR | PASS | Cambios limitados al cierre documental de HU004 en `3_BattleZone/docs/`. |
+| AV01 Dependencias | PASS | HU003 completada y contrato vigente. |
+| AV02 Candidatos permitidos | PASS | DQN, DQN+PER, DDQN y REINFORCE. |
+| AV03 Suma de pesos | PASS | Matriz original conserva `100 %`. |
+| AV04 Escala válida | PASS | Escala original 1–5 conservada. |
+| AV05 Scores | PASS | Scores originales conservados sin alteración. |
+| AV06 Trazabilidad | PASS | Evidencia BattleZone y restricción global diferenciadas. |
+| AV07 Evidencia BattleZone | PASS | Sparse reward, varianza, Discrete(18), contrato visual y Colab considerados. |
+| AV08 Sensibilidad | PASS | Escenarios originales preservados y reinterpretados bajo elegibilidad. |
+| AV09 Selección única | PASS | Selección final única: DQN. |
+| AV10 Componentes posteriores | PASS | HU005 debe implementar DQN. |
+| AV11 Sin implementación agente | PASS | Corrección exclusivamente documental. |
+| AV12 Contrato HU003 intacto | PASS | Sin cambios. |
+| AV13 Independencia Assault | PASS | Sin cambios/imports desde `2_Assault/`. |
+| AV14 Sin MLflow | PASS | No se introduce MLflow. |
+| AV15 Alcance PR | PASS | Solo documentación HU004/plan de implementación. |
 
-## 18. Controles complementarios de auditoría
+## 14. Conclusión
 
-- HU005 restringida al algoritmo seleccionado (`DDQN`) para la primera implementación.
-- Diff de esta corrección limitado al alcance documental de HU004.
-- Control anti-alucinación mantenido: separación explícita entre evidencia empírica, teoría e hipótesis.
-- Verificación de datos empíricos: cada cifra usada en matriz se rastrea a HU002/HU003.
+**Decisión final HU004: DQN.**
 
-## 19. Limitaciones
-
-- HU004 no ejecuta entrenamiento; por diseño, los scores son una decisión de arquitectura y no una prueba empírica de performance.
-- No existe evidencia empírica disponible en HU001-HU003 para cuantificar consumo exacto de VRAM por algoritmo en Colab.
-- No existe evidencia empírica disponible en HU001-HU003 para comparar throughput real entre DQN, DQN+PER, DDQN y REINFORCE en BattleZone.
-
-## 20. Datos no disponibles que no pudieron verificarse
-
-- Consumo exacto de RAM/VRAM por algoritmo durante entrenamiento real en Colab.
-- Tiempo por actualización y tiempo total por target de timesteps para cada algoritmo candidato.
-- Diferencias empíricas reales de recompensa final entre candidatos en BattleZone.
-
-Estado de esos puntos: `PENDIENTE — por validar en HU005/HU006/HU009/HU011`.
+DDQN conserva el mejor score técnico original, pero queda descartado por la restricción global del reto. DQN es la mejor alternativa elegible y permite cumplir el requisito de utilizar al menos dos métodos distintos en los tres ejercicios.
