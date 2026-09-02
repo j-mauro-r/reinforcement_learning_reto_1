@@ -408,6 +408,8 @@ def run_training_session(
             write_run_manifest(manifest_path, manifest)
         return {"run_id": resolved_run_id, "manifest": manifest, "preflight": preflight, "paths": paths}
     except KeyboardInterrupt:
+        if trainer is not None:
+            initial_state = TrainingState(**trainer.export_training_state())
         if trainer is not None and initial_state.global_step > manifest["sessions"][-1]["start_global_step"]:
             output_checkpoint = paths["checkpoints"] / checkpoint_filename(
                 global_step=initial_state.global_step, checkpoint_mode=CHECKPOINT_MODE_LIGHTWEIGHT,
