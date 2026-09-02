@@ -1,4 +1,4 @@
-"""Uniform replay buffer for BattleZone DDQN HU005."""
+"""Uniform replay buffer for BattleZone DQN HU005."""
 
 from __future__ import annotations
 
@@ -48,19 +48,7 @@ class ReplayBuffer:
         next_state: np.ndarray,
         done: bool,
     ) -> None:
-        """Adds a transition to the replay buffer.
-
-        Args:
-            state: State observation with ``state_shape`` and dtype ``uint8``.
-            action: Integer action index.
-            reward: Scalar reward.
-            next_state: Next state observation with ``state_shape`` and dtype ``uint8``.
-            done: Terminal transition flag.
-
-        Raises:
-            ValueError: If shapes are invalid.
-            TypeError: If state dtypes are not uint8.
-        """
+        """Adds a transition to the replay buffer."""
         state_array = self._validate_state("state", state)
         next_state_array = self._validate_state("next_state", next_state)
 
@@ -75,17 +63,7 @@ class ReplayBuffer:
         self._size = min(self._size + 1, self.capacity)
 
     def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
-        """Samples a uniform batch of transitions.
-
-        Args:
-            batch_size: Number of transitions to sample.
-
-        Returns:
-            Dictionary with arrays for states, actions, rewards, next_states, and dones.
-
-        Raises:
-            ValueError: If ``batch_size`` is invalid or larger than current buffer size.
-        """
+        """Samples a uniform batch of transitions."""
         if batch_size <= 0:
             raise ValueError("batch_size must be positive.")
         if batch_size > self._size:
