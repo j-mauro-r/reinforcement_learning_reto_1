@@ -3,7 +3,9 @@
 from copy import deepcopy
 from pathlib import Path
 
+import numpy as np
 import pytest
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 from src.environment import load_config
 from src.experiment import generate_run_id, load_config_snapshot
@@ -23,6 +25,27 @@ from src.training_run import (
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "3_BattleZone/configs/battlezone_config.yaml"
 GIT = {"commit": "a" * 40, "branch": "test", "dirty": False}
+
+
+class ContinuousFakeEnv:
+    def __init__(self):
+        self.cursor = 0
+        self.reset_calls = 0
+        self.closed = 0
+        self.action_space = type("ActionSpace", (), {"seed": lambda self, seed: None})()
+
+    def reset(self, seed=None):
+        self.cursor = 0
+        self.reset_calls += 1
+        return np.zeros((4, 128, 128, 3), dtype=np.uint8), {}
+
+    def step(self, action):
+        self.cursor += 1
+        terminated = self.cursor == 6
+        return np.zeros((4, 128, 128, 3), dtype=np.uint8), 1.0, terminated, False, {}
+
+    def close(self):
+        self.closed += 1
 
 
 def test_reference_v1_resolution_preserves_smoke():
@@ -143,3 +166,56 @@ def test_scope_remains_dqn_only_without_external_tracking():
     assert "ml" + "flow" not in source
     config = load_config(CONFIG_PATH)
     assert config["algorithm"] == "DQN"
+
+
+def test_multiple_internal_checkpoints_keep_one_session_and_resume_adds_one(tmp_path, monkeypatch):
+    config = load_config(CONFIG_PATH)
+    config["long_training"]["dqn"]["replay_buffer_capacity"] = 16
+    config["long_training"]["dqn"]["batch_size"] = 2
+    config["long_training"]["training"]["learning_starts"] = 100
+    config["long_training"]["checkpointing"]["interval_steps"] = 4
+    config["long_training"]["checkpointing"]["full_milestone_interval_steps"] = 100
+    config["long_training"]["tensorboard"]["scalar_log_interval_steps"] = 1
+    environments = []
+
+    def make_env(*args, **kwargs):
+        env = ContinuousFakeEnv()
+        environments.append(env)
+        return env
+
+    monkeypatch.setattr("src.training_run.capture_git_lineage", lambda root: GIT)
+    monkeypatch.setattr(
+        "src.training_run.capture_hardware",
+        lambda: {"device": "cpu", "ram_gb": 32.0},
+    )
+    monkeypatch.setattr("src.training_run.create_battlezone_env", make_env)
+    first = run_training_session(
+        base_config=config, config_path=CONFIG_PATH, persistent_root=tmp_path,
+        mode="new", repo_root=ROOT, require_accelerator_override=False,
+        target_global_step_override=12,
+    )
+    assert [path.name for path in first["checkpoints"]] == [
+        "battlezone_dqn_step_00000004_lightweight.pt",
+        "battlezone_dqn_step_00000008_lightweight.pt",
+        "battlezone_dqn_step_00000012_lightweight.pt",
+    ]
+    assert len(first["manifest"]["sessions"]) == 1
+    assert first["summary"].episode_lengths == [6, 6]
+    assert first["summary"].episode_rewards == pytest.approx([6.0, 6.0])
+    assert environments[0].reset_calls == 3
+    assert first["manifest"]["sessions"][0]["elapsed_seconds"] > 0
+    events = EventAccumulator(str(first["paths"]["logs"]))
+    events.Reload()
+    scalar_steps = [event.step for event in events.Scalars("train/epsilon")]
+    assert 3 in scalar_steps and 5 in scalar_steps
+    assert scalar_steps == sorted(scalar_steps)
+
+    resumed = run_training_session(
+        base_config=config, config_path=CONFIG_PATH, persistent_root=tmp_path,
+        mode="resume_lightweight", run_id=first["run_id"],
+        checkpoint_path=first["checkpoints"][-1], repo_root=ROOT,
+        require_accelerator_override=False, target_global_step_override=16,
+    )
+    assert resumed["run_id"] == first["run_id"]
+    assert len(resumed["manifest"]["sessions"]) == 2
+    assert resumed["manifest"]["sessions"][1]["start_global_step"] == 12
