@@ -2,17 +2,14 @@
 
 ## 1. Objetivo
 
-Documentar las características de `ALE/BattleZone-v5` relevantes para diseñar, implementar, entrenar y evaluar un agente de Reinforcement Learning dentro del Reto 1.
+Documentar las características de `ALE/BattleZone-v5` relevantes para diseñar, implementar, entrenar y evaluar el agente de Reinforcement Learning del Reto 1, integrando en un único documento:
 
-Esta ficha constituye la caracterización inicial del entorno y debe evolucionar con evidencia empírica obtenida en HU002 — Experimento 0 y baseline aleatorio.
+1. hechos soportados por documentación oficial;
+2. restricciones académicas del reto;
+3. evidencia empírica obtenida en HU002 — Experimento 0 y baseline aleatorio;
+4. implicaciones y preguntas abiertas para HU003 y HU004.
 
-La información se clasifica en:
-
-1. **Hechos documentados:** provenientes de Arcade Learning Environment (ALE) y documentación del juego.
-2. **Decisiones iniciales del proyecto:** acuerdos técnicos sujetos a validación mediante las HUs.
-3. **Información pendiente:** datos que deben medirse empíricamente antes de convertirse en verdad del proyecto.
-
-BattleZone se implementará de forma completamente independiente de Assault. El trabajo previo de Assault se utiliza únicamente como referencia metodológica y base de conocimiento. No se copiará, importará ni reutilizará código desde `2_Assault/`.
+BattleZone se implementará de forma completamente independiente de Assault. El trabajo previo de Assault se utiliza únicamente como referencia metodológica y base de conocimiento. **No se copiará, importará ni reutilizará código desde `2_Assault/`.**
 
 ---
 
@@ -28,59 +25,61 @@ BattleZone se implementará de forma completamente independiente de Assault. El 
 - Arcade Learning Environment — Atari Environments: https://ale.farama.org/environments/
 - Manual Atari 2600 BattleZone publicado por AtariAge: https://www.atariage.com/manual_html_page.php?SoftwareID=859&SystemID=2600&itemTypeID=HTMLMANUAL
 
+### Evidencia interna
+
+- `3_BattleZone/experimento_0_battlezone.ipynb`.
+- `3_BattleZone/data/baseline_random_battlezone_local.json`.
+- `3_BattleZone/docs/hu002_evidencia_implementacion.md`.
+
 ### Documentación interna del proyecto
 
 - `3_BattleZone/docs/implementacion.md`.
 - `3_BattleZone/docs/lineamientos.md`.
 - `3_BattleZone/docs/arquitectura.md`.
+- `3_BattleZone/docs/hu001_caracterizacion_tecnica_battlezone.md`.
+- `3_BattleZone/docs/hu002_experimento_0_baseline_aleatorio.md`.
 
 ---
 
-## 3. Descripción del problema
+## 3. Restricciones académicas
 
-BattleZone es un videojuego Atari en primera persona donde el agente controla un tanque dentro de un entorno que simula profundidad tridimensional mediante gráficos vectoriales.
-
-El objetivo es destruir vehículos enemigos, sobrevivir a sus ataques y maximizar la recompensa acumulada.
-
-El juego combina simultáneamente:
-
-- navegación;
-- orientación espacial;
-- adquisición de blancos;
-- disparo;
-- evasión;
-- uso de radar;
-- interpretación temporal del movimiento;
-- interacción con obstáculos.
-
-El agente no recibe directamente coordenadas semánticas de enemigos, obstáculos o radar. Bajo la configuración visual del reto deberá aprender estas relaciones a partir de píxeles.
-
----
-
-## 4. Restricciones académicas
-
-El Reto 1 permite únicamente los siguientes métodos:
+El Reto 1 permite únicamente:
 
 - DQN;
 - DQN + Prioritized Experience Replay;
 - DDQN;
 - REINFORCE.
 
-La selección formal del algoritmo se realizará en HU004 después de completar:
+La selección formal del algoritmo corresponde a HU004. HU002 no selecciona algoritmo ni implementa entrenamiento.
 
-- HU001 — caracterización técnica;
-- HU002 — Experimento 0 y baseline aleatorio;
-- HU003 — pipeline reproducible del entorno.
+Para BattleZone no se exige alcanzar desempeño humano u óptimo. Debe demostrarse comportamiento lógico aprendido y no predominantemente aleatorio.
 
-Para BattleZone no se exige alcanzar un puntaje humano u óptimo. El entregable debe demostrar que el agente aprendió un comportamiento lógico y no predominantemente aleatorio.
-
-La evaluación formal deberá utilizar al menos **10 partidas independientes**.
+La evaluación formal final deberá ejecutar al menos **10 episodios independientes** y comparar el agente entrenado contra el baseline aleatorio definido en HU002.
 
 ---
 
-## 5. Identificación oficial del entorno
+## 4. Descripción del problema
 
-| Característica | Valor documentado |
+BattleZone es un juego Atari en primera persona en el que el agente controla un tanque. El objetivo es destruir vehículos enemigos, sobrevivir y maximizar la recompensa acumulada.
+
+El problema combina:
+
+- navegación y orientación espacial;
+- adquisición de blancos;
+- disparo y evasión;
+- radar;
+- obstáculos;
+- dependencia temporal;
+- observación visual de alta dimensionalidad;
+- un espacio de acciones considerablemente mayor que otros entornos Atari del reto.
+
+El radar y la vista principal se encuentran en la misma observación visual, por lo que el preprocessing debe conservar información útil de ambas regiones.
+
+---
+
+## 5. Contrato oficial de `ALE/BattleZone-v5`
+
+| Característica | Valor |
 |---|---|
 | Familia | Atari / Arcade Learning Environment |
 | Environment ID | `ALE/BattleZone-v5` |
@@ -88,22 +87,21 @@ La evaluación formal deberá utilizar al menos **10 partidas independientes**.
 | Action space | `Discrete(18)` |
 | Observación por defecto | RGB |
 | Observation space | `Box(0, 255, (210, 160, 3), uint8)` |
-| `frameskip` v5 | `4` |
-| `repeat_action_probability` v5 | `0.25` |
-| `full_action_space` | no cambia BattleZone: el juego utiliza las 18 acciones |
+| `frameskip` | `4` |
+| `repeat_action_probability` | `0.25` |
 | Modes disponibles | `[1, 2, 3]` |
 | Mode por defecto | `1` |
 | Difficulties disponibles | `[0]` |
 | Difficulty por defecto | `0` |
-| Vidas iniciales documentadas por ALE | `5` |
+| Vidas iniciales documentadas | `5` |
 
-ALE indica además que el jugador puede obtener hasta dos vidas adicionales al alcanzar suficiente puntuación.
+ALE documenta además la posibilidad de obtener vidas adicionales durante una partida según la puntuación alcanzada.
 
 ---
 
 ## 6. Espacio de acciones
 
-BattleZone utiliza las **18 acciones Atari completas**. A diferencia de muchos juegos ALE, habilitar `full_action_space=True` no aumenta el espacio de acciones.
+BattleZone utiliza las 18 acciones Atari completas. `full_action_space=True` no amplía el espacio para este juego.
 
 | Índice | Acción |
 |---:|---|
@@ -128,20 +126,20 @@ BattleZone utiliza las **18 acciones Atari completas**. A diferencia de muchos j
 
 ### Implicación para RL
 
-El espacio de acciones es considerablemente mayor que el de Assault y aumenta:
+`Discrete(18)` aumenta:
 
-- el número de Q-values a estimar en algoritmos value-based;
-- la complejidad de exploración;
-- la probabilidad de acciones poco útiles durante una política aleatoria;
-- el tiempo necesario para descubrir combinaciones de movimiento y disparo coherentes.
+- el costo de exploración;
+- el número de Q-values a estimar en métodos value-based;
+- la posibilidad de ejecutar acciones poco útiles durante exploración;
+- la dificultad de descubrir secuencias coordinadas de movimiento y disparo.
 
-No se reducirá artificialmente el action space antes de HU002/HU004 sin evidencia empírica y justificación técnica.
+No se reducirá artificialmente el action space antes de una decisión técnica explícita y sustentada.
 
 ---
 
 ## 7. Espacio de observaciones
 
-ALE soporta tres tipos de observación para BattleZone.
+ALE soporta:
 
 | `obs_type` | Espacio |
 |---|---|
@@ -149,23 +147,16 @@ ALE soporta tres tipos de observación para BattleZone.
 | `grayscale` | `Box(0,255,(210,160),uint8)` |
 | `ram` | `Box(0,255,(128,),uint8)` |
 
-La configuración por defecto `ALE/BattleZone-v5` utiliza RGB.
+El proyecto parte de observaciones visuales RGB, coherente con el enunciado y con la necesidad de interpretar radar, enemigos y obstáculos.
 
-### Decisión inicial del proyecto
+El preprocessing definitivo permanece abierto para HU003. Deben validarse específicamente:
 
-El proyecto partirá de observaciones visuales, coherente con el enunciado y con la naturaleza perceptual del problema.
-
-El pipeline definitivo de preprocessing no se fijará copiando el utilizado en Assault. HU001-HU003 deberán validar específicamente para BattleZone:
-
-- escala de grises vs RGB;
+- RGB vs grayscale;
 - resolución objetivo;
 - frame stacking;
 - normalización;
-- pérdida potencial de información relevante del radar y de blancos pequeños.
-
-### Hipótesis inicial
-
-Una representación compacta basada en resize y frame stack es razonable para controlar memoria y costo computacional, pero debe comprobarse que conserva señales útiles del radar y del campo visual.
+- cropping;
+- conservación del radar y de objetos pequeños.
 
 ---
 
@@ -176,521 +167,437 @@ Para `ALE/BattleZone-v5`:
 - `frameskip=4`;
 - `repeat_action_probability=0.25`.
 
-Esto significa que cada decisión del agente corresponde normalmente a cuatro frames del emulador y existe una probabilidad del 25 % de repetir la acción anterior en lugar de ejecutar la acción recién seleccionada.
+Esto implica que una decisión del agente corresponde normalmente a cuatro frames internos y que existe un 25 % de probabilidad de repetición de la acción anterior.
 
-### Implicaciones
+Consecuencias:
 
-1. El entorno no debe tratarse como determinista desde la perspectiva del agente.
-2. El `frameskip` efectivo debe aplicarse **una sola vez**.
-3. Entrenamiento, baseline y evaluación deben mantener configuraciones equivalentes.
-4. Una única imagen no captura velocidad ni dirección de movimiento.
-5. Frame stacking u otro mecanismo temporal debe evaluarse antes de fijar la arquitectura de entrada.
-
----
-
-## 9. Radar y percepción parcial
-
-BattleZone incorpora un radar en la parte superior de la pantalla que permite localizar amenazas que pueden no estar directamente visibles en la vista frontal.
-
-Esto hace que la observación visual contenga dos fuentes complementarias de información:
-
-1. **vista principal en primera persona**, útil para apuntar, percibir enemigos y obstáculos;
-2. **radar**, útil para orientación espacial y detección de amenazas fuera del campo visual directo.
-
-### Implicación de diseño
-
-El preprocessing debe evitar destruir información pequeña o de alto contraste del radar.
-
-Reducir excesivamente la resolución o recortar la zona superior podría eliminar una señal estratégica crítica.
-
-Cualquier cropping deberá considerarse una decisión experimental explícita y no un default heredado de otros juegos Atari.
+1. el entorno no debe tratarse como completamente determinista;
+2. el `frameskip` efectivo debe aplicarse una sola vez;
+3. baseline, entrenamiento y evaluación deben mantener configuraciones equivalentes;
+4. una única imagen no contiene por sí sola toda la información de movimiento;
+5. HU003 deberá evaluar frame stacking u otra representación temporal permitida por la arquitectura definida.
 
 ---
 
-## 10. Movimiento y control
+## 9. Radar y percepción
 
-El tanque puede:
+BattleZone incorpora un radar en la parte superior de la pantalla. Esta señal puede informar sobre amenazas fuera del campo visual frontal.
 
-- avanzar;
-- retroceder;
-- girar a izquierda o derecha;
-- desplazarse en combinaciones diagonales/arcadas;
-- disparar;
-- combinar movimiento y disparo.
+La observación contiene por tanto dos regiones complementarias:
 
-Las combinaciones movimiento+fuego explican buena parte del action space de 18 acciones.
+- vista principal en primera persona;
+- radar.
 
-### Implicación para la política
+### Evidencia HU002
 
-Una política útil debe aprender al menos parte de los siguientes comportamientos:
+El notebook muestra explícitamente:
 
-- orientar el tanque hacia enemigos;
-- disparar cuando existe oportunidad de impacto;
-- moverse o girar ante amenazas;
-- evitar permanecer inmóvil de forma sistemática;
-- utilizar combinaciones de movimiento y fuego cuando sean ventajosas.
+- frame RGB original;
+- región superior correspondiente al radar;
+- transformación exploratoria a grayscale y resize `84×84`.
 
-El reto académico no exige perfección, pero estos patrones permiten evaluar cualitativamente si emerge comportamiento lógico.
+Esta visualización es diagnóstica. **HU002 no demuestra que grayscale `84×84` sea suficiente**, ni autoriza recortar el radar.
+
+HU003 debe evitar decisiones de resize/cropping que destruyan una señal estratégica pequeña.
 
 ---
 
-## 11. Enemigos y objetivos
+## 10. Movimiento, enemigos y obstáculos
 
-La documentación del juego describe distintos tipos de objetivos/enemigos, entre ellos:
+El tanque puede avanzar, retroceder, girar, disparar y combinar movimiento con fuego mediante las acciones disponibles.
+
+La documentación del juego describe objetivos como:
 
 - tanque estándar;
-- fighter/aerial fighter o misil según la versión/documentación;
+- fighter/aerial fighter o misil según la documentación histórica;
 - supertank;
 - flying saucer.
 
-El manual Atari 2600 reporta la siguiente tabla de puntuación:
+Los obstáculos pueden afectar movimiento, línea de visión y posicionamiento relativo.
 
-| Objetivo | Puntaje documentado |
+Una política útil debería aprender patrones relacionados con orientación, adquisición de blancos, disparo, movimiento y evasión. Estos comportamientos se evaluarán cualitativamente además de la recompensa final.
+
+---
+
+## 11. Scoring histórico vs. reward ALE
+
+El manual Atari 2600 reporta:
+
+| Objetivo | Puntaje histórico documentado |
 |---|---:|
-| Tank | 1,000 |
-| Fighter | 2,000 |
-| Supertank | 3,000 |
-| Saucer | 5,000 |
+| Tank | 1.000 |
+| Fighter | 2.000 |
+| Supertank | 3.000 |
+| Saucer | 5.000 |
 
-ALE únicamente documenta de forma general que se reciben puntos por destruir enemigos.
+Estos valores son referencias históricas del videojuego y **no deben asumirse automáticamente como una relación uno-a-uno con cada reward retornado por ALE**.
 
-### Regla de evidencia
-
-La equivalencia exacta entre estos valores del manual y los rewards observados mediante la API Gymnasium/ALE deberá validarse empíricamente en HU002 antes de usar esta tabla como verdad cuantitativa del entrenamiento.
+HU002 observó rewards por step de `1000`, `2000`, `5000` y `6000`, además de `0`. El valor `6000` no corresponde directamente a un único objetivo de la tabla histórica; HU002 no identificó el evento causal exacto. Por tanto, la equivalencia evento del juego ↔ reward ALE permanece parcialmente abierta.
 
 ---
 
-## 12. Obstáculos
+# 12. Evidencia empírica HU002 — Experimento 0
 
-El escenario contiene objetos geométricos que pueden influir en:
+## 12.1 Naturaleza de la corrida
 
-- movimiento;
-- línea de visión;
-- trayectoria de disparos;
-- evasión;
-- posicionamiento relativo frente a enemigos.
+La evidencia guardada en el notebook corresponde a una ejecución **local en Windows**, no a Google Colab.
 
-Desde RL, los obstáculos agregan una capa de navegación que no puede resolverse únicamente mediante una política de "disparar siempre".
+La política fue estrictamente aleatoria mediante:
 
-HU002 deberá observar si la política aleatoria presenta bloqueos, giros prolongados, colisiones o patrones que permitan definir métricas adicionales útiles.
+`env.action_space.sample()`
 
----
+No se aplicó:
 
-## 13. Recompensas
+- clipping de reward;
+- normalización;
+- reward shaping;
+- heurísticas;
+- preferencia por FIRE;
+- reducción del action space.
 
-La página oficial de ALE indica que el jugador recibe puntos por destruir enemigos, pero no expone en su ficha la tabla exacta de rewards retornados por cada evento.
+## 12.2 Configuración
 
-### Métrica oficial del proyecto
+| Parámetro | Valor |
+|---|---|
+| Environment ID | `ALE/BattleZone-v5` |
+| Episodios | `10` |
+| Seed base | `20260830` |
+| Seeds por episodio | `20260831` a `20260840` |
+| Mode | `1` |
+| Difficulty | `0` |
+| `obs_type` | `rgb` |
+| `frameskip` | `4` |
+| `repeat_action_probability` | `0.25` |
+| Política | Aleatoria |
 
-La métrica principal será:
-
-**Recompensa promedio obtenida por el agente en al menos 10 episodios independientes de evaluación.**
-
-### Baseline
-
-La referencia mínima será una política completamente aleatoria ejecutada bajo el mismo entorno y protocolo.
-
-### Reward clipping
-
-Si el algoritmo seleccionado utiliza reward clipping durante entrenamiento, la evaluación formal deberá calcularse con la recompensa real del entorno para mantener comparabilidad con el baseline.
-
-Cualquier clipping debe quedar documentado como transformación de entrenamiento y nunca confundirse con la métrica oficial.
-
----
-
-## 14. Vidas y finalización
-
-ALE documenta:
-
-- 5 vidas iniciales;
-- posibilidad de obtener hasta 2 vidas extra con suficiente puntuación.
-
-El juego termina cuando se agotan las vidas.
-
-### Pendiente de validación empírica
-
-HU002 deberá verificar:
-
-- valor de `info["lives"]` en `reset()` y durante `step()`;
-- relación exacta entre pérdida de la última vida y `terminated=True`;
-- existencia y causas de `truncated=True`;
-- duración típica de episodios;
-- cambios de recompensa alrededor de pérdida de vida;
-- comportamiento al conseguir vidas extra.
-
-No se utilizará pérdida de vida como terminación artificial durante el entrenamiento salvo decisión explícita posterior.
+Para cada episodio se sembraron tanto el entorno como el action space. El notebook incluye además una prueba independiente que reprodujo correctamente una secuencia de 32 acciones usando la misma seed del action space.
 
 ---
 
-## 15. `info` y observabilidad del entorno
+## 13. Runtime observado en HU002
 
-ALE suele exponer metadatos útiles como vidas y contadores de frames, pero la ficha oficial de BattleZone no enumera exhaustivamente el contenido real de `info` para la versión instalada.
+| Componente | Valor observado |
+|---|---|
+| Python | `3.8.10` |
+| Gymnasium | `1.1.1` |
+| ALE-Py | `0.10.1` |
+| NumPy | `1.24.4` |
+| Plataforma | `Windows-10-10.0.19044-SP0` |
+| CPU | `AMD64 Family 23 Model 17 Stepping 0, AuthenticAMD` |
+| RAM total | `6.9 GB` |
+| GPU | No disponible |
 
-HU002 deberá inspeccionar directamente `info` en:
-
-- `reset()`;
-- pasos normales;
-- eventos con recompensa;
-- pérdida de vida;
-- terminación.
-
-La documentación interna solo incorporará como hechos aquellas claves verificadas en ejecución.
-
----
-
-## 16. Modes y difficulty
-
-La documentación oficial indica:
-
-- modes disponibles: `[1, 2, 3]`;
-- mode default: `1`;
-- difficulties disponibles: `[0]`;
-- difficulty default: `0`.
-
-El proyecto utilizará inicialmente los valores default para evitar introducir una variable adicional durante el baseline.
-
-Cualquier cambio de mode constituye un experimento diferente y debe quedar versionado en configuración y manifiesto de ejecución.
+Estas son las versiones **realmente observadas en la corrida local**. Las versiones efectivas del runtime Colab deben registrarse cuando se ejecute AV14.
 
 ---
 
-## 17. Principales dificultades de aprendizaje
+## 14. Contrato empírico observado
 
-### 17.1 Observación visual de alta dimensionalidad
+HU002 confirmó:
 
-Cada frame RGB contiene 100,800 valores (`210×160×3`). Una red debe aprender características útiles sin supervisión directa.
+- `observation_space = Box(0, 255, (210, 160, 3), uint8)`;
+- `action_space = Discrete(18)`;
+- 18 action meanings esperados;
+- observación inicial `(210,160,3)`, dtype `uint8`;
+- rango observado en el frame inicial `[0,236]`.
 
-### 17.2 Espacio de acciones grande
-
-`Discrete(18)` incrementa el costo de exploración y la dificultad de estimar acciones útiles.
-
-### 17.3 Dependencia temporal
-
-Posición instantánea no describe velocidad, trayectoria o dirección relativa. El agente necesita contexto temporal.
-
-### 17.4 Información distribuida en la pantalla
-
-Radar y vista principal contienen información complementaria separada espacialmente.
-
-### 17.5 Perspectiva en primera persona
-
-El agente debe inferir orientación y profundidad aproximada desde píxeles.
-
-### 17.6 Equilibrio ataque-defensa
-
-El reward proviene del combate, pero sobrevivir permite acceder a más oportunidades de recompensa futura.
-
-### 17.7 Sticky actions
-
-La acción ejecutada puede diferir de la intención actual de la política.
-
-### 17.8 Recompensa potencialmente escasa
-
-La densidad real de eventos con reward debe determinarse en HU002. Si resulta baja, la eficiencia muestral será un criterio importante en HU004.
+No se encontró contradicción material con la caracterización oficial de HU001.
 
 ---
 
-## 18. Información para selección de algoritmo
+## 15. `info` observado
 
-La caracterización inicial permite afirmar:
+### En `reset()`
 
-1. El espacio de acciones es discreto.
-2. Existen 18 acciones.
-3. El estado visual es de alta dimensionalidad.
-4. El entorno requiere razonamiento temporal.
-5. El entrenamiento será computacionalmente costoso.
-6. El reto permite DQN, DQN+PER, DDQN y REINFORCE.
+Se observaron:
 
-No se seleccionará definitivamente el algoritmo hasta contar con las métricas del Experimento 0.
+- `lives`;
+- `episode_frame_number`;
+- `frame_number`;
+- `seeds`.
 
-### Variables que HU004 deberá ponderar
+### Durante `step()`
 
-- densidad de recompensa;
-- dispersión del baseline;
-- longitud de episodios;
-- frecuencia de acciones efectivamente útiles;
-- tamaño de Replay Buffer viable;
-- estabilidad del aprendizaje;
-- costo GPU;
-- riesgo de sobreestimación de Q-values;
-- beneficio potencial de priorizar experiencias raras;
-- costo de implementación dentro del tiempo académico.
+En pasos normales, rewards no-cero, cambios de vida y terminación se observaron:
+
+- `lives`;
+- `episode_frame_number`;
+- `frame_number`.
+
+No se observaron otras claves relevantes en esta corrida.
+
+Los contadores de frames son candidatos útiles para observabilidad y validación temporal en HU003.
 
 ---
 
-## 19. Baseline y protocolo de evaluación
+## 16. Baseline aleatorio por episodio
 
-HU002 construirá una política aleatoria sobre al menos 10 episodios.
+| Episodio | Seed | Reward | Steps | Terminated | Truncated | Vidas inicio | Vidas fin |
+|---:|---:|---:|---:|---|---|---:|---:|
+| 1 | 20260831 | 2000 | 821 | Sí | No | 5 | 0 |
+| 2 | 20260832 | 0 | 1079 | Sí | No | 5 | 0 |
+| 3 | 20260833 | 10000 | 1038 | Sí | No | 5 | 0 |
+| 4 | 20260834 | 7000 | 946 | Sí | No | 5 | 0 |
+| 5 | 20260835 | 4000 | 866 | Sí | No | 5 | 0 |
+| 6 | 20260836 | 0 | 1960 | Sí | No | 5 | 0 |
+| 7 | 20260837 | 1000 | 868 | Sí | No | 5 | 0 |
+| 8 | 20260838 | 1000 | 1277 | Sí | No | 5 | 0 |
+| 9 | 20260839 | 2000 | 1156 | Sí | No | 5 | 0 |
+| 10 | 20260840 | 3000 | 1584 | Sí | No | 5 | 0 |
 
-El baseline deberá registrar como mínimo:
+---
+
+## 17. Métricas agregadas del baseline
 
 ### Recompensa
 
-- promedio;
-- mediana;
-- desviación estándar;
-- mínimo;
-- máximo.
+| Métrica | Valor |
+|---|---:|
+| Media | `3000.0` |
+| Mediana | `2000.0` |
+| Desviación estándar poblacional | `3065.94` |
+| Mínimo | `0.0` |
+| Máximo | `10000.0` |
+
+La desviación estándar es ligeramente mayor que la media, por lo que este baseline de 10 episodios presenta alta dispersión.
 
 ### Duración
 
-- steps por episodio;
-- frames cuando estén disponibles.
+| Métrica | Valor |
+|---|---:|
+| Steps totales | `11595` |
+| Steps promedio/episodio | `1159.5` |
+| Mínimo | `821` |
+| Máximo | `1960` |
 
-### Recompensa por step
+### Terminación
 
-- proporción de rewards positivos;
-- rewards cero;
-- rewards negativos si existen;
-- cantidad media de eventos con reward por episodio.
+- `terminated=True`: `10/10` episodios.
+- `truncated=True`: `0/10` episodios.
 
-### Vidas
+En los 10 episodios observados, la terminación ocurrió con `lives_end == 0`.
 
-- iniciales;
-- pérdidas;
-- vidas extra si ocurren;
-- relación con terminación.
+---
 
-### Acciones
+## 18. Densidad de reward
 
-- frecuencia absoluta y relativa de las 18 acciones.
+Sobre `11595` steps:
 
-### Criterio de comparación
+| Clase | Proporción |
+|---|---:|
+| Reward positivo | `0.1725 %` |
+| Reward cero | `99.8275 %` |
+| Reward negativo | `0.0 %` |
 
-Baseline y agente entrenado deberán utilizar:
+Eventos de reward no-cero promedio por episodio: `2.0`.
+
+Frecuencia de rewards por step:
+
+| Reward | Frecuencia |
+|---:|---:|
+| `0` | `11575` |
+| `1000` | `17` |
+| `2000` | `1` |
+| `5000` | `1` |
+| `6000` | `1` |
+
+### Lectura técnica
+
+La recompensa es **muy escasa** en esta muestra: aproximadamente 1,7 steps de cada 1000 produjeron reward positivo.
+
+Este resultado es relevante para HU004 porque la eficiencia muestral y la capacidad de aprender de experiencias poco frecuentes deben formar parte de la comparación entre algoritmos permitidos.
+
+---
+
+## 19. Vidas y finalización
+
+HU002 resolvió empíricamente varios puntos abiertos de HU001:
+
+- vidas iniciales observadas: siempre `5`;
+- pérdidas promedio por episodio: `5.0`;
+- vidas extra detectadas: `0` en esta muestra;
+- los 10 episodios terminaron con `lives_end = 0`;
+- no se observó `truncated=True`.
+
+Estos resultados describen la muestra HU002 y no demuestran que vidas extra o truncation sean imposibles en otras condiciones.
+
+---
+
+## 20. Distribución de acciones del baseline
+
+El total de acciones contabilizadas coincide con los `11595` steps.
+
+| Acción | Conteo | Frecuencia aprox. |
+|---:|---:|---:|
+| 0 | 624 | 5.38 % |
+| 1 | 629 | 5.42 % |
+| 2 | 628 | 5.42 % |
+| 3 | 633 | 5.46 % |
+| 4 | 626 | 5.40 % |
+| 5 | 608 | 5.24 % |
+| 6 | 691 | 5.96 % |
+| 7 | 665 | 5.74 % |
+| 8 | 651 | 5.61 % |
+| 9 | 632 | 5.45 % |
+| 10 | 655 | 5.65 % |
+| 11 | 673 | 5.80 % |
+| 12 | 603 | 5.20 % |
+| 13 | 622 | 5.36 % |
+| 14 | 662 | 5.71 % |
+| 15 | 664 | 5.73 % |
+| 16 | 653 | 5.63 % |
+| 17 | 676 | 5.83 % |
+
+La distribución observada es compatible con el muestreo uniforme esperado de `env.action_space.sample()`; no existe evidencia de una preferencia manual introducida por la implementación.
+
+---
+
+## 21. Preguntas de HU001 resueltas por HU002
+
+| Pregunta | Resultado HU002 |
+|---|---|
+| Reward promedio de política aleatoria | `3000.0` |
+| Dispersión | Alta; std `3065.94`, rango `0–10000` |
+| Densidad de reward | `0.1725 %` positivo; `99.8275 %` cero |
+| Rewards negativos | No observados |
+| Duración típica | Media `1159.5` steps; rango `821–1960` |
+| Vidas en `info` | Sí; 5 iniciales, 0 al terminar en 10/10 episodios |
+| Claves de `info` | `lives`, `episode_frame_number`, `frame_number`, y `seeds` en reset |
+| Terminación | 10/10 `terminated`; 0/10 `truncated` |
+| Action space | `Discrete(18)` confirmado |
+| Runtime local | Python 3.8.10 / Gymnasium 1.1.1 / ALE-Py 0.10.1 |
+| Equivalencia exacta score/reward | Solo parcialmente caracterizada; no demostrada evento por evento |
+
+---
+
+## 22. Preguntas todavía abiertas
+
+HU003/HU004 deberán resolver o considerar:
+
+1. ¿RGB o grayscale conserva mejor la información necesaria del radar y objetos pequeños?
+2. ¿`84×84` conserva suficiente información o se necesita una resolución mayor?
+3. ¿Qué frame stack proporciona contexto temporal suficiente?
+4. ¿Debe evitarse completamente cropping?
+5. ¿Cuál es el consumo real de RAM/VRAM con el preprocessing y buffer seleccionados?
+6. ¿Cuál es el throughput de interacción/entrenamiento en Colab GPU?
+7. ¿Qué algoritmo permitido ofrece mejor compromiso entre eficiencia muestral, estabilidad y costo?
+8. ¿Qué explica exactamente los rewards por step agregados como `6000`?
+9. ¿Las versiones de runtime en Colab serán iguales o deberán fijarse explícitamente en HU003?
+
+---
+
+## 23. Implicaciones para HU003 — Pipeline reproducible
+
+La evidencia recomienda que HU003:
+
+- conserve una fábrica única para `ALE/BattleZone-v5`;
+- mantenga `frameskip=4` aplicado una sola vez;
+- preserve `repeat_action_probability=0.25`;
+- mantenga action space completo mientras no exista decisión contraria justificada;
+- pruebe explícitamente la legibilidad del radar tras preprocessing;
+- pruebe RGB vs grayscale y resolución antes de fijarlas;
+- considere contexto temporal mediante frame stack;
+- registre las versiones efectivas de Colab;
+- utilice `info`/contadores de frames para validar el contrato temporal cuando sea útil;
+- mantenga train/eval bajo la misma fábrica y preprocessing.
+
+HU002 no fija el preprocessing definitivo.
+
+---
+
+## 24. Implicaciones para HU004 — Selección de algoritmo
+
+La evidencia disponible introduce cuatro factores importantes:
+
+1. **Reward muy escaso:** solo `0.1725 %` de steps tuvo reward positivo.
+2. **Alta dispersión:** reward medio `3000`, std `3065.94` y máximo `10000`.
+3. **18 acciones:** aumenta el costo de exploración.
+4. **Observación visual/temporal:** el agente debe aprender desde píxeles y contexto temporal.
+
+Estos hallazgos deben utilizarse en la matriz comparativa DQN vs DQN+PER vs DDQN vs REINFORCE, pero **no constituyen por sí solos la selección del algoritmo**.
+
+---
+
+## 25. Riesgos técnicos actualizados
+
+| Riesgo | Impacto | Evidencia / mitigación |
+|---|---|---|
+| Radar pierde legibilidad | Alto | HU002 confirma que es una región pequeña; validar preprocessing en HU003 |
+| Reward muy escaso | Alto | 0.1725 % positivo; considerar eficiencia muestral en HU004 |
+| Baseline con alta varianza | Alto | std > media; usar evaluación multi-episodio |
+| 18 acciones dificultan exploración | Alto | action space confirmado empíricamente |
+| Doble frameskip | Alto | fábrica única y test explícito en HU003 |
+| Diferencias train/eval | Alto | misma fábrica/preprocessing |
+| Sesiones Colab interrumpidas | Alto | checkpoints/resume en HUs posteriores |
+| Replay Buffer consume RAM | Alto si aplica | mantener observaciones compactas y perfilar memoria |
+| Versiones Colab diferentes | Medio/alto | registrar y fijar versiones en pipeline reproducible |
+| Confundir score histórico/reward | Medio | no mapear eventos sin evidencia |
+
+---
+
+## 26. Protocolo de comparación futura
+
+Baseline y agente entrenado deberán conservar condiciones comparables:
 
 - mismo environment ID;
 - mismo mode/difficulty;
 - mismo `frameskip`;
 - mismo `repeat_action_probability`;
-- mismo pipeline de observaciones para la evaluación del agente;
-- mismo número mínimo de episodios;
-- rewards reales del entorno.
+- rewards reales del entorno en evaluación;
+- al menos 10 episodios independientes;
+- reporte de media, mediana, desviación estándar, mínimo y máximo.
+
+Además se registrarán duración, vidas y evidencia cualitativa cuando aporten valor.
+
+El baseline de HU002 que servirá de referencia inicial es:
+
+**reward promedio = `3000.0` en 10 episodios aleatorios locales.**
 
 ---
 
-## 20. Evidencia cualitativa de aprendizaje
+## 27. Estado de HU002 después de auditoría del PR #18
 
-Debido a que el enunciado no fija un puntaje absoluto mínimo para BattleZone, además de la recompensa deberán observarse comportamientos como:
+### Implementado y validado con evidencia local
 
-- reducción de acciones claramente erráticas;
-- uso intencional de FIRE o acciones combinadas con FIRE;
-- orientación hacia objetivos;
-- cambios de dirección asociados a amenazas;
-- mayor supervivencia si se observa de forma consistente;
-- secuencias de acción más estructuradas que el baseline aleatorio.
+- notebook del Experimento 0;
+- política estrictamente aleatoria;
+- seed del entorno y del action space;
+- prueba de reproducibilidad de muestreo de acciones;
+- 10 episodios completos;
+- estadísticas agregadas;
+- densidad de rewards;
+- frecuencia de acciones;
+- vidas y terminación;
+- `info`;
+- visualizaciones de recompensa, duración y acciones;
+- inspección visual del radar;
+- actualización de esta ficha técnica;
+- independencia de `2_Assault/`.
 
-Estas observaciones complementan, pero no sustituyen, la evaluación cuantitativa.
+### Pendiente para cierre formal
 
----
+1. **AV14 — ejecución completa en Google Colab limpio.** La evidencia guardada actualmente corresponde a ejecución local.
+2. **Conclusiones del Experimento 0 dentro del notebook.** La sección existe, pero en el notebook auditado permanece como plantilla con instrucciones para completarla, no como conclusiones derivadas de los resultados ejecutados.
 
-## 21. Preprocessing: decisiones abiertas
+Por lo anterior, el estado correcto es:
 
-La arquitectura deberá soportar experimentación controlada con preprocessing sin acoplarlo a la red.
+**HU002 IMPLEMENTADA — pendiente de completar las conclusiones del notebook y de AV14 en Google Colab.**
 
-HU003 deberá resolver:
-
-1. ¿RGB o grayscale?
-2. ¿84×84 conserva información suficiente del radar?
-3. ¿Se requiere una resolución mayor?
-4. ¿Frame stack de 4 es suficiente?
-5. ¿Conviene mantener píxeles `uint8` en memoria y normalizar al convertir a tensor?
-6. ¿Debe evitarse cropping para conservar el radar?
-7. ¿Cómo asegurar `frameskip` efectivo de 4 una sola vez?
-
-Hasta entonces, ninguna combinación concreta se considera definitiva.
-
----
-
-## 22. Riesgos técnicos iniciales
-
-| Riesgo | Impacto | Mitigación prevista |
-|---|---|---|
-| Radar pierde legibilidad tras resize | Alto | validar visualmente y mediante smoke test |
-| 18 acciones dificultan exploración | Alto | analizar acción/reward en HU002 y selección algorítmica en HU004 |
-| Entrenamiento largo excede sesión Colab | Alto | checkpoints y resume obligatorios |
-| Replay Buffer consume demasiada RAM | Alto | `uint8`, capacidad configurable, profiling |
-| Doble frameskip | Alto | fábrica única + test explícito |
-| Diferencias train/eval | Alto | misma fábrica y preprocessing |
-| Corridas no reproducibles | Medio/alto | seed, commit, config, run manifest |
-| Optimización sin evidencia | Medio | cambios por hipótesis y comparación controlada |
-| Sobreingeniería | Medio | SOLID/DRY pragmáticos y DWP |
+No debe marcarse como CERRADA/COMPLETADA hasta resolver ambos puntos y actualizar la evidencia.
 
 ---
 
-## 23. Preguntas abiertas para HU002
+## 28. Implicaciones MLOps
 
-1. ¿Cuál es la recompensa promedio real de una política aleatoria?
-2. ¿Qué tan alta es su dispersión?
-3. ¿Qué porcentaje de steps entrega reward distinto de cero?
-4. ¿Existen rewards negativos?
-5. ¿Cuánto dura un episodio típico?
-6. ¿Qué acciones aparecen asociadas a eventos positivos por azar?
-7. ¿Cómo se comportan las vidas en `info`?
-8. ¿Qué claves adicionales entrega `info`?
-9. ¿Cómo se relacionan `terminated` y `truncated` con la dinámica real?
-10. ¿El radar sigue siendo interpretable después de posibles resize/grayscale?
-11. ¿Qué modes/configuración efectiva confirma la instalación seleccionada?
-12. ¿Los valores de scoring documentados por el manual coinciden con los rewards ALE observados?
+BattleZone no utilizará MLflow.
 
----
+Las fases posteriores utilizarán, según `lineamientos.md`:
 
-## 24. Estado de la ficha
+- Git/GitHub como fuente de verdad;
+- configuración versionada;
+- `run_id` y `run_manifest.json`;
+- TensorBoard para entrenamiento;
+- checkpoints y resume;
+- resultados persistidos.
 
-### Confirmado por documentación oficial
-
-- `ALE/BattleZone-v5`;
-- `Discrete(18)`;
-- significado de las 18 acciones;
-- observación RGB `(210,160,3)` `uint8`;
-- observaciones alternativas grayscale y RAM;
-- `frameskip=4` en v5;
-- `repeat_action_probability=0.25`;
-- modes `[1,2,3]`, default `1`;
-- difficulty `[0]`, default `0`;
-- 5 vidas iniciales;
-- posibilidad de obtener vidas adicionales;
-- existencia de radar;
-- recompensa asociada a destruir enemigos.
-
-### Requiere validación empírica
-
-- distribución de reward;
-- equivalencia exacta score/reward;
-- duración de episodios;
-- comportamiento real de `info`;
-- pérdida de vidas y terminación;
-- preprocessing definitivo;
-- resolución adecuada;
-- densidad de recompensas;
-- baseline aleatorio;
-- consumo real de RAM/VRAM;
-- throughput de interacción y entrenamiento.
-
----
-
-## 25. Implicaciones MLOps iniciales
-
-Toda corrida relevante deberá registrar:
-
-- environment ID;
-- mode/difficulty;
-- `obs_type`;
-- action space;
-- `frameskip`;
-- sticky actions;
-- preprocessing;
-- seed;
-- algoritmo;
-- hiperparámetros;
-- versiones;
-- hardware;
-- commit Git;
-- `run_id`;
-- TensorBoard log path;
-- checkpoint/modelo asociado;
-- métricas de evaluación.
-
-BattleZone no utilizará MLflow. La trazabilidad seguirá los lineamientos de `3_BattleZone/docs/lineamientos.md` mediante Git/GitHub, configuración versionada, `run_manifest.json`, TensorBoard, checkpoints y resultados persistidos.
-
----
-
-## 26. Evidencia empírica observada (HU002 - Experimento 0 local)
-
-Esta sección resume una corrida empírica del Experimento 0 ejecutada localmente con política estrictamente aleatoria (`env.action_space.sample()`) y **sin** clipping/shaping/normalización de reward.
-
-### 26.1 Configuración de la corrida
-
-- Environment ID: `ALE/BattleZone-v5`
-- Episodios: `10`
-- Seed base: `20260830` (seed por episodio: `base_seed + episode_id`)
-- Mode: `1`
-- Difficulty: `0`
-- `obs_type`: `rgb`
-- `frameskip`: `4`
-- `repeat_action_probability`: `0.25`
-- Estrategia de muestreo aleatorio reproducible: `env.reset(seed=s)` + `env.action_space.seed(s)` por episodio
-- Validación de reproducibilidad de muestreo: secuencia inicial de `32` acciones reproducida con la misma seed
-
-### 26.2 Runtime observado
-
-- Python: `3.8.10`
-- Gymnasium: `1.1.1`
-- ALE-Py: `0.10.1`
-- NumPy: `1.24.4`
-- Plataforma: `Windows-10-10.0.19044-SP0`
-- CPU: `AMD64 Family 23 Model 17 Stepping 0, AuthenticAMD`
-- RAM total: `6.9 GB`
-- GPU disponible para la corrida: `False`
-
-### 26.3 Contrato observado del entorno
-
-- `observation_space`: `Box(0, 255, (210, 160, 3), uint8)`
-- `action_space`: `Discrete(18)`
-- Action meanings: 18 acciones Atari completas (`NOOP` ... `DOWNLEFTFIRE`)
-- Observación inicial: shape `(210, 160, 3)`, dtype `uint8`, rango observado min/max `[0, 236]`
-
-### 26.4 `info` observado
-
-Claves observadas en `reset()`:
-
-- `lives`
-- `episode_frame_number`
-- `frame_number`
-- `seeds`
-
-Claves observadas en `step()` (incluyendo eventos de reward no-cero, cambios de vida y terminación):
-
-- `lives`
-- `episode_frame_number`
-- `frame_number`
-
-En esta corrida no aparecieron claves adicionales fuera de las listadas.
-
-### 26.5 Baseline aleatorio (10 episodios)
-
-Métricas agregadas observadas:
-
-- Recompensa media: `3000.0`
-- Recompensa mediana: `2000.0`
-- Desviación estándar: `3065.94`
-- Recompensa mínima: `0.0`
-- Recompensa máxima: `10000.0`
-- Steps promedio por episodio: `1159.5`
-- Steps min/max: `821 / 1960`
-- Episodios `terminated=True`: `10`
-- Episodios `truncated=True`: `0`
-
-Densidad global de reward por step:
-
-- Positive: `0.1725%`
-- Zero: `99.8275%`
-- Negative: `0.0%`
-- Eventos no-cero promedio por episodio: `2.0`
-
-Rewards observados por step:
-
-- Valores únicos: `{0.0, 1000.0, 2000.0, 5000.0, 6000.0}`
-- Frecuencias: `0.0 -> 11575`, `1000.0 -> 17`, `2000.0 -> 1`, `5000.0 -> 1`, `6000.0 -> 1`
-
-Vidas y terminación:
-
-- Vidas iniciales observadas: `{5}`
-- Pérdidas promedio por episodio: `5.0`
-- Vidas extra detectadas: `0`
-- Episodios terminados con `lives_end == 0`: `10`
-
-### 26.6 Lectura técnica de la evidencia
-
-- En esta corrida, la recompensa fue escasa (la gran mayoría de steps con reward cero).
-- No se observaron rewards negativos.
-- Se observaron valores de reward compatibles con el scoring histórico (1000, 2000, 5000 y 6000), pero esta evidencia no prueba por sí sola equivalencia completa para todos los objetivos/eventos.
-- La alta proporción de reward cero y la varianza inter-episodio apoyan evaluar cuidadosamente eficiencia muestral y estabilidad en HU004.
-- La presencia consistente de `lives`, `frame_number` y `episode_frame_number` en `info` es útil para observabilidad de HU003+.
-- La secuencia inicial de acciones muestreadas con `env.action_space.sample()` resultó reproducible al reutilizar la misma seed del action space.
-
-### 26.7 Alcance y límites de esta evidencia
-
-- Estos resultados corresponden a una corrida local específica de baseline aleatorio y no reemplazan futuras validaciones en Colab.
-- La decisión de preprocessing definitivo (grayscale/RGB, resize, frame stack, posibles recortes) permanece abierta para HU003 y debe basarse en evidencia visual adicional del radar.
-- Estado HU002: IMPLEMENTADA, pendiente únicamente de AV14 en Google Colab.
-- Estado AV14: `PENDING_COLAB_VALIDATION`; solo debe actualizarse a PASS después de ejecutar `3_BattleZone/experimento_0_battlezone.ipynb` en un Colab limpio, confirmar instalación sin cambios manuales, ejecutar ≥10 episodios, generar tablas/métricas/gráficas y registrar las versiones reales del runtime Colab.
+HU002 es un baseline exploratorio y no utiliza TensorBoard, checkpoints ni `run_manifest`.
