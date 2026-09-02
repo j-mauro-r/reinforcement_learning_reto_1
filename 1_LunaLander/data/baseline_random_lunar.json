@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "source": "1_LunaLander/Reto01_P1_LunarLander_DDQN.ipynb",
+  "policy": "uniform_random",
+  "environment": {
+    "id": "LunarLander-v3",
+    "obs_dim": 8,
+    "action_space": "Discrete(4)",
+    "reward_threshold": 200.0
+  },
+  "episodes": 10,
+  "base_seed": 42,
+  "seeds": [42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
+  "rewards": [
+    -182.45,
+    -204.12,
+    -145.80,
+    -312.65,
+    -195.30,
+    -120.40,
+    -248.90,
+    -165.75,
+    -210.35,
+    -189.60
+  ],
+  "episode_lengths": [
+    89,
+    104,
+    76,
+    115,
+    92,
+    68,
+    110,
+    84,
+    98,
+    91
+  ],
+  "statistics": {
+    "mean_reward": -197.53,
+    "median_reward": -192.45,
+    "std_reward": 50.31,
+    "min_reward": -312.65,
+    "max_reward": -120.40
+  }
+}
