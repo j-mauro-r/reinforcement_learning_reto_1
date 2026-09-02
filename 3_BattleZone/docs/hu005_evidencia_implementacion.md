@@ -4,6 +4,11 @@
 
 - HU: HU005
 - Rama: `feature/battlezone-hu005-ddqn-agent-core`
+- Commits HU005:
+  - `5689f6f` feat(battlezone): implement DDQN agent core
+  - `ac720a7` test(battlezone): validate HU005 DDQN contracts
+  - `1d6f19b` docs(battlezone): document HU005 validation evidence
+- PR: #23
 - Estado HU005 en este PR: Implementada — pendiente de revisión/merge
 - Algoritmo implementado: `DDQN`
 
