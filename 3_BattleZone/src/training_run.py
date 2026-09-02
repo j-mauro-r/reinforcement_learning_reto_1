@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 import math
 from pathlib import Path
+import time
 from typing import Any, Mapping, Optional
 
 import numpy as np
@@ -353,41 +354,57 @@ def run_training_session(
     )
     trainer: Optional[DQNTrainer] = None
     output_checkpoint: Optional[Path] = None
+    checkpoint_paths: list[Path] = []
+    started_at = time.monotonic()
     try:
-        while initial_state.global_step < session_target:
-            interval = int(base_config["long_training"]["checkpointing"]["interval_steps"])
-            segment_target = min(session_target, ((initial_state.global_step // interval) + 1) * interval)
-            tb = effective["tensorboard"]
-            logger = TensorBoardTrainingLogger(
-                log_dir=paths["logs"], reward_window=int(tb["reward_window"]),
-                scalar_log_interval_steps=int(tb["scalar_log_interval_steps"]),
-                flush_interval_steps=int(tb["flush_interval_steps"]),
-            )
-            trainer = DQNTrainer.from_config(
-                config=effective, agent=agent, env=env, total_timesteps=segment_target,
-                logger=logger,
-            )
-            trainer.train(
-                total_timesteps=segment_target, initial_state=initial_state,
-                mode=mode, replay_restored=bool(replay_restored),
-            )
-            state = trainer.export_training_state()
-            initial_state = TrainingState(**state)
+        tb = effective["tensorboard"]
+        logger = TensorBoardTrainingLogger(
+            log_dir=paths["logs"], reward_window=int(tb["reward_window"]),
+            scalar_log_interval_steps=int(tb["scalar_log_interval_steps"]),
+            flush_interval_steps=int(tb["flush_interval_steps"]),
+        )
+        trainer = DQNTrainer.from_config(
+            config=effective, agent=agent, env=env, total_timesteps=session_target,
+            logger=logger,
+        )
+
+        def persist_at_boundary(global_step: int, active_trainer: DQNTrainer) -> None:
+            nonlocal output_checkpoint
             decision = checkpoint_decision(
-                initial_state.global_step, base_config,
+                global_step, base_config,
                 full_checkpoint_ready=preflight.memory.full_checkpoint_ready,
             )
-            if initial_state.global_step >= session_target and decision is CheckpointDecision.NONE:
-                decision = CheckpointDecision.LIGHTWEIGHT
             if decision is not CheckpointDecision.NONE:
                 cp_mode = decision.value
                 output_checkpoint = paths["checkpoints"] / checkpoint_filename(
-                    global_step=initial_state.global_step, checkpoint_mode=cp_mode,
+                    global_step=global_step, checkpoint_mode=cp_mode,
                 )
                 _save_training_checkpoint(
                     path=output_checkpoint, mode=decision, agent=agent,
-                    trainer=trainer, config=effective, seed=int(effective["environment"]["seed"]),
+                    trainer=active_trainer, config=effective,
+                    seed=int(effective["environment"]["seed"]),
                 )
+                checkpoint_paths.append(output_checkpoint)
+
+        summary = trainer.train(
+            total_timesteps=session_target, initial_state=initial_state,
+            mode=mode, replay_restored=bool(replay_restored),
+            step_callback=persist_at_boundary,
+        )
+        initial_state = TrainingState(**trainer.export_training_state())
+        if output_checkpoint is None or int(summary.total_steps) % int(
+            base_config["long_training"]["checkpointing"]["interval_steps"]
+        ) != 0:
+            output_checkpoint = paths["checkpoints"] / checkpoint_filename(
+                global_step=initial_state.global_step,
+                checkpoint_mode=CHECKPOINT_MODE_LIGHTWEIGHT,
+            )
+            _save_training_checkpoint(
+                path=output_checkpoint, mode=CheckpointDecision.LIGHTWEIGHT,
+                agent=agent, trainer=trainer, config=effective,
+                seed=int(effective["environment"]["seed"]),
+            )
+            checkpoint_paths.append(output_checkpoint)
         completed = is_training_complete(initial_state.global_step, logical_target)
         if completed:
             assert trainer is not None
@@ -398,7 +415,8 @@ def run_training_session(
             )
         manifest = finish_session(
             manifest, end_global_step=initial_state.global_step,
-            episode_index=initial_state.episode_index, elapsed_seconds=0.0,
+            episode_index=initial_state.episode_index,
+            elapsed_seconds=time.monotonic() - started_at,
             output_checkpoint=str(output_checkpoint) if output_checkpoint else None,
             completed=completed, manifest_path=manifest_path,
         )
@@ -406,7 +424,11 @@ def run_training_session(
             manifest["artifacts"]["model_path"] = str(paths["final_model"])
             from src.experiment import write_run_manifest
             write_run_manifest(manifest_path, manifest)
-        return {"run_id": resolved_run_id, "manifest": manifest, "preflight": preflight, "paths": paths}
+        return {
+            "run_id": resolved_run_id, "manifest": manifest,
+            "preflight": preflight, "paths": paths, "summary": summary,
+            "checkpoints": checkpoint_paths,
+        }
     except KeyboardInterrupt:
         if trainer is not None:
             initial_state = TrainingState(**trainer.export_training_state())
@@ -415,7 +437,7 @@ def run_training_session(
                 global_step=initial_state.global_step, checkpoint_mode=CHECKPOINT_MODE_LIGHTWEIGHT,
             )
             _save_training_checkpoint(path=output_checkpoint, mode=CheckpointDecision.LIGHTWEIGHT, agent=agent, trainer=trainer, config=effective, seed=int(effective["environment"]["seed"]))
-            finish_session(manifest, end_global_step=initial_state.global_step, episode_index=initial_state.episode_index, elapsed_seconds=0.0, output_checkpoint=str(output_checkpoint), completed=False, manifest_path=manifest_path)
+            finish_session(manifest, end_global_step=initial_state.global_step, episode_index=initial_state.episode_index, elapsed_seconds=time.monotonic() - started_at, output_checkpoint=str(output_checkpoint), completed=False, manifest_path=manifest_path)
         raise
     except Exception as exc:
         fail_session(manifest, error=exc, manifest_path=manifest_path)
