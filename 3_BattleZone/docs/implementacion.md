@@ -188,5 +188,3 @@ Consolidar notebook, modelo, videos, gráficas, métricas, hardware, configuraci
 - HU004: `[COMPLETADA — decisión revisada a DQN]`.
 - HU005: requiere alineación de su implementación a `DQN` antes de poder cerrarse.
 - HU011B: `[DEFINIDA — PENDIENTE DE IMPLEMENTACIÓN]`.
-
-La HU011B se incorpora para cubrir explícitamente los artefactos técnicos obligatorios de entrega que no forman parte del alcance de HU011: modelo autónomo, gráficas y videos. No modifica algoritmo, preprocessing ni resultados empíricos existentes.
