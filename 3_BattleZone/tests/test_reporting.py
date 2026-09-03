@@ -51,8 +51,8 @@ def test_missing_invalid_and_duplicate_scalars_fail_clearly(tmp_path):
 
 def test_exploitation_plot_consumes_structured_records_without_manual_values(tmp_path):
     records = [
-        {"episode": 1, "seed": 101, "reward": 2.0, "steps": 10},
-        {"episode": 2, "seed": 102, "reward": 4.0, "steps": 12},
+        {"episode": 1, "reward": 2.0},
+        {"episode": 2, "reward": 4.0},
     ]
     output = tmp_path / "exploitation_reward.png"
     figure = plot_exploitation_rewards(records, output_path=output)
@@ -61,4 +61,4 @@ def test_exploitation_plot_consumes_structured_records_without_manual_values(tmp
     assert "DELIVERY_SANITY_ONLY" in figure.axes[0].get_title()
     assert output.stat().st_size > 0
     with pytest.raises(ValueError, match="requires"):
-        plot_exploitation_rewards([{"episode": 1, "reward": 1.0}])
+        plot_exploitation_rewards([{"episode": 1}])
