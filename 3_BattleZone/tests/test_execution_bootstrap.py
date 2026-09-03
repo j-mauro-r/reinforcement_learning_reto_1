@@ -201,7 +201,10 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     assert "/content/reinforcement_learning_reto_1" in sources[bootstrap_index]
     assert "REQUESTED_REF" in sources[bootstrap_index]
     assert "REQUESTED_COMMIT" in sources[bootstrap_index]
-    assert 'REQUESTED_REF = "feature/battlezone-colab-execution-bootstrap"' in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "feature/battlezone-hu011b-delivery-artifacts"' in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "feature/battlezone-colab-execution-bootstrap"' not in sources[bootstrap_index]
+    assert "REQUESTED_COMMIT = None" in sources[bootstrap_index]
+    assert "b7c33d58f6c896da3bea824537cd810a83932ee0" not in sources[bootstrap_index]
     assert 'REQUESTED_REF = "main"' not in sources[bootstrap_index]
     assert sources[bootstrap_index].index("rev-parse") < sources[bootstrap_index].index("import src.execution_bootstrap")
     assert "bootstrap_source" in sources[bootstrap_index]
@@ -266,3 +269,32 @@ def test_required_cuda_runtime_accepts_complete_cuda_build():
         torch_version="2.11.0+cu128", cuda_available=True,
         cuda_version="12.8", gpu_name="Fake GPU", required=True,
     )
+
+
+def test_notebook_contains_hu011b_delivery_and_standalone_contract():
+    notebook = json.loads((PROJECT / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+    sources = ["".join(cell.get("source", [])) for cell in notebook["cells"]]
+    combined = "\n".join(sources)
+    bootstrap_index = next(i for i, source in enumerate(sources) if "prepare_execution_environment(" in source)
+    for module_import in (
+        "from src.delivery import", "from src.model_artifact import",
+        "from src.reporting import", "from src.video import",
+    ):
+        hu011b_import_index = next(i for i, source in enumerate(sources) if module_import in source)
+        assert bootstrap_index < hu011b_import_index
+    for marker in (
+        "HU011B — DELIVERY ARTIFACTS", "VERIFICACIÓN AUTÓNOMA DEL MODELO ENTREGADO",
+        "HU011B_DELIVERY_GATE", "battlezone_dqn_model.pt",
+        "battlezone_dqn_training_process.mp4", "battlezone_dqn_post_training.mp4",
+        "load_tensorboard_scalars", "delivery_manifest.json",
+        "EVIDENCIA DEL PROCESO DE ENTRENAMIENTO", "COMPORTAMIENTO APRENDIDO POST-ENTRENAMIENTO",
+        'local_project_model = PROJECT_DIR / "battlezone_dqn_model.pt"',
+        'print("MODEL_SOURCE:", MODEL_SOURCE)',
+    ):
+        assert marker in combined
+    assert "RUN_HU011B_DELIVERY = False" in combined
+    assert "RUN_LONG_TRAINING = False" in combined
+    assert "latest_checkpoint" not in combined.lower()
+    assert "get_latest" not in combined.lower()
+    assert "2_Assault" not in combined
+    assert "mlflow" not in combined.lower()

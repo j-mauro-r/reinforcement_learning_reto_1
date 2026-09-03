@@ -2,9 +2,25 @@
 
 ## Estado
 
-**HU011 IMPLEMENTADA — ENTRENAMIENTO PENDIENTE**
+**HU011 — COMPLETED TRAINING**
 
-La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Colab GPU. Esta evidencia no presenta el preflight local como entrenamiento final.
+La ejecución real `reference_v1` alcanzó 1.000.000 global steps en Colab GPU. Los datos siguientes provienen exclusivamente de los outputs persistidos en `pipeline_battlezone.ipynb`.
+
+## Ejecución real HU011
+
+- `run_id`: `battlezone-dqn-20260903-001628-b7c33d5-255e`.
+- Git SHA ejecutado: `b7c33d58f6c896da3bea824537cd810a83932ee0`; checkout limpio según preflight.
+- GPU: `NVIDIA A100-SXM4-40GB`; CUDA disponible; RAM reportada: 83.47 GiB.
+- Perfil/algoritmo: `reference_v1`, DQN clásico.
+- Progreso final: 1.000.000 global steps, 669 episodios completados, 249.745 updates, Replay final 4.096, epsilon final 0,05 y 100 sincronizaciones Target Network.
+- Tiempo observado al último progreso: 4.700,8 segundos. No se infiere una duración distinta de ese output.
+- Checkpoints: 40 artefactos visibles cada 25.000 steps; FULL en 250k, 500k, 750k y 1M, y LIGHTWEIGHT en los demás intervalos.
+- TensorBoard: `<PERSISTENT_ROOT>/logs/<run_id>/events.out.tfevents...`, verificado `PASS` por el notebook.
+- Manifest: `<PERSISTENT_ROOT>/results/<run_id>/run_manifest.json`, verificado `PASS`.
+- Modelo/checkpoint final: `<PERSISTENT_ROOT>/models/<run_id>/battlezone_dqn_final.pt`, verificado `PASS`.
+- Persistent root: `/content/drive/MyDrive/reinforcement_learning/battlezone`.
+- `RECOVERY_CAPABILITY_IMPLEMENTED_AND_TESTED`.
+- `REAL_MULTI_SESSION_RESUME_NOT_DEMONSTRATED`: el output evidencia una sesión `MODE=new`; no se inventa una segunda sesión real.
 
 ## Implementación
 
@@ -72,7 +88,7 @@ La ejecución `reference_v1` de 1.000.000 global steps queda pendiente para Cola
 - DQN clásico únicamente; sin PER, DDQN, REINFORCE, MLflow ni dependencias de Assault.
 - No se ejecutó tuning HU012, evaluación formal HU013 ni entrenamiento largo local.
 - El notebook solo recibió una sección de orquestación HU011 con MODE, RUN_ID, CHECKPOINT_PATH y PERSISTENT_ROOT explícitos; no se reejecutó ni se añadieron outputs.
-- Pendiente: Colab CUDA real, 1.000.000 steps, resume real entre sesiones, curvas completas, manifest completed, artefacto final y decisión READY_FOR_HU012.
+- Pendiente fuera de HU011: materializar HU011B desde los artefactos reales; evaluación formal HU013 y conclusiones HU014. El resume real entre sesiones no fue demostrado.
 
 ## Operación Colab desde PR #35
 
