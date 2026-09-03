@@ -72,11 +72,11 @@ HU009  Smoke test end-to-end
   ↓
 HU010  Trazabilidad ligera de experimentos
   ↓
-HU011  Entrenamiento completo
+HU011  Entrenamiento completo — [COMPLETED TRAINING]
   ↓
-HU011B Entregables técnicos: modelo, gráficas y videos
+HU011B Entregables técnicos — [IMPLEMENTADA — MATERIALIZACIÓN PENDIENTE]
   ↓
-HU012  Optimización controlada de hiperparámetros
+HU012  Optimización controlada — [BLOCKED BY HU011B DELIVERY GATE]
   ↓
 HU013  Evaluación formal contra baseline
   ↓
@@ -187,4 +187,8 @@ Consolidar notebook, modelo, videos, gráficas, métricas, hardware, configuraci
 - HU003: `[COMPLETADA]`.
 - HU004: `[COMPLETADA — decisión revisada a DQN]`.
 - HU005: requiere alineación de su implementación a `DQN` antes de poder cerrarse.
-- HU011B: `[DEFINIDA — PENDIENTE DE IMPLEMENTACIÓN]`.
+- HU011: `[COMPLETED TRAINING]`; la corrida `battlezone-dqn-20260903-001628-b7c33d5-255e` alcanzó 1.000.000 steps.
+- HU011B: `[IMPLEMENTADA — MATERIALIZACIÓN PENDIENTE]`; requiere ejecutar sus celdas sobre los artefactos reales de Drive y obtener `HU011B_DELIVERY_GATE=PASS`.
+- HU012: `[BLOCKED BY HU011B DELIVERY GATE]`.
+- HU013: `[PENDING]`.
+- HU014: `[PENDING]`.
