@@ -93,13 +93,14 @@ $$Y_t^{\text{DDQN}} = R_{t+1} + \gamma Q\left(S_{t+1}, \arg\max_{a'} Q(S_{t+1}, 
 
 ### 5.1 Comparativa: Política Aleatoria vs. Agente DDQN Entrenado
 
-| Métrica de Desempeño | Baseline Aleatorio (Uniform Random) | Agente DDQN Entrenado (Explotación) | Criterio de Éxito ($\ge 200$) |
+| Métrica de Desempeño | Baseline Aleatorio (Uniform Random) | Agente DDQN Entrenado (Optimizado) | Criterio de Éxito ($\ge 200$) |
 | :--- | :---: | :---: | :---: |
-| **Recompensa Promedio (10 eps)** | **$-197.53$ pts** | **$+255.40$ pts** | **CUMPLIDO (+55.4 pts)** |
-| **Desviación Estándar** | $\pm 50.31$ | $\pm 18.65$ | Alta consistencia |
-| **Puntaje Mínimo** | $-312.65$ | $+228.10$ | Cero colisiones |
-| **Puntaje Máximo** | $-120.40$ | $+284.50$ | Aterrizaje óptimo |
-| **Tasa de Aterrizaje Exitoso** | $0\%$ ($0/10$) | $100\%$ ($10/10$) | $100\%$ efectividad |
+| **Recompensa Promedio (10 eps)** | **$-156.34$ pts** | **$+225.95$ pts** | **CUMPLIDO (+25.95 pts)** |
+| **Desviación Estándar** | $\pm 89.86$ pts | $\pm 79.35$ pts | Desempeño controlado |
+| **Puntaje Mínimo** | $-330.26$ pts | $+28.37$ pts | Sin colisiones destructivas |
+| **Puntaje Máximo** | $-64.64$ pts | **$+306.30$ pts** | Aterrizaje perfecto |
+| **Pasos Promedio por Episodio** | N/A | **$363$ pasos** | Descenso eficiente |
+| **Tasa de Aterrizaje Exitoso ($\ge 200$)** | $0\%$ ($0/10$) | **$70\%$ ($7/10$)** | $100\%$ supervivencia |
 
 ### 5.2 Caracterización del Comportamiento Aprendido
 1. **Fase de Orientación Inicial:** Inmediatamente tras el inicio, el agente realiza correcciones angulares finas con propulsores laterales para mantener $\theta \approx 0$ y neutralizar velocidades laterales $v_x \approx 0$.
