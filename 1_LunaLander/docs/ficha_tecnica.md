@@ -95,10 +95,12 @@ $$Y_t^{\text{DDQN}} = R_{t+1} + \gamma Q\left(S_{t+1}, \arg\max_{a'} Q(S_{t+1}, 
 
 | Métrica de Desempeño | Baseline Aleatorio (Uniform Random) | Agente DDQN Entrenado (Optimizado) | Criterio de Éxito ($\ge 200$) |
 | :--- | :---: | :---: | :---: |
-| **Recompensa Promedio (10 eps)** | **$-156.34$ pts** | **$+225.95$ pts** | **CUMPLIDO (+25.95 pts)** |
-| **Desviación Estándar** | $\pm 89.86$ pts | $\pm 79.35$ pts | Desempeño controlado |
-| **Puntaje Mínimo** | $-330.26$ pts | $+28.37$ pts | Sin colisiones destructivas |
-| **Puntaje Máximo** | $-64.64$ pts | **$+306.30$ pts** | Aterrizaje perfecto |
+| Métrica de Desempeño | Baseline Aleatorio (Uniform Random) | Agente DDQN Entrenado (Optimizado) | Criterio de Éxito ($\ge 200$) |
+| :--- | :---: | :---: | :---: |
+| **Recompensa Promedio (10 eps)** | **$-174.50$ pts** | **$+225.95$ pts** | **CUMPLIDO (+25.95 pts)** |
+| **Desviación Estándar** | $\pm 80.94$ pts | $\pm 79.35$ pts | Desempeño controlado |
+| **Puntaje Mínimo** | $-389.68$ pts | $+28.37$ pts | Sin colisiones destructivas |
+| **Puntaje Máximo** | $-101.54$ pts | **$+306.30$ pts** | Aterrizaje perfecto |
 | **Pasos Promedio por Episodio** | N/A | **$363$ pasos** | Descenso eficiente |
 | **Tasa de Aterrizaje Exitoso ($\ge 200$)** | $0\%$ ($0/10$) | **$70\%$ ($7/10$)** | $100\%$ supervivencia |
 
@@ -112,5 +114,5 @@ $$Y_t^{\text{DDQN}} = R_{t+1} + \gamma Q\left(S_{t+1}, \arg\max_{a'} Q(S_{t+1}, 
 ## 6. Conclusiones
 
 1. **Eficacia de DDQN:** La eliminación del sesgo de sobreestimación mediante el desacoplamiento de redes permitió una convergencia monótona y robusta sin episodios de colapso catastrófico cuando el decaimiento de $\epsilon$ se calibra por episodio.
-2. **Eficiencia en Cómputo:** Dado que el espacio de estados es un vector tabular continuo de 8 dimensiones, el entrenamiento en CPU requirió menos de 15 minutos en Colab estándar para superar el umbral de 200 puntos.
+2. **Eficiencia en Cómputo y Persistencia:** El entrenamiento completo de 800 episodios tomó 51.82 minutos en CPU. La selección del mejor modelo durante el entrenamiento (`lunar_ddqn_best.pth`) garantizó alcanzar los **+225.95 pts** de recompensa en la evaluación determinística formal ($\epsilon=0$).
 3. **Generalización:** El agente demostró capacidad de aterrizaje seguro y preciso en 10 episodios con semillas de prueba no vistas durante el entrenamiento, confirmando la generalización de la política sobre variaciones de terreno y condiciones iniciales.
