@@ -266,3 +266,22 @@ def test_required_cuda_runtime_accepts_complete_cuda_build():
         torch_version="2.11.0+cu128", cuda_available=True,
         cuda_version="12.8", gpu_name="Fake GPU", required=True,
     )
+
+
+def test_notebook_contains_hu011b_delivery_and_standalone_contract():
+    notebook = json.loads((PROJECT / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+    combined = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    for marker in (
+        "HU011B — DELIVERY ARTIFACTS", "VERIFICACIÓN AUTÓNOMA DEL MODELO ENTREGADO",
+        "HU011B_DELIVERY_GATE", "battlezone_dqn_model.pt",
+        "battlezone_dqn_training_process.mp4", "battlezone_dqn_post_training.mp4",
+        "load_tensorboard_scalars", "delivery_manifest.json",
+        "EVIDENCIA DEL PROCESO DE ENTRENAMIENTO", "COMPORTAMIENTO APRENDIDO POST-ENTRENAMIENTO",
+    ):
+        assert marker in combined
+    assert "RUN_HU011B_DELIVERY = False" in combined
+    assert "RUN_LONG_TRAINING = False" in combined
+    assert "latest_checkpoint" not in combined.lower()
+    assert "get_latest" not in combined.lower()
+    assert "2_Assault" not in combined
+    assert "mlflow" not in combined.lower()
