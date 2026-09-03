@@ -43,7 +43,7 @@ from src.persistence import (
 from src.trainer import DQNTrainer, TrainingMode, TrainingState
 
 
-REFERENCE_PROFILE = "reference_v1"
+SUPPORTED_LONG_TRAINING_PROFILES = {"reference_v1", "improved_v2"}
 
 
 class CheckpointDecision(str, Enum):
@@ -94,7 +94,7 @@ class HU011Preflight:
 
 
 def resolve_long_training_config(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Resolves `reference_v1` into a detached effective configuration.
+    """Resolves a supported long-training profile into a detached configuration.
 
     Args:
         config: Complete versioned BattleZone configuration.
@@ -108,10 +108,12 @@ def resolve_long_training_config(config: Mapping[str, Any]) -> dict[str, Any]:
     long = config.get("long_training")
     if not isinstance(long, Mapping) or long.get("enabled") is not True:
         raise ValueError("long_training must be configured and enabled.")
-    if long.get("profile") != REFERENCE_PROFILE:
+    if long.get("profile") not in SUPPORTED_LONG_TRAINING_PROFILES:
         raise ValueError(f"Unsupported long-training profile: {long.get('profile')!r}.")
     effective = deepcopy(dict(config))
     effective["dqn"]["batch_size"] = int(long["dqn"]["batch_size"])
+    if "learning_rate" in long["dqn"]:
+        effective["dqn"]["learning_rate"] = float(long["dqn"]["learning_rate"])
     effective["dqn"]["replay_buffer"]["capacity"] = int(
         long["dqn"]["replay_buffer_capacity"]
     )

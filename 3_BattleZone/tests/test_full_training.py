@@ -52,6 +52,10 @@ class ContinuousFakeEnv:
 
 def test_reference_v1_resolution_preserves_smoke():
     base = load_config(CONFIG_PATH)
+    base["long_training"]["profile"] = "reference_v1"
+    base["long_training"]["dqn"]["replay_buffer_capacity"] = 4096
+    base["long_training"]["dqn"].pop("learning_rate")
+    base["long_training"]["training"]["epsilon"]["decay_steps"] = 250000
     original = deepcopy(base)
     effective = resolve_long_training_config(base)
     assert base == original
@@ -60,9 +64,27 @@ def test_reference_v1_resolution_preserves_smoke():
     assert effective["training"]["total_timesteps"] == 1_000_000
     assert effective["dqn"]["batch_size"] == 32
     assert effective["dqn"]["replay_buffer"]["capacity"] == 4096
+    assert effective["dqn"]["learning_rate"] == 0.00025
     assert effective["training"]["epsilon"] == {
         "start": 1.0, "end": 0.05, "decay_steps": 250000,
     }
+
+
+def test_improved_v2_resolution_applies_only_controlled_overrides():
+    base = load_config(CONFIG_PATH)
+    effective = resolve_long_training_config(base)
+
+    assert effective["long_training"]["profile"] == "improved_v2"
+    assert effective["training"]["total_timesteps"] == 1_000_000
+    assert effective["dqn"]["batch_size"] == 32
+    assert effective["dqn"]["replay_buffer"]["capacity"] == 16_384
+    assert effective["dqn"]["replay_buffer"]["sampling"] == "uniform"
+    assert effective["dqn"]["learning_rate"] == 0.0001
+    assert effective["training"]["epsilon"] == {
+        "start": 1.0, "end": 0.05, "decay_steps": 750_000,
+    }
+    assert effective["training"]["train_frequency"] == 4
+    assert effective["training"]["target_sync_interval"] == 10_000
 
 
 def test_memory_estimate_matches_concrete_replay_layout():
