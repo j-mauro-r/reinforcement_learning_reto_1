@@ -9,7 +9,10 @@ import pytest
 import torch
 
 from src.agent import DQNAgent
-from src.delivery import build_delivery_paths, evaluate_delivery_gate, write_delivery_manifest
+from src.delivery import (
+    build_delivery_paths, evaluate_delivery_gate, resolve_latest_full_checkpoint,
+    write_delivery_manifest,
+)
 from src.environment import load_config
 from src.model_artifact import (
     MAX_MODEL_BYTES, compute_sha256, export_inference_model,
@@ -25,6 +28,29 @@ from src.persistence import (
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "3_BattleZone/configs/battlezone_config.yaml"
 RUN_ID = "battlezone-dqn-test-run"
+
+
+def test_latest_full_checkpoint_prefers_highest_intermediate_step(tmp_path):
+    for step in (250_000, 500_000, 750_000, 1_000_000):
+        (tmp_path / f"battlezone_dqn_step_{step:08d}_full.pt").touch()
+    (tmp_path / "battlezone_dqn_step_00900000_lightweight.pt").touch()
+
+    path, step = resolve_latest_full_checkpoint(tmp_path, final_step=1_000_000)
+
+    assert step == 750_000
+    assert path.name == "battlezone_dqn_step_00750000_full.pt"
+
+
+def test_latest_full_checkpoint_falls_back_and_fails_clearly(tmp_path):
+    fallback = tmp_path / "battlezone_dqn_step_00500000_full.pt"
+    fallback.touch()
+    (tmp_path / "battlezone_dqn_step_00750000_lightweight.pt").touch()
+
+    assert resolve_latest_full_checkpoint(tmp_path, 1_000_000) == (fallback, 500_000)
+
+    fallback.unlink()
+    with pytest.raises(RuntimeError, match="No FULL checkpoint"):
+        resolve_latest_full_checkpoint(tmp_path, 1_000_000)
 
 
 @pytest.fixture()

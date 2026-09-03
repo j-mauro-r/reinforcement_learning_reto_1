@@ -201,7 +201,7 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     assert "/content/reinforcement_learning_reto_1" in sources[bootstrap_index]
     assert "REQUESTED_REF" in sources[bootstrap_index]
     assert "REQUESTED_COMMIT" in sources[bootstrap_index]
-    assert 'REQUESTED_REF = "feature/battlezone-hu011b-delivery-artifacts"' in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "feature/battlezone-hu011d-mejora-dqn"' in sources[bootstrap_index]
     assert 'REQUESTED_REF = "feature/battlezone-colab-execution-bootstrap"' not in sources[bootstrap_index]
     assert "REQUESTED_COMMIT = None" in sources[bootstrap_index]
     assert "b7c33d58f6c896da3bea824537cd810a83932ee0" not in sources[bootstrap_index]
@@ -222,7 +222,7 @@ def test_notebook_hard_gates_cuda_and_arms_real_hu011_training_explicitly():
     combined = "\n".join(sources)
     cuda_index = next(i for i, source in enumerate(sources) if "validate_cuda_runtime(" in source)
     drive_index = next(i for i, source in enumerate(sources) if "drive.mount(" in source)
-    training_index = next(i for i, source in enumerate(sources) if "RUN_LONG_TRAINING = False" in source)
+    training_index = next(i for i, source in enumerate(sources) if "RUN_LONG_TRAINING = True" in source)
 
     assert cuda_index <= drive_index < training_index
     assert "torch.cuda.is_available()" in sources[cuda_index]
@@ -292,9 +292,18 @@ def test_notebook_contains_hu011b_delivery_and_standalone_contract():
         'print("MODEL_SOURCE:", MODEL_SOURCE)',
     ):
         assert marker in combined
-    assert "RUN_HU011B_DELIVERY = False" in combined
-    assert "RUN_LONG_TRAINING = False" in combined
-    assert "latest_checkpoint" not in combined.lower()
-    assert "get_latest" not in combined.lower()
+    assert "RUN_HU011B_DELIVERY" not in combined
+    assert "RUN_LONG_TRAINING = True" in combined
+    assert 'HU011B_RUN_ID = result["run_id"]' in combined
+    assert 'TRAINING_GIT_SHA = bootstrap.resolved_sha' in combined
+    assert "resolve_latest_full_checkpoint" in combined
+    assert 'result["paths"]["final_model"]' in combined
+    assert 'result["paths"]["checkpoints"]' in combined
+    assert 'result["paths"]["logs"]' in combined
+    assert "LinearEpsilonSchedule" in combined
+    assert '**delivery_config["training"]["epsilon"]' in combined
+    assert "battlezone-dqn-20260903-001628-b7c33d5-255e" not in combined
+    assert "b7c33d58f6c896da3bea824537cd810a83932ee0" not in combined
+    assert "INTERMEDIATE_STEP / 250_000" not in combined
     assert "2_Assault" not in combined
     assert "mlflow" not in combined.lower()

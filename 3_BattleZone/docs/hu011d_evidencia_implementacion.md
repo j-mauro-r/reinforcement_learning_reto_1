@@ -32,12 +32,9 @@ target_sync_interval: 10000
 - Tests focales de `test_full_training.py`: `20 passed`.
 - Smoke y regresiones relevantes de training, agent, trainer, checkpoints,
   TensorBoard, evaluación y modelo: `99 passed, 1 skipped`.
-- Suite BattleZone: `161 passed, 1 skipped, 3 failed`.
-
-Los tres fallos de la suite completa corresponden a expectativas anteriores
-del notebook sobre `REQUESTED_REF` y los flags ejecutados de HU011/HU011B. No
-corresponden al perfil `improved_v2`; las regresiones relacionadas con HU011D
-y el smoke existente pasan.
+- Automatización focal HU011/HU011B/HU011D, delivery, modelo, video y smoke:
+  `65 passed, 1 skipped`.
+- Suite BattleZone: `166 passed, 1 skipped`.
 
 ## Smoke test
 
@@ -70,3 +67,16 @@ No se modificó ni forzó el memory gate.
 ## Estado
 
 **IMPLEMENTADA — LISTA PARA ENTRENAMIENTO REAL**
+
+## Automatización HU011B
+
+- HU011B consume directamente el `result` producido por HU011 en la misma
+  ejecución y reutiliza el SHA efectivo del bootstrap.
+- El último checkpoint FULL con `0 < checkpoint_step < final_step` se resuelve
+  automáticamente; si no existe, el flujo falla con un mensaje explícito.
+- El epsilon del video intermedio usa `LinearEpsilonSchedule` y la configuración
+  efectiva de entrenamiento, incluido `decay_steps=750000` para `improved_v2`.
+- El notebook no contiene run ID, SHA, step intermedio ni rutas históricas que
+  el profesor deba editar. El flujo está preparado para ejecutarse con Run all.
+- Validación focal de HU011/HU011B/HU011D, delivery, modelo, video y smoke:
+  `65 passed, 1 skipped`.
