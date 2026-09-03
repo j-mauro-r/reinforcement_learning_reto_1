@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 from tempfile import NamedTemporaryFile
 from typing import Any, Mapping, Optional
 
@@ -212,6 +213,56 @@ def resolve_delivery_model_path(
     raise FileNotFoundError(f"Delivery model not found. Searched: {local}; {fallback}")
 
 
+def materialize_model_copies(
+    *, delivery_model_path: str | Path, persistent_model_path: str | Path,
+    local_project_model_path: str | Path, expected_sha256: str,
+    overwrite: bool = False,
+) -> dict[str, Path]:
+    """Copies model and sidecars atomically to persistent and local-first paths.
+
+    Every destination is checksum-verified after replacement. Existing models
+    with another checksum require explicit ``overwrite=True``.
+    """
+    source = Path(delivery_model_path)
+    if compute_sha256(source) != expected_sha256:
+        raise ValueError("Delivery model checksum does not match expected_sha256.")
+    source_files = {
+        "model": source,
+        "checksum": source.with_suffix(".pt.sha256"),
+        "metadata": source.with_name(f"{source.stem}.metadata.json"),
+    }
+    missing = [str(path) for path in source_files.values() if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"Delivery model sidecars missing: {missing}")
+
+    results: dict[str, Path] = {"delivery_model": source}
+    for location, model_path in (
+        ("persistent", Path(persistent_model_path)),
+        ("local_project", Path(local_project_model_path)),
+    ):
+        destinations = {
+            "model": model_path,
+            "checksum": model_path.with_suffix(".pt.sha256"),
+            "metadata": model_path.with_name(f"{model_path.stem}.metadata.json"),
+        }
+        if destinations["model"].exists():
+            current_sha = compute_sha256(destinations["model"])
+            if current_sha != expected_sha256 and not overwrite:
+                raise FileExistsError(
+                    f"Existing {location} model checksum differs; explicit overwrite required."
+                )
+        for kind, source_path in source_files.items():
+            _copy_file_atomic(source_path, destinations[kind])
+        if compute_sha256(destinations["model"]) != expected_sha256:
+            raise RuntimeError(f"{location} model checksum verification failed after copy.")
+        source_metadata = json.loads(source_files["metadata"].read_text(encoding="utf-8"))
+        copied_metadata = json.loads(destinations["metadata"].read_text(encoding="utf-8"))
+        if source_metadata != copied_metadata:
+            raise RuntimeError(f"{location} model metadata differs after copy.")
+        results[f"{location}_model"] = destinations["model"]
+    return results
+
+
 def validate_model_artifact(
     path: str | Path, *, expected_sha256: str, expected_run_id: str,
     config: Mapping[str, Any], max_size_bytes: int = MAX_MODEL_BYTES,
@@ -331,3 +382,16 @@ def _write_text_atomic(path: Path, content: str) -> None:
 
 def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
     _write_text_atomic(path, json.dumps(dict(payload), indent=2, sort_keys=True))
+
+
+def _copy_file_atomic(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    try:
+        with source.open("rb") as incoming, temporary.open("wb") as outgoing:
+            shutil.copyfileobj(incoming, outgoing)
+            outgoing.flush()
+            os.fsync(outgoing.fileno())
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)

@@ -13,6 +13,7 @@ from src.model_artifact import compute_sha256
 
 MANDATORY_KEYS = (
     "model", "model_checksum", "model_metadata", "round_trip_load",
+    "persistent_delivery_model", "local_delivery_model", "model_sha_consistency",
     "greedy_action", "standalone_episode", "training_reward_figure",
     "training_loss_figure", "training_q_epsilon_figure", "training_video",
     "training_video_metadata", "post_training_video",
@@ -42,17 +43,27 @@ def write_delivery_manifest(
     *, path: str | Path, project_run_id: str, training_git_sha: str,
     delivery_git_sha: str, source_final_checkpoint: str | Path,
     source_intermediate_checkpoint: str | Path, tensorboard_logs: str | Path,
-    model_path: str | Path, figures: Mapping[str, str | Path],
+    delivery_model_path: str | Path, persistent_model_path: str | Path,
+    local_project_model_path: str | Path, figures: Mapping[str, str | Path],
     videos: Mapping[str, str | Path], environment: str = "ALE/BattleZone-v5",
     algorithm: str = "DQN",
 ) -> Path:
     """Writes a distinct delivery manifest atomically with source lineage."""
-    model = Path(model_path)
+    delivery_model = Path(delivery_model_path)
+    persistent_model = Path(persistent_model_path)
+    local_model = Path(local_project_model_path)
+    hashes = {compute_sha256(path) for path in (delivery_model, persistent_model, local_model)}
+    if len(hashes) != 1:
+        raise ValueError("Delivery, persistent, and local project model SHA256 values differ.")
+    model_sha256 = hashes.pop()
     payload = {
         "schema_version": 1, "run_id": project_run_id,
         "training_git_sha": training_git_sha, "delivery_git_sha": delivery_git_sha,
         "environment": environment, "algorithm": algorithm,
-        "model_path": str(model), "model_sha256": compute_sha256(model),
+        "delivery_model_path": str(delivery_model),
+        "persistent_model_path": str(persistent_model),
+        "local_project_model_path": str(local_model),
+        "model_sha256": model_sha256,
         "source_final_checkpoint": str(source_final_checkpoint),
         "source_intermediate_checkpoint": str(source_intermediate_checkpoint),
         "tensorboard_logs": str(tensorboard_logs),
