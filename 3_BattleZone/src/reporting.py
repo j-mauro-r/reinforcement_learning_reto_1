@@ -128,9 +128,9 @@ def plot_exploitation_rewards(
     """Plots structured episode/seed/reward/steps records, ready for HU013 data."""
     if not records:
         raise ValueError("At least one exploitation record is required.")
-    required = {"episode", "seed", "reward", "steps"}
+    required = {"episode", "reward"}
     if any(required - set(record) for record in records):
-        raise ValueError("Each exploitation record requires episode, seed, reward, and steps.")
+        raise ValueError("Each exploitation record requires episode and reward.")
     rewards = np.asarray([float(record["reward"]) for record in records], dtype=np.float64)
     if not np.isfinite(rewards).all():
         raise ValueError("Exploitation rewards contain NaN or Inf.")

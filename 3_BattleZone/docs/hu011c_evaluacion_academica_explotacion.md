@@ -55,12 +55,16 @@ HU011C debe:
 - cargar `battlezone_dqn_model.pt` sin reentrenar;
 - ejecutar un mínimo de 10 episodios independientes de evaluación;
 - ejecutar el agente en explotación, sin exploración aleatoria (`epsilon=0.0`);
-- registrar al menos `episode`, `seed`, `reward` y `steps` por episodio;
+- registrar `episode` y `reward` por episodio;
 - calcular el promedio de recompensa de los episodios evaluados;
 - generar una gráfica simple de recompensa por episodio de explotación;
 - mostrar los resultados dentro de `pipeline_battlezone.ipynb`;
 - dejar una sección Markdown claramente identificada para que el estudiante escriba el análisis del comportamiento aprendido;
 - dejar una sección Markdown claramente identificada para que el estudiante escriba las conclusiones finales.
+
+`seed` y `steps` son datos opcionales. No deben requerir lógica, persistencia ni
+validaciones adicionales. Los resultados pueden permanecer en el notebook; esta
+HU no crea un sistema nuevo de persistencia.
 
 ---
 
@@ -96,7 +100,7 @@ crear entorno BattleZone en modo evaluación
         ↓
 ejecutar >= 10 episodios con epsilon=0.0
         ↓
-registrar reward y steps por episodio
+registrar reward por episodio
         ↓
 calcular reward promedio
         ↓
@@ -135,15 +139,9 @@ La finalidad es observar el comportamiento aprendido por el modelo, no su polít
 
 ### 7.3 Independencia de episodios
 
-Cada episodio debe comenzar con un `reset()` nuevo y usar una seed explícita distinta.
-
-No se requiere construir un framework adicional de gestión de seeds. Una lista simple y visible en el notebook es suficiente.
-
-Ejemplo:
-
-```python
-EVALUATION_SEEDS = [20262001 + i for i in range(EVALUATION_EPISODES)]
-```
+Cada episodio debe comenzar con un `reset()` nuevo. Una seed puede conservarse
+como dato opcional si el entorno ya la ofrece de forma trivial, pero no es un
+requisito académico ni un criterio de cierre.
 
 ### 7.4 Datos mínimos por episodio
 
@@ -152,9 +150,11 @@ Registrar únicamente lo necesario:
 | Campo | Obligatorio | Uso |
 |---|---:|---|
 | `episode` | Sí | Identificar la partida |
-| `seed` | Sí | Trazabilidad básica |
 | `reward` | Sí | Métrica académica |
-| `steps` | Sí | Contexto de duración |
+| `seed` | No | Dato opcional si ya está disponible sin lógica extra |
+| `steps` | No | Dato opcional si ya está disponible sin lógica extra |
+
+No se deben crear lógica, persistencia o tests obligatorios para `seed` o `steps`.
 
 No agregar métricas adicionales salvo que ya existan y puedan reutilizarse sin aumentar complejidad.
 
@@ -265,7 +265,7 @@ Antes de crear código nuevo, revisar si la evaluación puede implementarse reut
 Si la lógica no existe, implementar una función pequeña y con una sola responsabilidad, por ejemplo:
 
 ```python
-def evaluate_agent(agent, env_factory, seeds):
+def evaluate_agent(agent, env_factory, episodes=10):
     ...
 ```
 
@@ -288,7 +288,7 @@ HU011C — Evaluación académica de explotación
 Orden mínimo de celdas:
 
 1. cargar el modelo entrenado;
-2. definir `EVALUATION_EPISODES >= 10` y seeds;
+2. definir `EVALUATION_EPISODES = 10`;
 3. ejecutar evaluación;
 4. mostrar tabla de resultados;
 5. mostrar promedio de recompensa;
@@ -316,9 +316,7 @@ El notebook muestra por cada episodio al menos:
 
 ```text
 episode
-seed
 reward
-steps
 ```
 
 ### CA04 — Promedio
@@ -359,7 +357,7 @@ La implementación no modifica el entrenamiento DQN ni rompe la carga/inferencia
 
 HU011C puede marcarse **IMPLEMENTADA** cuando:
 
-- [ ] existen al menos 10 episodios de evaluación reales;
+- [ ] existen exactamente 10 episodios de evaluación reales con la configuración por defecto;
 - [ ] todos fueron ejecutados en explotación con el modelo entrenado;
 - [ ] existe tabla con reward por episodio;
 - [ ] existe puntaje promedio calculado sobre esos episodios;
