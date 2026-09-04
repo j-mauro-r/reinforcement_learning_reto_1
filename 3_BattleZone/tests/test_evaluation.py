@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -67,7 +68,7 @@ def test_notebook_contains_the_minimum_hu011c_academic_evidence_flow():
     combined = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
 
     for marker in (
-        "HU011C — Evaluación académica de explotación",
+        "Evaluación de la política",
         "EVALUATION_EPISODES = 10",
         "evaluate_agent(",
         'print(\"AVERAGE_REWARD:\", average_reward)',
@@ -76,3 +77,26 @@ def test_notebook_contains_the_minimum_hu011c_academic_evidence_flow():
         "Conclusiones — completar por el estudiante",
     ):
         assert marker in combined
+
+
+def test_every_code_cell_has_brief_markdown_without_story_identifiers():
+    project = Path(__file__).resolve().parents[1]
+    notebook = json.loads((project / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+
+    for index, cell in enumerate(notebook["cells"]):
+        if cell.get("cell_type") != "code":
+            continue
+        assert index > 0
+        previous = notebook["cells"][index - 1]
+        assert previous.get("cell_type") == "markdown"
+        text = "".join(previous.get("source", []))
+        assert len(re.findall(r"\b\w+\b", text)) <= 100
+
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    )
+    assert not re.search(r"\bHU\s*\d|HU\d", markdown, re.IGNORECASE)
+    assert "historia de usuario" not in markdown.lower()
+    assert "descripción del código" not in markdown.lower()
