@@ -15,3 +15,5 @@ mlruns/
 3_BattleZone/logs/
 3_BattleZone/checkpoints/
 3_BattleZone/results/
+3_BattleZone/docs/
+3_BattleZone/tests/
