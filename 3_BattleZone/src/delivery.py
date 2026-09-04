@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 from typing import Any, Mapping
 
 from src.model_artifact import compute_sha256
@@ -19,6 +20,31 @@ MANDATORY_KEYS = (
     "training_video_metadata", "post_training_video",
     "post_training_video_metadata", "delivery_manifest", "run_lineage",
 )
+
+_FULL_CHECKPOINT_PATTERN = re.compile(
+    r"^battlezone_dqn_step_(\d{8})_full\.pt$"
+)
+
+
+def resolve_latest_full_checkpoint(
+    checkpoint_dir: str | Path, final_step: int,
+) -> tuple[Path, int]:
+    """Returns the latest FULL checkpoint strictly before the final step."""
+    directory = Path(checkpoint_dir)
+    candidates: list[tuple[int, Path]] = []
+    if directory.is_dir():
+        for path in directory.glob("battlezone_dqn_step_*_full.pt"):
+            match = _FULL_CHECKPOINT_PATTERN.fullmatch(path.name)
+            if match:
+                step = int(match.group(1))
+                if 0 < step < int(final_step):
+                    candidates.append((step, path))
+    if not candidates:
+        raise RuntimeError(
+            f"No FULL checkpoint found with 0 < step < {int(final_step)} in {directory}."
+        )
+    step, path = max(candidates, key=lambda candidate: candidate[0])
+    return path, step
 
 
 def build_delivery_paths(persistent_root: str | Path, project_run_id: str) -> dict[str, Path]:
