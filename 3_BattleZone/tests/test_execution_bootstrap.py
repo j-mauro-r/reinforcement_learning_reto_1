@@ -5,7 +5,6 @@ from __future__ import annotations
 import builtins
 import json
 from pathlib import Path
-import re
 import subprocess
 import sys
 import types
@@ -202,11 +201,11 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     assert "/content/reinforcement_learning_reto_1" in sources[bootstrap_index]
     assert "REQUESTED_REF" in sources[bootstrap_index]
     assert "REQUESTED_COMMIT" in sources[bootstrap_index]
-    assert 'REQUESTED_REF = "feature/battlezone-hu011d-mejora-dqn"' in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "main"' in sources[bootstrap_index]
     assert 'REQUESTED_REF = "feature/battlezone-colab-execution-bootstrap"' not in sources[bootstrap_index]
-    assert re.search(r'REQUESTED_COMMIT = "[0-9a-f]{40}"', sources[bootstrap_index])
+    assert "REQUESTED_COMMIT = None" in sources[bootstrap_index]
     assert "b7c33d58f6c896da3bea824537cd810a83932ee0" not in sources[bootstrap_index]
-    assert 'REQUESTED_REF = "main"' not in sources[bootstrap_index]
+    assert "feature/" not in sources[bootstrap_index]
     assert sources[bootstrap_index].index("rev-parse") < sources[bootstrap_index].index("import src.execution_bootstrap")
     assert "bootstrap_source" in sources[bootstrap_index]
     assert "Unexpected bootstrap source" in sources[bootstrap_index]
