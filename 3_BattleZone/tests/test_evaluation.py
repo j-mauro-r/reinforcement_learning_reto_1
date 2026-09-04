@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -67,7 +68,7 @@ def test_notebook_contains_the_minimum_hu011c_academic_evidence_flow():
     combined = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
 
     for marker in (
-        "HU011C — Evaluación académica de explotación",
+        "Evaluación de la política",
         "EVALUATION_EPISODES = 10",
         "evaluate_agent(",
         'print(\"AVERAGE_REWARD:\", average_reward)',
@@ -76,3 +77,58 @@ def test_notebook_contains_the_minimum_hu011c_academic_evidence_flow():
         "Conclusiones — completar por el estudiante",
     ):
         assert marker in combined
+
+
+def test_every_code_cell_has_brief_markdown_without_story_identifiers():
+    project = Path(__file__).resolve().parents[1]
+    notebook = json.loads((project / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+
+    for index, cell in enumerate(notebook["cells"]):
+        if cell.get("cell_type") != "code":
+            continue
+        assert index > 0
+        previous = notebook["cells"][index - 1]
+        assert previous.get("cell_type") == "markdown"
+        text = "".join(previous.get("source", []))
+        assert len(re.findall(r"\b\w+\b", text)) <= 100
+
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    )
+    assert not re.search(r"\bHU\s*\d|HU\d", markdown, re.IGNORECASE)
+    assert "historia de usuario" not in markdown.lower()
+    assert "descripción del código" not in markdown.lower()
+
+
+def test_notebook_starts_with_short_professor_execution_options():
+    project = Path(__file__).resolve().parents[1]
+    notebook = json.loads((project / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+    first = notebook["cells"][0]
+    text = "".join(first.get("source", []))
+
+    assert first.get("cell_type") == "markdown"
+    assert "# BattleZone — Ejecución" in text
+    assert "Opción 1 — Entrenar desde cero" in text
+    assert "Run all" in text
+    assert "Opción 2 — Probar el agente entrenado" in text
+    assert "3_BattleZone/battlezone_dqn_model.pt" in text
+    assert "3_BattleZone/requirements.txt" in text
+    assert len(re.findall(r"\b\w+\b", text)) <= 80
+
+
+def test_final_evaluation_uses_root_model_without_drive_or_training_result():
+    project = Path(__file__).resolve().parents[1]
+    notebook = json.loads((project / "pipeline_battlezone.ipynb").read_text(encoding="utf-8"))
+    evaluation_cell = next(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if 'EVALUATION_MODEL_PATH = PROJECT_DIR / "battlezone_dqn_model.pt"'
+        in "".join(cell.get("source", []))
+    )
+
+    assert "PERSISTENT_ROOT" not in evaluation_cell
+    assert "result[" not in evaluation_cell
+    assert "run_training_session" not in evaluation_cell
+    assert "load_inference_model" in evaluation_cell

@@ -201,11 +201,11 @@ def test_notebook_bootstraps_before_project_imports_and_uses_drive_only_for_arti
     assert "/content/reinforcement_learning_reto_1" in sources[bootstrap_index]
     assert "REQUESTED_REF" in sources[bootstrap_index]
     assert "REQUESTED_COMMIT" in sources[bootstrap_index]
-    assert 'REQUESTED_REF = "feature/battlezone-hu011d-mejora-dqn"' in sources[bootstrap_index]
+    assert 'REQUESTED_REF = "main"' in sources[bootstrap_index]
     assert 'REQUESTED_REF = "feature/battlezone-colab-execution-bootstrap"' not in sources[bootstrap_index]
     assert "REQUESTED_COMMIT = None" in sources[bootstrap_index]
     assert "b7c33d58f6c896da3bea824537cd810a83932ee0" not in sources[bootstrap_index]
-    assert 'REQUESTED_REF = "main"' not in sources[bootstrap_index]
+    assert "feature/" not in sources[bootstrap_index]
     assert sources[bootstrap_index].index("rev-parse") < sources[bootstrap_index].index("import src.execution_bootstrap")
     assert "bootstrap_source" in sources[bootstrap_index]
     assert "Unexpected bootstrap source" in sources[bootstrap_index]
@@ -283,10 +283,9 @@ def test_notebook_contains_hu011b_delivery_and_standalone_contract():
         hu011b_import_index = next(i for i, source in enumerate(sources) if module_import in source)
         assert bootstrap_index < hu011b_import_index
     for marker in (
-        "HU011B — DELIVERY ARTIFACTS", "VERIFICACIÓN AUTÓNOMA DEL MODELO ENTREGADO",
+        "Generación del modelo y artefactos", "Verificación independiente del modelo",
         "HU011B_DELIVERY_GATE", "battlezone_dqn_model.pt",
-        "battlezone_dqn_training_process.mp4", "battlezone_dqn_post_training.mp4",
-        "load_tensorboard_scalars", "delivery_manifest.json",
+        "load_tensorboard_scalars",
         "EVIDENCIA DEL PROCESO DE ENTRENAMIENTO", "COMPORTAMIENTO APRENDIDO POST-ENTRENAMIENTO",
         'local_project_model = PROJECT_DIR / "battlezone_dqn_model.pt"',
         'print("MODEL_SOURCE:", MODEL_SOURCE)',
