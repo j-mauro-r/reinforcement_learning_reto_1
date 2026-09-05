@@ -139,6 +139,9 @@ class DQNTrainer:
         self.training_state = TrainingState()
         self.mode = TrainingMode.NEW
         self.replay_restored = False
+        self.updates_completed = 0
+        self.target_syncs_completed = 0
+        self.latest_loss: Optional[float] = None
 
     @classmethod
     def from_config(
@@ -229,6 +232,9 @@ class DQNTrainer:
         terminated_episodes = 0
         truncated_episodes = 0
         last_loss: Optional[float] = None
+        self.updates_completed = 0
+        self.target_syncs_completed = 0
+        self.latest_loss = None
 
         initial_epsilon = self.epsilon_schedule.value(state.global_step)
         last_epsilon = initial_epsilon
@@ -278,6 +284,8 @@ class DQNTrainer:
                     update_result = self.agent.update(batch)
                     last_loss = float(update_result.loss)
                     updates += 1
+                    self.updates_completed = updates
+                    self.latest_loss = last_loss
                     update_steps.append(state.global_step)
                     if self.logger is not None:
                         self.logger.on_update(
@@ -289,6 +297,7 @@ class DQNTrainer:
                 if state.global_step % self.target_sync_interval == 0:
                     self.agent.sync_target_network()
                     target_syncs += 1
+                    self.target_syncs_completed = target_syncs
                     target_sync_steps.append(state.global_step)
 
                 if self.logger is not None:

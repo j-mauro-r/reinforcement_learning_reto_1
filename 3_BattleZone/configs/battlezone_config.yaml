@@ -126,13 +126,14 @@ tracking:
 
 long_training:
   enabled: true
-  profile: "reference_v1"
+  profile: "improved_v2"
   target_global_step: 1000000
   require_accelerator: true
   preferred_device: "cuda"
   dqn:
     batch_size: 32
-    replay_buffer_capacity: 4096
+    replay_buffer_capacity: 16384
+    learning_rate: 0.0001
   training:
     learning_starts: 1024
     train_frequency: 4
@@ -140,7 +141,7 @@ long_training:
     epsilon:
       start: 1.0
       end: 0.05
-      decay_steps: 250000
+      decay_steps: 750000
   checkpointing:
     periodic_mode: "lightweight"
     interval_steps: 25000

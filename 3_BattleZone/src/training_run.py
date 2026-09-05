@@ -43,7 +43,7 @@ from src.persistence import (
 from src.trainer import DQNTrainer, TrainingMode, TrainingState
 
 
-REFERENCE_PROFILE = "reference_v1"
+SUPPORTED_LONG_TRAINING_PROFILES = {"reference_v1", "improved_v2"}
 
 
 class CheckpointDecision(str, Enum):
@@ -94,7 +94,7 @@ class HU011Preflight:
 
 
 def resolve_long_training_config(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Resolves `reference_v1` into a detached effective configuration.
+    """Resolves a supported long-training profile into a detached configuration.
 
     Args:
         config: Complete versioned BattleZone configuration.
@@ -108,10 +108,12 @@ def resolve_long_training_config(config: Mapping[str, Any]) -> dict[str, Any]:
     long = config.get("long_training")
     if not isinstance(long, Mapping) or long.get("enabled") is not True:
         raise ValueError("long_training must be configured and enabled.")
-    if long.get("profile") != REFERENCE_PROFILE:
+    if long.get("profile") not in SUPPORTED_LONG_TRAINING_PROFILES:
         raise ValueError(f"Unsupported long-training profile: {long.get('profile')!r}.")
     effective = deepcopy(dict(config))
     effective["dqn"]["batch_size"] = int(long["dqn"]["batch_size"])
+    if "learning_rate" in long["dqn"]:
+        effective["dqn"]["learning_rate"] = float(long["dqn"]["learning_rate"])
     effective["dqn"]["replay_buffer"]["capacity"] = int(
         long["dqn"]["replay_buffer_capacity"]
     )
@@ -276,6 +278,7 @@ def run_training_session(
     run_id: Optional[str] = None, checkpoint_path: Optional[str | Path] = None,
     target_global_step_override: Optional[int] = None,
     require_accelerator_override: Optional[bool] = None,
+    progress_interval_steps: int = 5000,
 ) -> dict[str, Any]:
     """Runs one explicit NEW/FULL/LIGHTWEIGHT HU011 training session.
 
@@ -285,6 +288,8 @@ def run_training_session(
     """
     if mode not in {item.value for item in TrainingMode}:
         raise ValueError(f"Unsupported mode={mode!r}.")
+    if progress_interval_steps <= 0:
+        raise ValueError("progress_interval_steps must be positive.")
     if mode != TrainingMode.NEW.value and (not run_id or not checkpoint_path):
         raise ValueError("Resume requires explicit run_id and checkpoint_path.")
     effective = resolve_long_training_config(base_config)
@@ -372,6 +377,18 @@ def run_training_session(
 
         def persist_at_boundary(global_step: int, active_trainer: DQNTrainer) -> None:
             nonlocal output_checkpoint
+            if global_step % progress_interval_steps == 0:
+                elapsed = time.monotonic() - started_at
+                percentage = 100.0 * global_step / logical_target
+                epsilon = active_trainer.epsilon_schedule.value(global_step)
+                print(
+                    "TRAINING_PROGRESS "
+                    f"global_step={global_step} target={logical_target} percentage={percentage:.2f} "
+                    f"episodes={active_trainer.training_state.episode_index} epsilon={epsilon:.6f} "
+                    f"replay_size={len(agent.replay_buffer)} updates={active_trainer.updates_completed} "
+                    f"target_syncs={active_trainer.target_syncs_completed} "
+                    f"latest_loss={active_trainer.latest_loss} elapsed_seconds={elapsed:.1f}"
+                )
             decision = checkpoint_decision(
                 global_step, base_config,
                 full_checkpoint_ready=preflight.memory.full_checkpoint_ready,
@@ -387,6 +404,12 @@ def run_training_session(
                     seed=int(effective["environment"]["seed"]),
                 )
                 checkpoint_paths.append(output_checkpoint)
+                if not output_checkpoint.exists():
+                    raise RuntimeError(f"Checkpoint was not persisted: {output_checkpoint}")
+                print(
+                    "CHECKPOINT_SAVED "
+                    f"path={output_checkpoint} mode={decision.value.upper()} global_step={global_step}"
+                )
 
         summary = trainer.train(
             total_timesteps=session_target, initial_state=initial_state,
@@ -426,6 +449,12 @@ def run_training_session(
             manifest["artifacts"]["model_path"] = str(paths["final_model"])
             from src.experiment import write_run_manifest
             write_run_manifest(manifest_path, manifest)
+        print(
+            "TRAINING_ACTIVE=True "
+            f"GLOBAL_STEP={summary.total_steps} UPDATES={summary.updates} "
+            f"REPLAY_SIZE={summary.replay_size} EPSILON={summary.final_epsilon:.6f} "
+            f"TARGET_SYNCS={summary.target_syncs} LATEST_LOSS={summary.last_loss}"
+        )
         return {
             "run_id": resolved_run_id, "manifest": manifest,
             "preflight": preflight, "paths": paths, "summary": summary,
